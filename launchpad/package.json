@@ -1,0 +1,35 @@
+{
+  "name": "betterbase-launchpad",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --port 5380",
+    "build": "tsc -b && vite build",
+    "format": "prettier --write .",
+    "check": "prettier --write . && tsc -b && vite build"
+  },
+  "dependencies": {
+    "@betterbase/examples-shared": "link:../shared",
+    "@betterbase/sdk": "link:../../betterbase/js",
+    "@mantine/core": "^7.17.0",
+    "@mantine/hooks": "^7.17.0",
+    "lucide-react": "^0.469.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-wasm": "^3.5.0",
+    "vite-plugin-top-level-await": "^1.6.0"
+  }
+}

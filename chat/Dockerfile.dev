@@ -1,0 +1,18 @@
+FROM node:22-alpine
+RUN corepack enable
+WORKDIR /workspace
+
+COPY less-platform-js/ ./less-platform-js/
+COPY less-db-js/ ./less-db-js/
+RUN cd less-db-js && pnpm install --frozen-lockfile && pnpm build
+RUN cd less-platform-js && pnpm install --frozen-lockfile && pnpm build
+
+COPY examples/shared/ ./examples/shared/
+RUN cd examples/shared && pnpm install --frozen-lockfile && pnpm build
+
+COPY examples/chat/ ./examples/chat/
+RUN cd examples/chat && pnpm install --frozen-lockfile
+
+WORKDIR /workspace/examples/chat
+EXPOSE 5385
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]

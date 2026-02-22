@@ -1,0 +1,27 @@
+FROM node:22-alpine
+
+RUN corepack enable
+
+WORKDIR /workspace
+
+# Copy the linked package sources (link: protocol resolves via symlinks)
+COPY less-platform-js/ ./less-platform-js/
+COPY less-db-js/ ./less-db-js/
+
+# Build linked packages
+RUN cd less-db-js && pnpm install --frozen-lockfile && pnpm build
+RUN cd less-platform-js && pnpm install --frozen-lockfile && pnpm build
+
+# Build the shared example package (tasks depends on it)
+COPY examples/shared/ ./examples/shared/
+RUN cd examples/shared && pnpm install --frozen-lockfile && pnpm build
+
+# Copy the tasks app and install its deps
+COPY examples/tasks/ ./examples/tasks/
+RUN cd examples/tasks && pnpm install --frozen-lockfile
+
+WORKDIR /workspace/examples/tasks
+
+EXPOSE 5381
+
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
