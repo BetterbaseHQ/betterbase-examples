@@ -1,7 +1,10 @@
 {
   "name": "@betterbase/examples-shared",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "private": true,
+  "description": "Shared utilities for Betterbase example apps",
+  "license": "Apache-2.0",
+  "author": "Betterbase <hello@betterbase.dev>",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

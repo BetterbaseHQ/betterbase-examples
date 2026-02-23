@@ -2,15 +2,18 @@ FROM node:22-alpine
 RUN corepack enable
 WORKDIR /workspace
 
-COPY less-platform-js/ ./less-platform-js/
-COPY less-db-js/ ./less-db-js/
-RUN cd less-db-js && pnpm install --frozen-lockfile && pnpm build
-RUN cd less-platform-js && pnpm install --frozen-lockfile && pnpm build
+# Copy the SDK (TypeScript source + pre-built WASM bindings)
+COPY betterbase/js/ ./betterbase/js/
+COPY betterbase/crates/betterbase-wasm/pkg/ ./betterbase/crates/betterbase-wasm/pkg/
+COPY betterbase/crates/betterbase-db-wasm/pkg/ ./betterbase/crates/betterbase-db-wasm/pkg/
 
-COPY examples/shared/ ./examples/shared/
+# Install SDK dependencies (no build needed — Vite resolves TS source directly)
+RUN cd betterbase/js && pnpm install --frozen-lockfile
+
+COPY betterbase-examples/shared/ ./examples/shared/
 RUN cd examples/shared && pnpm install --frozen-lockfile && pnpm build
 
-COPY examples/board/ ./examples/board/
+COPY betterbase-examples/board/ ./examples/board/
 RUN cd examples/board && pnpm install --frozen-lockfile
 
 WORKDIR /workspace/examples/board

@@ -2,6 +2,9 @@
   "name": "betterbase-passwords",
   "private": true,
   "version": "0.0.0",
+  "description": "Betterbase example: encrypted password vault",
+  "license": "Apache-2.0",
+  "author": "Betterbase <hello@betterbase.dev>",
   "type": "module",
   "engines": {
     "node": ">=22"

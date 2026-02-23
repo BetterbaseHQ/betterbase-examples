@@ -2,6 +2,9 @@
   "name": "betterbase-board",
   "private": true,
   "version": "0.0.0",
+  "description": "Betterbase example: collaborative board with encrypted sync",
+  "license": "Apache-2.0",
+  "author": "Betterbase <hello@betterbase.dev>",
   "type": "module",
   "engines": {
     "node": ">=22"

@@ -4,20 +4,20 @@ RUN corepack enable
 
 WORKDIR /workspace
 
-# Copy the linked package sources (link: protocol resolves via symlinks)
-COPY less-platform-js/ ./less-platform-js/
-COPY less-db-js/ ./less-db-js/
+# Copy the SDK (TypeScript source + pre-built WASM bindings)
+COPY betterbase/js/ ./betterbase/js/
+COPY betterbase/crates/betterbase-wasm/pkg/ ./betterbase/crates/betterbase-wasm/pkg/
+COPY betterbase/crates/betterbase-db-wasm/pkg/ ./betterbase/crates/betterbase-db-wasm/pkg/
 
-# Build linked packages
-RUN cd less-db-js && pnpm install --frozen-lockfile && pnpm build
-RUN cd less-platform-js && pnpm install --frozen-lockfile && pnpm build
+# Install SDK dependencies (no build needed — Vite resolves TS source directly)
+RUN cd betterbase/js && pnpm install --frozen-lockfile
 
 # Build the shared example package (passwords depends on it)
-COPY examples/shared/ ./examples/shared/
+COPY betterbase-examples/shared/ ./examples/shared/
 RUN cd examples/shared && pnpm install --frozen-lockfile && pnpm build
 
 # Copy the passwords app and install its deps
-COPY examples/passwords/ ./examples/passwords/
+COPY betterbase-examples/passwords/ ./examples/passwords/
 RUN cd examples/passwords && pnpm install --frozen-lockfile
 
 WORKDIR /workspace/examples/passwords

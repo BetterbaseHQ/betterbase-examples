@@ -2,6 +2,9 @@
   "name": "betterbase-notes",
   "private": true,
   "version": "0.0.0",
+  "description": "Betterbase example: rich text notes with CRDT merging",
+  "license": "Apache-2.0",
+  "author": "Betterbase <hello@betterbase.dev>",
   "type": "module",
   "engines": {
     "node": ">=22"
