@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
-import { OAuthClient } from "@betterbase/sdk/auth";
-import { useAuth as useAuthBase } from "@betterbase/sdk/auth/react";
+import { OAuthClient } from "betterbase/auth";
+import { useAuth as useAuthBase } from "betterbase/auth/react";
 
 const CLIENT_ID_KEY = "oauth_client_id";
 
@@ -15,10 +15,10 @@ export interface AuthProviderProps {
 }
 
 export interface AuthContextValue {
-  session: import("@betterbase/sdk/auth").AuthSession | null;
+  session: import("betterbase/auth").AuthSession | null;
   getToken: () => Promise<string | null>;
-  encryptionKey: Uint8Array | null;
-  epochKey: Uint8Array | null;
+  encryptionKey: CryptoKey | null;
+  epochKey: CryptoKey | null;
   personalSpaceId: string | null;
   keypair: { privateKeyJwk: JsonWebKey; publicKeyJwk: JsonWebKey } | null;
   handle: string | null;

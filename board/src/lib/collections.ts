@@ -1,4 +1,4 @@
-import { collection, t } from "@betterbase/sdk/db";
+import { collection, t } from "betterbase/db";
 
 export const boards = collection("boards")
   .v(1, {

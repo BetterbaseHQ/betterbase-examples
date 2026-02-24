@@ -1,6 +1,6 @@
 # Betterbase Examples
 
-Everything here works offline, syncs in real time, and encrypts data before it leaves the browser. These apps are built with the [@betterbase/sdk](https://github.com/BetterbaseHQ/betterbase) to show what local-first, end-to-end encrypted development looks like in practice.
+Everything here works offline, syncs in real time, and encrypts data before it leaves the browser. These apps are built with [betterbase](https://github.com/BetterbaseHQ/betterbase) to show what local-first, end-to-end encrypted development looks like in practice.
 
 > **Start here:** The [tasks](./tasks) app is the simplest full example — auth, sync, and CRDT merge in under 200 lines of application code. Read it first, then explore the others.
 
@@ -44,7 +44,7 @@ All apps share common UI components via the [`shared`](./shared) package (`@bett
 Define a collection with a typed schema:
 
 ```ts
-import { collection, t } from "@betterbase/sdk/db";
+import { collection, t } from "betterbase/db";
 
 export const lists = collection("lists")
   .v(1, {
@@ -64,7 +64,7 @@ export const lists = collection("lists")
 Query it reactively in a component:
 
 ```ts
-import { useQuery } from "@betterbase/sdk/db/react";
+import { useQuery } from "betterbase/db/react";
 
 const result = useQuery(lists, { sort: [{ field: "createdAt", direction: "asc" }] });
 ```
@@ -75,7 +75,7 @@ The SDK handles offline storage, encryption, sync, and conflict resolution. Your
 
 - **React 19** + **TypeScript** + **Vite**
 - **Mantine UI 7** for components and layout
-- **@betterbase/sdk** for auth, crypto, sync, and local-first storage
+- **betterbase** for auth, crypto, sync, and local-first storage
 - **pnpm** for package management
 
 ## License

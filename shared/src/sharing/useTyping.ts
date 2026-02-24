@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useEvent, useSendEvent } from "@betterbase/sdk/sync/react";
+import { useEvent, useSendEvent } from "betterbase/sync/react";
 
 const SEND_INTERVAL = 2000; // suppress duplicate sends within 2s
 const RECEIVE_TIMEOUT = 3000; // expire peer after 3s of silence

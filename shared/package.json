@@ -18,8 +18,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --external react --external @mantine/core --external @mantine/hooks --external @betterbase/sdk --external lucide-react",
-    "dev": "tsup src/index.ts --format esm --dts --external react --external @mantine/core --external @mantine/hooks --external @betterbase/sdk --external lucide-react --watch",
+    "build": "tsup src/index.ts --format esm --dts --external react --external @mantine/core --external @mantine/hooks --external betterbase --external lucide-react",
+    "dev": "tsup src/index.ts --format esm --dts --external react --external @mantine/core --external @mantine/hooks --external betterbase --external lucide-react --watch",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "check": "prettier --write . && pnpm build && pnpm typecheck"
@@ -30,7 +30,7 @@
     "@mantine/hooks": "^7.17.0"
   },
   "dependencies": {
-    "@betterbase/sdk": "link:../../betterbase/js",
+    "betterbase": "link:../../betterbase/js",
     "lucide-react": "^0.469.0"
   },
   "devDependencies": {

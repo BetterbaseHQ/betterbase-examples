@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { Image } from "lucide-react";
 import {
-  LessProvider,
+  BetterbaseProvider,
   FileStoreProvider,
-  useLessSync,
+  useSync,
   useSyncReady,
-} from "@betterbase/sdk/sync/react";
-import { FileStore, type SpaceFields } from "@betterbase/sdk/sync";
-import { useQuery, useSyncStatus } from "@betterbase/sdk/db/react";
-import { LessAppShell, useAuth, InvitationBanner, type SyncStatus } from "@betterbase/examples-shared";
+} from "betterbase/sync/react";
+import { FileStore, type SpaceFields } from "betterbase/sync";
+import { useQuery, useSyncStatus } from "betterbase/db/react";
+import {
+  LessAppShell,
+  useAuth,
+  InvitationBanner,
+  type SyncStatus,
+} from "@betterbase/examples-shared";
 import { db, albums, photos } from "@/lib/db";
 import type { Photo } from "@/lib/db";
 import { useAlbums } from "@/lib/sync";
@@ -163,7 +168,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
 }
 
 // ---------------------------------------------------------------------------
-// PhotosApp — synced + sharing (authenticated path, inside LessProvider)
+// PhotosApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
 function PhotosApp({
@@ -174,7 +179,7 @@ function PhotosApp({
   fileStore: FileStore;
 }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { syncing, error: syncError } = useLessSync();
+  const { syncing, error: syncError } = useSync();
   const [view, setView] = useState<View>({ kind: "all" });
 
   const {
@@ -340,7 +345,7 @@ function SyncGuard({
 }
 
 // ---------------------------------------------------------------------------
-// App — wraps PhotosApp in LessProvider when authenticated
+// App — wraps PhotosApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
 export default function App() {
@@ -349,7 +354,7 @@ export default function App() {
 
   if (isAuthenticated && session) {
     return (
-      <LessProvider
+      <BetterbaseProvider
         adapter={db}
         collections={[albums, photos]}
         session={session}
@@ -359,7 +364,7 @@ export default function App() {
         fileStore={fileStore}
       >
         <SyncGuard personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
-      </LessProvider>
+      </BetterbaseProvider>
     );
   }
 

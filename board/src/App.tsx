@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Kanban } from "lucide-react";
-import { LessProvider, useLessSync, useSyncReady } from "@betterbase/sdk/sync/react";
-import { useQuery, useSyncStatus } from "@betterbase/sdk/db/react";
+import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { useQuery, useSyncStatus } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
@@ -14,7 +14,7 @@ import type { Board } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
-import type { SpaceFields } from "@betterbase/sdk/sync";
+import type { SpaceFields } from "betterbase/sync";
 
 // ---------------------------------------------------------------------------
 // LocalBoardApp — offline-first, no sharing (unauthenticated path)
@@ -131,12 +131,12 @@ function LocalBoardApp() {
 }
 
 // ---------------------------------------------------------------------------
-// BoardApp — synced + sharing (authenticated path, inside LessProvider)
+// BoardApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
 function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, syncing, error: syncError } = useLessSync();
+  const { phase, syncing, error: syncError } = useSync();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -285,14 +285,14 @@ function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// App — wraps BoardApp in LessProvider when authenticated
+// App — wraps BoardApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
   if (isAuthenticated && session) {
     return (
-      <LessProvider
+      <BetterbaseProvider
         adapter={db}
         collections={[boards, cards]}
         session={session}
@@ -301,7 +301,7 @@ export default function App() {
         onAuthError={logout}
       >
         <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
-      </LessProvider>
+      </BetterbaseProvider>
     );
   }
 

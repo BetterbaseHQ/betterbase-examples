@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { KeyRound, Plus } from "lucide-react";
-import { LessProvider, useLessSync, useSyncReady } from "@betterbase/sdk/sync/react";
-import { useQuery, useSyncStatus } from "@betterbase/sdk/db/react";
+import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { useQuery, useSyncStatus } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
@@ -16,7 +16,7 @@ import { CategoriesSidebar, type Category } from "@/components/CategoriesSidebar
 import { EntryList } from "@/components/EntryList";
 import { EntryDetail } from "@/components/EntryDetail";
 import { EntryForm } from "@/components/EntryForm";
-import type { SpaceFields } from "@betterbase/sdk/sync";
+import type { SpaceFields } from "betterbase/sync";
 
 // ---------------------------------------------------------------------------
 // LocalPasswordsApp — offline-first, no sharing (unauthenticated path)
@@ -161,12 +161,12 @@ function LocalPasswordsApp() {
 }
 
 // ---------------------------------------------------------------------------
-// PasswordsApp — synced + sharing (authenticated path, inside LessProvider)
+// PasswordsApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
 function PasswordsApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { syncing, error: syncError } = useLessSync();
+  const { syncing, error: syncError } = useSync();
   const [selectedCategory, setSelectedCategory] = useState<Category>("all");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -340,14 +340,14 @@ function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// App — wraps PasswordsApp in LessProvider when authenticated
+// App — wraps PasswordsApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
   if (isAuthenticated && session) {
     return (
-      <LessProvider
+      <BetterbaseProvider
         adapter={db}
         collections={[entries]}
         session={session}
@@ -356,7 +356,7 @@ export default function App() {
         onAuthError={logout}
       >
         <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
-      </LessProvider>
+      </BetterbaseProvider>
     );
   }
 

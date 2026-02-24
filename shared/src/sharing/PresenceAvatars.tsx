@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { Tooltip, Group, Stack, Text } from "@mantine/core";
-import { usePeers } from "@betterbase/sdk/sync/react";
+import { usePeers } from "betterbase/sync/react";
 import { peerGradient } from "./peerColor.js";
 
 interface PresenceAvatarsProps {

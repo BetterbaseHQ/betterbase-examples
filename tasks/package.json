@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@betterbase/examples-shared": "link:../shared",
-    "@betterbase/sdk": "link:../../betterbase/js",
+    "betterbase": "link:../../betterbase/js",
     "@mantine/core": "^7.17.0",
     "@mantine/hooks": "^7.17.0",
     "lucide-react": "^0.469.0",
@@ -32,7 +32,6 @@
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0"
   }
 }

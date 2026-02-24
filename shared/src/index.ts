@@ -26,4 +26,4 @@ export { TypingIndicator } from "./sharing/TypingIndicator.js";
 export { useTyping } from "./sharing/useTyping.js";
 export { EditHistory } from "./sharing/EditHistory.js";
 export { peerGradient, peerHue } from "./sharing/peerColor.js";
-export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "@betterbase/sdk/sync";
+export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "betterbase/sync";

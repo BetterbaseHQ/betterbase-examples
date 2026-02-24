@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { FileText } from "lucide-react";
-import { LessProvider, useLessSync, useSyncReady } from "@betterbase/sdk/sync/react";
-import { useQuery, useSyncStatus } from "@betterbase/sdk/db/react";
+import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { useQuery, useSyncStatus } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
@@ -15,7 +15,7 @@ import { useNotebooks } from "@/lib/sync";
 import { NotebookSidebar } from "@/components/NotebookSidebar";
 import { NoteList } from "@/components/NoteList";
 import { NoteEditor } from "@/components/NoteEditor";
-import type { SpaceFields } from "@betterbase/sdk/sync";
+import type { SpaceFields } from "betterbase/sync";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -215,12 +215,12 @@ function LocalNotesApp() {
 }
 
 // ---------------------------------------------------------------------------
-// NotesApp — synced + sharing (authenticated path, inside LessProvider)
+// NotesApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
 function NotesApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, syncing, error: syncError } = useLessSync();
+  const { phase, syncing, error: syncError } = useSync();
   const [view, setView] = useState<View>({ kind: "all" });
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -423,14 +423,14 @@ function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// App — wraps NotesApp in LessProvider when authenticated
+// App — wraps NotesApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
   if (isAuthenticated && session) {
     return (
-      <LessProvider
+      <BetterbaseProvider
         adapter={db}
         collections={[notebooks, notes]}
         session={session}
@@ -439,7 +439,7 @@ export default function App() {
         onAuthError={logout}
       >
         <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
-      </LessProvider>
+      </BetterbaseProvider>
     );
   }
 

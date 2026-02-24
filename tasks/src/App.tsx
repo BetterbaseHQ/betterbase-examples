@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
-import { LessProvider, useLessSync, useSyncReady } from "@betterbase/sdk/sync/react";
-import { useQuery, useSyncStatus } from "@betterbase/sdk/db/react";
+import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { useQuery, useSyncStatus } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
@@ -124,12 +124,12 @@ function LocalTasksApp() {
 }
 
 // ---------------------------------------------------------------------------
-// TasksApp — synced + sharing (authenticated path, inside LessProvider)
+// TasksApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
 function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, syncing, error: syncError } = useLessSync();
+  const { phase, syncing, error: syncError } = useSync();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -233,7 +233,7 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 // ---------------------------------------------------------------------------
 // SyncGuard — waits for LessContext to be ready before rendering TasksApp.
-// LessProvider always renders children immediately but LessContext is null
+// BetterbaseProvider always renders children immediately but LessContext is null
 // until async session key derivation completes. All useLists hooks throw on
 // a null context, so we gate here rather than inside each hook.
 // ---------------------------------------------------------------------------
@@ -245,14 +245,14 @@ function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// App — wraps TasksApp in LessProvider when authenticated
+// App — wraps TasksApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
   if (isAuthenticated && session) {
     return (
-      <LessProvider
+      <BetterbaseProvider
         adapter={db}
         collections={[lists]}
         session={session}
@@ -261,7 +261,7 @@ export default function App() {
         onAuthError={logout}
       >
         <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
-      </LessProvider>
+      </BetterbaseProvider>
     );
   }
 

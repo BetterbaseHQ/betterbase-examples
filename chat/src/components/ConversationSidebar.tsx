@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Stack, NavLink, TextInput, ActionIcon, Group, Text, Modal, Button } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { useMembers } from "@betterbase/sdk/sync/react";
+import { useMembers } from "betterbase/sync/react";
 import { MessageCircle, Plus, Trash2, Pencil } from "lucide-react";
 import type { Conversation } from "@/lib/db";
 import { shortHandle } from "@/lib/handle";

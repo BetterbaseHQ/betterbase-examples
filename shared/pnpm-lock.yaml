@@ -7,9 +7,9 @@ settings:
 importers:
   .:
     dependencies:
-      "@less-platform/wasm":
-        specifier: link:../../less-platform-rs/crates/less-platform-wasm/js
-        version: link:../../less-platform-rs/crates/less-platform-wasm/js
+      betterbase:
+        specifier: link:../../betterbase/js
+        version: link:../../betterbase/js
       lucide-react:
         specifier: ^0.469.0
         version: 0.469.0(react@19.2.4)

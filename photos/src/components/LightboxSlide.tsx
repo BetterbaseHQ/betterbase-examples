@@ -1,5 +1,5 @@
 import { Loader } from "@mantine/core";
-import { useFile } from "@betterbase/sdk/sync/react";
+import { useFile } from "betterbase/sync/react";
 import type { Photo } from "@/lib/db";
 
 interface LightboxSlideProps {

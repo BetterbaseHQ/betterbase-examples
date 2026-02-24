@@ -9,12 +9,12 @@
  * Local mutations auto-sync via SyncEngine's db.onChange listener — no manual
  * scheduleSync() calls needed.
  *
- * Must be called inside LessProvider (authenticated path only).
+ * Must be called inside BetterbaseProvider (authenticated path only).
  */
 
 import { useRef, useCallback } from "react";
-import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "@betterbase/sdk/sync/react";
-import { moveToSpace, bulkMoveToSpace, spaceOf, type SpaceFields } from "@betterbase/sdk/sync";
+import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
+import { moveToSpace, bulkMoveToSpace, spaceOf, type SpaceFields } from "betterbase/sync";
 import { boards, cards, type Board, type Card } from "@/lib/db";
 
 export function useBoards() {

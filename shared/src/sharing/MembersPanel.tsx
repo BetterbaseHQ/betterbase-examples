@@ -11,8 +11,8 @@ import {
   Popover,
 } from "@mantine/core";
 import { Users, ChevronDown, ChevronUp, X, Check } from "lucide-react";
-import { useMembers, usePeers } from "@betterbase/sdk/sync/react";
-import type { Member, SpaceRole } from "@betterbase/sdk/sync";
+import { useMembers, usePeers } from "betterbase/sync/react";
+import type { Member, SpaceRole } from "betterbase/sync";
 import { useAuth } from "../auth.js";
 
 interface MembersPanelProps {

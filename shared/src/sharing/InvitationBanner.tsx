@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Paper, Group, Text, ActionIcon, Stack } from "@mantine/core";
 import { Mail, Check, X } from "lucide-react";
-import type { SpaceRecord, SpaceFields } from "@betterbase/sdk/sync";
+import type { SpaceRecord, SpaceFields } from "betterbase/sync";
 
 interface InvitationBannerProps {
   invitations: readonly (SpaceRecord & SpaceFields)[];

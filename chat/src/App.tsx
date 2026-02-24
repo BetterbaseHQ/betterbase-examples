@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { MessageCircle } from "lucide-react";
 import { Box, Button } from "@mantine/core";
-import { LessProvider, useLessSync, useSyncReady } from "@betterbase/sdk/sync/react";
+import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
 import { LessAppShell, useAuth, EmptyState, InvitationBanner } from "@betterbase/examples-shared";
 import { db, conversations, messages } from "@/lib/db";
 import { useConversations } from "@/lib/sync";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { ChatView } from "@/components/ChatView";
-import type { SpaceFields } from "@betterbase/sdk/sync";
+import type { SpaceFields } from "betterbase/sync";
 
 // ---------------------------------------------------------------------------
 // SignInGate — shown when the user is not authenticated
@@ -45,20 +45,20 @@ function SignInGate() {
 }
 
 // ---------------------------------------------------------------------------
-// ChatApp — synced (authenticated path, inside LessProvider)
+// ChatApp — synced (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
 function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { syncing, error: syncError } = useLessSync();
+  const { syncing, error: syncError } = useSync();
   const [selectedConvId, setSelectedConvId] = useState<string | null>(() =>
-    localStorage.getItem("less-chat-selected-conv"),
+    localStorage.getItem("chat-selected-conv"),
   );
 
   const selectConv = (id: string | null) => {
     setSelectedConvId(id);
-    if (id) localStorage.setItem("less-chat-selected-conv", id);
-    else localStorage.removeItem("less-chat-selected-conv");
+    if (id) localStorage.setItem("chat-selected-conv", id);
+    else localStorage.removeItem("chat-selected-conv");
   };
 
   const {
@@ -176,7 +176,7 @@ function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// App — wraps ChatApp in LessProvider when authenticated, sign-in gate otherwise
+// App — wraps ChatApp in BetterbaseProvider when authenticated, sign-in gate otherwise
 // ---------------------------------------------------------------------------
 
 export default function App() {
@@ -184,7 +184,7 @@ export default function App() {
   if (!isAuthenticated || !session) return <SignInGate />;
 
   return (
-    <LessProvider
+    <BetterbaseProvider
       adapter={db}
       collections={[conversations, messages]}
       editChainCollections={["messages"]}
@@ -194,6 +194,6 @@ export default function App() {
       onAuthError={logout}
     >
       <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
-    </LessProvider>
+    </BetterbaseProvider>
   );
 }

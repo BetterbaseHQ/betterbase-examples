@@ -8,11 +8,11 @@ import {
   TypingIndicator,
   useTyping,
 } from "@betterbase/examples-shared";
-import { usePresence } from "@betterbase/sdk/sync/react";
+import { usePresence } from "betterbase/sync/react";
 import type { Conversation, Message } from "@/lib/db";
 import { MessageBubble } from "./MessageBubble";
 import { shortHandle } from "@/lib/handle";
-import type { SpaceFields } from "@betterbase/sdk/sync";
+import type { SpaceFields } from "betterbase/sync";
 
 type MessageWithChain = Message & { _editChainValid?: boolean };
 

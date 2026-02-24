@@ -1,4 +1,4 @@
-import { initOpfsWorker } from "@betterbase/sdk/db/worker";
+import { initWorker } from "betterbase/db/worker";
 import { notebooks, notes } from "./collections.js";
 
-initOpfsWorker([notebooks, notes]);
+initWorker([notebooks, notes]);

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Paper, Group, Text, Badge, Stack, UnstyledButton, ScrollArea } from "@mantine/core";
 import { History, ChevronDown, ChevronUp } from "lucide-react";
-import { useEditChain, useMembers, type EditHistoryEntry } from "@betterbase/sdk/sync/react";
-import type { SpaceFields, Member } from "@betterbase/sdk/sync";
-import type { EditDiff } from "@betterbase/sdk/crypto";
+import { useEditChain, useMembers, type EditHistoryEntry } from "betterbase/sync/react";
+import type { SpaceFields, Member } from "betterbase/sync";
+import type { EditDiff } from "betterbase/crypto";
 
 interface EditHistoryProps {
   record: (SpaceFields & Record<string, unknown>) | null | undefined;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActionIcon, Skeleton, Tooltip } from "@mantine/core";
 import { Trash2 } from "lucide-react";
-import { useFile } from "@betterbase/sdk/sync/react";
+import { useFile } from "betterbase/sync/react";
 import type { Photo } from "@/lib/db";
 
 interface PhotoCardProps {
