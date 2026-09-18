@@ -1,5 +1,5 @@
 FROM node:22-alpine
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /workspace
 
 # Copy the SDK (TypeScript source + pre-built WASM bindings)
