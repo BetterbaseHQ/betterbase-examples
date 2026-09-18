@@ -4,3 +4,6 @@ dist/
 .DS_Store
 .vite/
 test-results/
+
+# Per-machine OAuth client IDs (written by root setup-oauth-client.sh)
+.env
