@@ -81,9 +81,10 @@ describe("Board local cascade deletes", () => {
       { timeout: 4000 },
     );
 
-    // Delete the board from the sidebar (ConfirmDialog guards it)
+    // Delete the board from the sidebar (ConfirmDialog guards it). The modal
+    // animates in — findByRole waits for the confirm button to appear.
     await user.click(screen.getByRole("button", { name: /delete board/i }));
-    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+    await user.click(await screen.findByRole("button", { name: /^delete$/i }));
 
     await waitFor(
       async () => {
