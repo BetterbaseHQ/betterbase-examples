@@ -21,6 +21,11 @@ import { ChatView } from "@/components/ChatView";
 
 function SignInGate() {
   const { handle, login, logout } = useAuth();
+  const handleLogin = () => {
+    login().catch(() => {
+      /* failure rendered in the header's sync modal / console */
+    });
+  };
   return (
     <LessAppShell
       appName="Chat"
@@ -43,7 +48,7 @@ function SignInGate() {
           icon={<MessageCircle size={32} />}
           title="Sign in to start chatting"
           description="Chat requires an account to message other users"
-          action={<Button onClick={login}>Sign in</Button>}
+          action={<Button onClick={handleLogin}>Sign in</Button>}
         />
       </Box>
     </LessAppShell>
@@ -113,6 +118,8 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     if (!selectedConv || !handle) return Promise.resolve();
     return sendMessage(selectedConv, text, handle).catch((err) => {
       reportError(err, "Couldn't send message");
+      // Let ChatView keep the draft so the user doesn't lose the message
+      throw err;
     });
   };
 

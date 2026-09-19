@@ -113,7 +113,11 @@ function NotesApp() {
       createNotebook,
       deleteNotebook,
       createNote: (notebookId, notebook) => createNote(notebookId, notebook).then((r) => r.id),
-      updateNote,
+      // NoteEditor's onUpdate is fire-and-forget (void) — catch here like the
+      // local adapter does, or failed saves become unhandled rejections
+      updateNote: (id, patch) => {
+        updateNote(id, patch).catch((err) => reportError(err, "Couldn't save note"));
+      },
       deleteNote,
     }),
     [allNotebooks, allNotes, createNotebook, deleteNotebook, createNote, updateNote, deleteNote],

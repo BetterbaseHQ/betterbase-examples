@@ -96,15 +96,6 @@ export function BoardView({
     }
   }, [boardCards, pendingMoves]);
 
-  const clearPendingMove = (cardId: string) => {
-    setPendingMoves((prev) => {
-      if (!prev.has(cardId)) return prev;
-      const next = new Map(prev);
-      next.delete(cardId);
-      return next;
-    });
-  };
-
   const handleAddColumn = () => {
     const name = newColumnName.trim();
     if (!name) return;
@@ -157,7 +148,15 @@ export function BoardView({
       : db.patch(cards, { id: draggableId, columnId: destColumnId, order: newOrder });
     Promise.resolve(persist).catch((err) => {
       reportError(err, "Couldn't move card");
-      clearPendingMove(draggableId);
+      // Only clear the override if it's still the failed move — a newer drag
+      // of the same card must keep its own override
+      setPendingMoves((prev) => {
+        const cur = prev.get(draggableId);
+        if (!cur || cur.columnId !== destColumnId || cur.order !== newOrder) return prev;
+        const next = new Map(prev);
+        next.delete(draggableId);
+        return next;
+      });
     });
   };
 

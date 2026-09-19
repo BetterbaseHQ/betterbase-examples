@@ -12,7 +12,7 @@ import {
 } from "@mantine/core";
 import { ArrowLeft, Pencil, Trash2, Copy, Check, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { ConfirmDialog, ShareButton, MembersPanel } from "@betterbase/examples-shared";
-import { copySecret } from "@/lib/clipboard";
+import { copySecret, cancelPendingClear } from "@/lib/clipboard";
 import type { Entry } from "@/lib/db";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -233,6 +233,8 @@ function CopyField({ value, secret = false }: { value: string; secret?: boolean 
       if (secret) {
         await copySecret(value);
       } else {
+        // Don't let a pending secret auto-clear wipe what we just copied
+        cancelPendingClear();
         await navigator.clipboard.writeText(value);
       }
       setCopied(true);

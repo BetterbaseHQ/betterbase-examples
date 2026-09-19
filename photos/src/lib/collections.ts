@@ -18,6 +18,6 @@ export const photos = collection("photos")
     fileId: t.string(),
     /** Small JPEG for grid rendering; absent on records created before thumbnails */
     thumbFileId: t.optional(t.string()),
-    caption: t.string(),
+    caption: t.text(),
   })
   .build();

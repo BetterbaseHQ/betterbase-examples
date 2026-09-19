@@ -7,10 +7,10 @@ import type { SyncStatus } from "./SyncStatusBadge.js";
  * connectivity. Must be used inside a `BetterbaseProvider` tree.
  *
  * Centralizes the mapping apps previously each re-implemented:
- * offline > error > syncing > synced.
+ * offline > error > syncing (including connect/bootstrap phases) > synced.
  */
 export function useHeaderSyncStatus(): SyncStatus {
-  const { syncing, error } = useSync();
+  const { phase, syncing, error } = useSync();
   const [online, setOnline] = useState(() => navigator.onLine);
 
   useEffect(() => {
@@ -26,6 +26,6 @@ export function useHeaderSyncStatus(): SyncStatus {
 
   if (!online) return "offline";
   if (error) return "error";
-  if (syncing) return "syncing";
+  if (syncing || phase === "connecting" || phase === "bootstrapping") return "syncing";
   return "synced";
 }

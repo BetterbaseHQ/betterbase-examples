@@ -42,24 +42,27 @@ export function ChatView({
   usePresence(conversation?._spaceId, currentHandle ? { handle: currentHandle } : undefined);
   const { typingPeers, sendTyping } = useTyping(conversation?._spaceId, currentHandle);
 
-  // Jump to the bottom on conversation switch / initial history load — without
-  // this the near-bottom guard below keeps the viewport at the oldest messages.
+  // Jump to the bottom once per conversation — on switch or when the first
+  // batch of history arrives (queries start empty and fill in async, so the
+  // jump must wait for a non-empty list). Without this, the near-bottom guard
+  // below would keep the viewport pinned at the oldest messages.
+  const jumpedFor = useRef<string | null>(null);
   useEffect(() => {
     const el = viewportRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight });
-  }, [conversation?.id, conversation?._spaceId]);
-
-  // Follow new messages, but only when already near the bottom (so reading
-  // history isn't yanked around by incoming messages).
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
+    if (!el || messages.length === 0) return;
+    const convKey = conversation?.id ?? null;
+    if (jumpedFor.current !== convKey) {
+      jumpedFor.current = convKey;
+      el.scrollTo({ top: el.scrollHeight });
+      return;
+    }
+    // Follow new messages, but only when already near the bottom (so reading
+    // history isn't yanked around by incoming messages).
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 64;
     if (isNearBottom) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, conversation?.id]);
 
   const senderHandles = useMemo(
     () => [...new Set(messages.map((m) => m.senderHandle))],

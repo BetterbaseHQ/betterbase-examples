@@ -41,7 +41,7 @@ MantineProvider theme={lessTheme}
 | `AuthProvider` / `useAuth`                        | OAuth session context (`login`, `logout`, `session`, `error`, `clientId`)                                 |
 | `LessAppShell`                                    | Header + optional navbar + banner slot app shell                                                          |
 | `useHeaderSyncStatus`                             | `(offline > error > syncing > synced)` badge state from the sync engine — use inside `BetterbaseProvider` |
-| `reportError`                                     | Toast an failed async op                                                                                  |
+| `reportError`                                     | Toast a failed async op                                                                                   |
 | `EmptyState`                                      | Standard empty/loading pane                                                                               |
 | `ShareButton`, `MembersPanel`, `InvitationBanner` | Space sharing UI                                                                                          |
 | `PresenceAvatars`, `TypingIndicator`, `useTyping` | Realtime presence/typing                                                                                  |

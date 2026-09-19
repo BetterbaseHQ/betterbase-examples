@@ -13,19 +13,37 @@ interface ConnectSyncModalProps {
 
 export function ConnectSyncModal({ opened, onClose, onConnect, error }: ConnectSyncModalProps) {
   const [connecting, setConnecting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   const handleConnect = async () => {
     setConnecting(true);
+    setAttempted(true);
     try {
       await onConnect();
       onClose();
+    } catch {
+      // The error is captured in auth context state and rendered below —
+      // keep the modal open so the user can see it and retry
     } finally {
       setConnecting(false);
     }
   };
 
+  const handleClose = () => {
+    setAttempted(false);
+    onClose();
+  };
+
   return (
-    <Modal opened={opened} onClose={onClose} title="Sync your data securely" centered size="sm">
+    <Modal
+      opened={opened}
+      onClose={handleClose}
+      title="Sync your data securely"
+      centered
+      size="sm"
+      closeOnEscape={!connecting}
+      closeOnClickOutside={!connecting}
+    >
       <Stack gap="lg">
         <Text size="sm" c="dimmed">
           Your data is encrypted on your device before syncing. The server only stores encrypted
@@ -62,7 +80,9 @@ export function ConnectSyncModal({ opened, onClose, onConnect, error }: ConnectS
           </List.Item>
         </List>
 
-        {error && (
+        {/* Only show the error once the user has attempted a connect here —
+            session restore errors from a past visit aren't actionable now */}
+        {attempted && error && (
           <Text size="sm" c="red">
             {error}
           </Text>
@@ -72,7 +92,7 @@ export function ConnectSyncModal({ opened, onClose, onConnect, error }: ConnectS
           Continue with Betterbase Account
         </Button>
 
-        <Button fullWidth variant="subtle" color="gray" onClick={onClose} disabled={connecting}>
+        <Button fullWidth variant="subtle" color="gray" onClick={handleClose} disabled={connecting}>
           Maybe later
         </Button>
       </Stack>

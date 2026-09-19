@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionIcon, Skeleton, Tooltip, UnstyledButton } from "@mantine/core";
+import { ActionIcon, Skeleton, Tooltip } from "@mantine/core";
 import { Trash2 } from "lucide-react";
 import { useFile } from "betterbase/sync/react";
 import { ConfirmDialog } from "@betterbase/examples-shared";
@@ -57,8 +57,18 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
   }
 
   return (
-    <UnstyledButton
+    // div, not button: the hover overlay contains a nested delete button, and
+    // interactive elements can't nest in HTML
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       aria-label={`Open ${photo.filename}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -70,6 +80,7 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
         overflow: "hidden",
         width: dimensions.width,
         height: dimensions.height,
+        cursor: "pointer",
       }}
     >
       <img
@@ -134,6 +145,6 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
           onDelete(photo);
         }}
       />
-    </UnstyledButton>
+    </div>
   );
 }

@@ -20,6 +20,11 @@ import { db, albums, photos } from "@/lib/db";
 import type { Photo } from "@/lib/db";
 import { generateThumbnail } from "@/lib/thumbnail";
 
+/** Minimal db shape putPhotoFiles needs. */
+interface PhotoDb {
+  get(collection: typeof photos, id: string): Promise<unknown>;
+}
+
 /** All FileStore ids backing a photo record (full blob + thumbnail). */
 function photoFileIds(photo: Photo): string[] {
   return photo.thumbFileId ? [photo.fileId, photo.thumbFileId] : [photo.fileId];
@@ -54,6 +59,7 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
  * failure downgrades to rendering the full image, never fails the upload).
  */
 async function putPhotoFiles(
+  db: PhotoDb,
   fileStore: FileStore,
   recordId: string,
   file: File,
@@ -62,6 +68,10 @@ async function putPhotoFiles(
   await fileStore.put(fileId, new Uint8Array(await file.arrayBuffer()), recordId);
   try {
     const thumb = await generateThumbnail(file);
+    // The photo may have been deleted while the full blob was uploading —
+    // skip the thumbnail quietly instead of failing the whole upload
+    const record = await db.get(photos, recordId);
+    if (!record) return undefined;
     const thumbFileId = crypto.randomUUID();
     await fileStore.put(thumbFileId, thumb, recordId);
     return thumbFileId;
@@ -183,7 +193,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
           fileId,
           caption: "",
         });
-        const thumbFileId = await putPhotoFiles(fileStore, record.id, file, fileId);
+        const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
         if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
       });
       reportFailedUploads(failed, files.length);
@@ -319,7 +329,7 @@ function PhotosApp({
           },
           album,
         );
-        const thumbFileId = await putPhotoFiles(fileStore, record.id, file, fileId);
+        const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
         if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
       });
       reportFailedUploads(failed, files.length);

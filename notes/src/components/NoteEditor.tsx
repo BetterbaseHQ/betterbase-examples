@@ -23,10 +23,10 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
   const suppressNextUpdate = useRef(false);
 
   // noteId is passed as argument (captured at call time) so switching notes
-  // won't cause saves to target the wrong record; pending edits for the old
-  // note still flush via their timers. flushOnUnmount writes through edits
-  // pending at unmount (view switch, delete, login/logout) instead of
-  // silently dropping them.
+  // can't cause saves to target the wrong record. flushOnUnmount writes
+  // through edits pending at unmount; the effect below flushes on note SWITCH
+  // (typing in the next note within the debounce window would otherwise
+  // replace the pending timer and drop the previous note's last edit).
   const debouncedSaveBody = useDebouncedCallback(
     (noteId: string, body: string) => {
       onUpdate(noteId, { body });
@@ -41,10 +41,17 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
     { delay: 300, flushOnUnmount: true },
   );
 
+  const prevNoteId = useRef(note.id);
   useEffect(() => {
+    if (prevNoteId.current !== note.id) {
+      // Pending args still belong to the previous note — write them through
+      debouncedSaveTitle.flush();
+      debouncedSaveBody.flush();
+      prevNoteId.current = note.id;
+    }
     noteIdRef.current = note.id;
     setLocalTitle(note.title);
-  }, [note.id, note.title]);
+  }, [note.id, note.title, debouncedSaveTitle, debouncedSaveBody]);
 
   const editor = useEditor(
     {
@@ -194,6 +201,10 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => {
           setConfirmDelete(false);
+          // Flush pending edits first so the delete cleanly wins instead of
+          // racing a debounce-fired patch against a tombstoned record
+          debouncedSaveTitle.flush();
+          debouncedSaveBody.flush();
           onDelete(note.id);
         }}
       />

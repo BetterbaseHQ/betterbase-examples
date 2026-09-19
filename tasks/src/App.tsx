@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
 import { Box, Loader } from "@mantine/core";
 import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
@@ -51,8 +51,6 @@ function LocalTasksApp() {
     if (selectedListId && !selectedList && firstList) setSelectedListId(firstList.id);
   }, [selectedListId, selectedList, firstList]);
 
-  const todoOps = useMemo(() => localTodoOps, []);
-
   const createList = (name: string, color: string) => {
     db.put(lists, { name, color, todos: [] }).catch((err) =>
       reportError(err, "Couldn't create list"),
@@ -86,9 +84,9 @@ function LocalTasksApp() {
       {selectedList ? (
         <TaskList
           list={selectedList}
-          onAddTodo={todoOps.addTodo}
-          onToggleTodo={todoOps.toggleTodo}
-          onDeleteTodo={todoOps.deleteTodo}
+          onAddTodo={localTodoOps.addTodo}
+          onToggleTodo={localTodoOps.toggleTodo}
+          onDeleteTodo={localTodoOps.deleteTodo}
         />
       ) : (
         <EmptyState
@@ -133,7 +131,9 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   useEffect(() => {
     if (phase === "ready" && allLists.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      createList("My Tasks", "indigo");
+      createList("My Tasks", "indigo").catch((err) =>
+        reportError(err, "Couldn't create default list"),
+      );
     }
   }, [phase, allLists.length, createList]);
 
@@ -167,7 +167,9 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           personalSpaceId={personalSpaceId}
           selectedListId={selectedListId}
           onSelect={setSelectedListId}
-          onCreate={createList}
+          onCreate={(name, color) =>
+            createList(name, color).catch((err) => reportError(err, "Couldn't create list"))
+          }
           onDelete={(id) => {
             if (selectedListId === id) setSelectedListId(null);
             deleteList(id).catch((err) => reportError(err, "Couldn't delete list"));

@@ -5,7 +5,7 @@ import { notifications } from "@mantine/notifications";
  * mutations (db writes, share flows) so failures are never silent.
  */
 export function reportError(err: unknown, title = "Something went wrong"): void {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = err instanceof Error ? err.message : err != null ? String(err) : "Unknown error";
   notifications.show({
     title,
     message,

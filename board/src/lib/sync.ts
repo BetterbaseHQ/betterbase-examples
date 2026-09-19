@@ -75,8 +75,9 @@ export function useBoards() {
     async (id: string) => {
       const boardColumns = allColumnsRef.current.filter((c) => c.boardId === id);
       const boardCards = allCardsRef.current.filter((c) => c.boardId === id);
-      await Promise.all(boardCards.map((c) => db.delete(cards, c.id)));
-      await Promise.all(boardColumns.map((c) => db.delete(columns, c.id)));
+      // allSettled: one failed delete shouldn't abort the rest
+      await Promise.allSettled(boardCards.map((c) => db.delete(cards, c.id)));
+      await Promise.allSettled(boardColumns.map((c) => db.delete(columns, c.id)));
       await db.delete(boards, id);
     },
     [db],
@@ -102,7 +103,7 @@ export function useBoards() {
   const deleteColumn = useCallback(
     async (columnId: string) => {
       const columnCards = allCardsRef.current.filter((c) => c.columnId === columnId);
-      await Promise.all(columnCards.map((c) => db.delete(cards, c.id)));
+      await Promise.allSettled(columnCards.map((c) => db.delete(cards, c.id)));
       await db.delete(columns, columnId);
     },
     [db],
@@ -110,8 +111,15 @@ export function useBoards() {
 
   /**
    * Share a personal board with another user.
-   * Creates a new shared space, moves the board, columns, and cards to it
-   * (remapping boardId/columnId FKs to the new record ids), and invites the user.
+   * Creates a new shared space, moves columns and cards first (remapping
+   * columnId FKs), moves the board last, then patches boardId FKs and invites.
+   *
+   * Children-first ordering keeps every intermediate failure retryable: the
+   * children keep the old boardId until the final patch, so the board keeps
+   * rendering locally and a retry re-finds them by that id. (Moving the board
+   * first would tombstone its record, orphaning children on any later failure.)
+   * The sequence is still not transactional — a failure mid-share can leave
+   * children temporarily in the shared space; a retry converges.
    */
   const shareBoard = useCallback(
     async (board: Board & { _spaceId?: string }, handle: string): Promise<Board & SpaceFields> => {
@@ -119,29 +127,38 @@ export function useBoards() {
       if (!exists) throw new Error(`User "${handle}" not found`);
 
       const spaceId = await createSpace();
-      const newBoard = await moveToSpace(db, boards, board.id, spaceId);
 
-      const boardColumns = allColumnsRef.current.filter((c) => c.boardId === board.id);
+      // Read children fresh (not from render state) so columns/cards arriving
+      // from sync during the share are included
+      const boardColumns = (await db.query(columns, { filter: { boardId: board.id } })).records;
+      const boardCards = (await db.query(cards, { filter: { boardId: board.id } })).records;
+
       const newColumns = await bulkMoveToSpace(
         db,
         columns,
         boardColumns.map((c) => c.id),
         spaceId,
-        { boardId: newBoard.id },
       );
       const columnIdMap = new Map(boardColumns.map((c, i) => [c.id, newColumns[i]!.id]));
 
-      const boardCards = allCardsRef.current.filter((c) => c.boardId === board.id);
-      await bulkMoveToSpace(
+      const newCards = await bulkMoveToSpace(
         db,
         cards,
         boardCards.map((c) => c.id),
         spaceId,
         (card) => ({
-          boardId: newBoard.id,
           columnId: columnIdMap.get(card.columnId) ?? card.columnId,
         }),
       );
+
+      const newBoard = await moveToSpace(db, boards, board.id, spaceId);
+
+      // Point the moved children at the new board record (patches don't need
+      // space routing)
+      await Promise.all([
+        ...newColumns.map((c) => db.patch(columns, { id: c.id, boardId: newBoard.id })),
+        ...newCards.map((c) => db.patch(cards, { id: c.id, boardId: newBoard.id })),
+      ]);
 
       await invite(spaceId, handle, { spaceName: board.name });
       return newBoard;

@@ -38,8 +38,14 @@ export function InlineTextInput({
       value={value}
       onChange={(e) => onChange(e.currentTarget.value)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onSubmit();
-        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") {
+          if (value.trim()) onSubmit();
+          else onCancel();
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
       }}
       onBlur={() => {
         if (value.trim()) onSubmit();

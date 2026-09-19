@@ -58,6 +58,8 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
   useEffect(() => {
     if (selectedEntryId && !allEntries.find((e) => e.id === selectedEntryId)) {
       setSelectedEntryId(null);
+      // Don't leave the edit form armed for whichever entry is opened next
+      setEditing(false);
     }
   }, [selectedEntryId, allEntries]);
 

@@ -170,12 +170,15 @@ function generatePassword(length: number, options: GeneratorOptions): string {
   if (options.symbols) groups.push("!@#$%^&*()_+-=[]{}|;:,.<>?");
   if (groups.length === 0) groups.push("abcdefghijklmnopqrstuvwxyz", "0123456789");
 
+  // The per-class guarantee can require more chars than a tiny length allows;
+  // the guarantee wins (callers asking for e.g. length 2 with 4 classes get 4)
+  const targetLength = Math.max(length, groups.length);
   const all = groups.join("");
 
   // Guarantee at least one char from every selected class, then shuffle so the
   // guaranteed positions aren't predictable.
   const chars: string[] = groups.map((g) => g[randomIndex(g.length)]!);
-  while (chars.length < length) chars.push(all[randomIndex(all.length)]!);
+  while (chars.length < targetLength) chars.push(all[randomIndex(all.length)]!);
   for (let i = chars.length - 1; i > 0; i--) {
     const j = randomIndex(i + 1);
     [chars[i], chars[j]] = [chars[j]!, chars[i]!];

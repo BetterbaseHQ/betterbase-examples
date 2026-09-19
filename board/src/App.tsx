@@ -83,17 +83,13 @@ function LocalBoardApp() {
   };
 
   const deleteBoard = (id: string) => {
-    allCards
-      .filter((c) => c.boardId === id)
-      .forEach((c) =>
-        db.delete(cards, c.id).catch((err) => reportError(err, "Couldn't delete card")),
-      );
-    allColumns
-      .filter((c) => c.boardId === id)
-      .forEach((c) =>
-        db.delete(columns, c.id).catch((err) => reportError(err, "Couldn't delete column")),
-      );
-    db.delete(boards, id).catch((err) => reportError(err, "Couldn't delete board"));
+    (async () => {
+      const boardCards = allCards.filter((c) => c.boardId === id);
+      const boardColumns = allColumns.filter((c) => c.boardId === id);
+      await Promise.allSettled(boardCards.map((c) => db.delete(cards, c.id)));
+      await Promise.allSettled(boardColumns.map((c) => db.delete(columns, c.id)));
+      await db.delete(boards, id);
+    })().catch((err) => reportError(err, "Couldn't delete board"));
     if (selectedBoardId === id) setSelectedBoardId(null);
   };
 
@@ -365,7 +361,7 @@ export default function App() {
     return (
       <BetterbaseProvider
         adapter={db}
-        collections={[boards, cards]}
+        collections={[boards, columns, cards]}
         session={session}
         clientId={clientId}
         domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}

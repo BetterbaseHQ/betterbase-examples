@@ -70,13 +70,14 @@ export function AuthProvider({
   const login = useCallback(async () => {
     if (!client) {
       setLoginError("Please configure a Client ID first");
-      return;
+      throw new Error("Please configure a Client ID first");
     }
     setLoginError(null);
     try {
       await client.startAuth();
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : "Login failed");
+      throw err;
     }
   }, [client]);
 
