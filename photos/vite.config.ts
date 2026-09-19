@@ -13,6 +13,7 @@ export default defineConfig({
     plugins: () => [wasm()],
   },
   resolve: {
+    dedupe: ["react", "react-dom", "@mantine/core", "@mantine/hooks", "lucide-react"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },

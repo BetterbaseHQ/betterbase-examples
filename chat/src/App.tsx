@@ -17,7 +17,7 @@ function SignInGate() {
   const { handle, login, logout } = useAuth();
   return (
     <LessAppShell
-      appName="Less Chat"
+      appName="Betterbase Chat"
       appIcon={<MessageCircle size={22} color="var(--mantine-color-indigo-6)" />}
       isAuthenticated={false}
       handle={handle}
@@ -36,7 +36,7 @@ function SignInGate() {
         <EmptyState
           icon={<MessageCircle size={32} />}
           title="Sign in to start chatting"
-          description="Less Chat requires an account to message other users"
+          description="Betterbase Chat requires an account to message other users"
           action={<Button onClick={login}>Sign in</Button>}
         />
       </Box>
@@ -116,7 +116,7 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   return (
     <LessAppShell
-      appName="Less Chat"
+      appName="Betterbase Chat"
       appIcon={<MessageCircle size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={

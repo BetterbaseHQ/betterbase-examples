@@ -88,7 +88,7 @@ function AppCard({ name, description, icon, port, ready }: (typeof apps)[number]
         </ThemeIcon>
         <div>
           <Text fw={600} size="md">
-            Less {name}
+            Betterbase {name}
           </Text>
           {!ready && (
             <Text size="xs" c="dimmed">
@@ -117,7 +117,7 @@ export default function App() {
 
   return (
     <LessAppShell
-      appName="Less Platform"
+      appName="Betterbase"
       appIcon={<LayoutGrid size={22} color="var(--mantine-color-indigo-6)" />}
       isAuthenticated={isAuthenticated}
       handle={handle}

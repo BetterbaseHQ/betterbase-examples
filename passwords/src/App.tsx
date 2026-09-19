@@ -96,7 +96,7 @@ function LocalPasswordsApp() {
 
   return (
     <LessAppShell
-      appName="Less Passwords"
+      appName="Betterbase Passwords"
       appIcon={<KeyRound size={22} color="var(--mantine-color-indigo-6)" />}
       navbar={
         <CategoriesSidebar
@@ -254,7 +254,7 @@ function PasswordsApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   return (
     <LessAppShell
-      appName="Less Passwords"
+      appName="Betterbase Passwords"
       appIcon={<KeyRound size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={

@@ -47,7 +47,7 @@ export function ConnectSyncModal({ opened, onClose, onConnect }: ConnectSyncModa
         </List>
 
         <Button fullWidth onClick={onConnect}>
-          Continue with Less Account
+          Continue with Betterbase Account
         </Button>
 
         <Button fullWidth variant="subtle" color="gray" onClick={onClose}>
