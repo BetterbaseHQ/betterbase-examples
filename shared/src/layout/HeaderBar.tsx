@@ -13,6 +13,8 @@ interface HeaderBarProps {
   syncError?: string;
   onLogin: () => Promise<void>;
   onLogout: () => void;
+  /** "sync" (default) shows sync copy; "auth" shows sign-in-only copy. */
+  authMode?: "sync" | "auth";
   /** Mobile burger toggle — omit to hide burger */
   navbarOpened?: boolean;
   onNavbarToggle?: () => void;
@@ -32,6 +34,7 @@ export function HeaderBar({
   syncError,
   onLogin,
   onLogout,
+  authMode,
   navbarOpened,
   onNavbarToggle,
   launchpadUrl = DEFAULT_LAUNCHPAD_URL,
@@ -74,6 +77,7 @@ export function HeaderBar({
           syncStatus={syncStatus}
           onLogin={onLogin}
           onLogout={onLogout}
+          mode={authMode}
         />
       </Group>
     </Group>

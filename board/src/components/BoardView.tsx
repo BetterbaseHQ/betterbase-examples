@@ -8,6 +8,7 @@ import {
   InlineTextInput,
   reportError,
 } from "@betterbase/examples-shared";
+import { isShared } from "betterbase/sync";
 import { db, cards, type Column as ColumnType } from "@/lib/db";
 import type { Board, Card } from "@/lib/db";
 import { Column } from "./Column";
@@ -160,8 +161,8 @@ export function BoardView({
     });
   };
 
-  const isPersonal = board._spaceId == null || board._spaceId === personalSpaceId;
-  const isShared = board._spaceId != null && !isPersonal;
+  const isSharedBoard = isShared(board, personalSpaceId);
+  const isPersonal = !isSharedBoard;
 
   return (
     <Box
@@ -186,7 +187,7 @@ export function BoardView({
           {board.name}
         </Text>
         {isPersonal && onShare && <ShareButton onShare={onShare} />}
-        {isShared && board._spaceId && onInvite && onRemoveMember && (
+        {isSharedBoard && board._spaceId && onInvite && onRemoveMember && (
           <MembersPanel
             spaceId={board._spaceId}
             isAdmin={isAdmin}

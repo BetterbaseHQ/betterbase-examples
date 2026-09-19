@@ -12,21 +12,14 @@
 
 import { useMemo, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { moveToSpace, type SpaceFields } from "betterbase/sync";
+import { shareTree, type SpaceFields } from "betterbase/sync";
 import { lists, type List } from "@/lib/db";
 import { createTodoOps } from "@/lib/todos";
 
 export function useLists() {
   const db = useSyncDb();
-  const {
-    userExists,
-    createSpace,
-    invite,
-    accept: acceptInvitation,
-    decline: declineInvitation,
-    removeMember,
-    isAdmin,
-  } = useSpaces();
+  const spaces = useSpaces();
+  const { invite } = spaces;
 
   const result = useQuery(lists, { sort: [{ field: "createdAt", direction: "asc" }] });
   const allLists = result.records;
@@ -37,7 +30,6 @@ export function useLists() {
 
   const createList = useCallback(
     async (name: string, color: string) => {
-      // @ts-expect-error TS2589: type depth limit
       await db.put(lists, { name, color, todos: [] });
     },
     [db],
@@ -52,19 +44,20 @@ export function useLists() {
 
   /**
    * Share a personal list with another user.
-   * Creates a new shared space, moves the list to it, and invites the user.
-   * Returns the new list record (with a new ID in the shared space).
+   * shareTree creates a new shared space, moves the list to it, and invites
+   * the user. Returns the new list record (with a new ID in the shared space).
    */
   const shareList = useCallback(
     async (list: List & SpaceFields, handle: string): Promise<List & SpaceFields> => {
-      const exists = await userExists(handle);
-      if (!exists) throw new Error(`User "${handle}" not found`);
-      const spaceId = await createSpace();
-      const newList = await moveToSpace(db, lists, list.id, spaceId);
-      await invite(spaceId, handle, { spaceName: list.name });
-      return newList;
+      const { parent: newList } = await shareTree(db, spaces, {
+        collection: lists,
+        id: list.id,
+        invitee: handle,
+        spaceName: list.name,
+      });
+      return newList as List & SpaceFields;
     },
-    [db, userExists, createSpace, invite],
+    [db, spaces],
   );
 
   const inviteToList = useCallback(
@@ -83,10 +76,10 @@ export function useLists() {
     deleteList,
     shareList,
     inviteToList,
-    acceptInvitation,
-    declineInvitation,
-    removeMember,
-    isAdmin,
+    acceptInvitation: spaces.accept,
+    declineInvitation: spaces.decline,
+    removeMember: spaces.removeMember,
+    isAdmin: spaces.isAdmin,
     todoOps,
   };
 }

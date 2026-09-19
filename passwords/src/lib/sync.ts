@@ -13,20 +13,13 @@
 
 import { useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { moveToSpace, type SpaceFields } from "betterbase/sync";
+import { shareTree, type SpaceFields } from "betterbase/sync";
 import { entries, type Entry } from "@/lib/db";
 
 export function useEntries() {
   const db = useSyncDb();
-  const {
-    userExists,
-    createSpace,
-    invite,
-    accept: acceptInvitation,
-    decline: declineInvitation,
-    removeMember,
-    isAdmin,
-  } = useSpaces();
+  const spaces = useSpaces();
+  const { invite } = spaces;
 
   const result = useQuery(entries, {
     sort: [
@@ -61,20 +54,21 @@ export function useEntries() {
 
   /**
    * Share a personal entry with another user.
-   * Creates a new shared space, moves the entry to it, and invites the user.
-   * Returns the new entry record (with a new ID in the shared space).
+   * shareTree creates a new shared space, moves the entry to it, and invites
+   * the user. Passwords shares single entries — no children. Returns the new
+   * entry record (with a new ID in the shared space).
    */
   const shareEntry = useCallback(
     async (entry: Entry & { _spaceId?: string }, handle: string): Promise<Entry & SpaceFields> => {
-      const exists = await userExists(handle);
-      if (!exists) throw new Error(`User "${handle}" not found`);
-
-      const spaceId = await createSpace();
-      const newEntry = await moveToSpace(db, entries, entry.id, spaceId);
-      await invite(spaceId, handle, { spaceName: entry.site });
+      const { parent: newEntry } = await shareTree(db, spaces, {
+        collection: entries,
+        id: entry.id,
+        invitee: handle,
+        spaceName: entry.site,
+      });
       return newEntry as Entry & SpaceFields;
     },
-    [db, userExists, createSpace, invite],
+    [db, spaces],
   );
 
   const inviteToEntry = useCallback(
@@ -94,9 +88,9 @@ export function useEntries() {
     deleteEntry,
     shareEntry,
     inviteToEntry,
-    acceptInvitation,
-    declineInvitation,
-    removeMember,
-    isAdmin,
+    acceptInvitation: spaces.accept,
+    declineInvitation: spaces.decline,
+    removeMember: spaces.removeMember,
+    isAdmin: spaces.isAdmin,
   };
 }

@@ -2,7 +2,7 @@
 
 Everything here works offline, syncs in real time, and encrypts data before it leaves the browser. These apps are built with [betterbase](https://github.com/BetterbaseHQ/betterbase) to show what local-first, end-to-end encrypted development looks like in practice.
 
-> **Start here:** The [tasks](./tasks) app is the simplest full example — auth, sync, and CRDT merge in under 200 lines of application code. Read it first, then explore the others.
+> **Start here:** The [tasks](./tasks) app is the simplest full example — auth, sync, sharing, and CRDT merge with minimal app code (the whole app is a few hundred lines; the interesting parts are `lib/` and `App.tsx`). Read it first, then explore the others. Every app has its own README covering what it demonstrates and a two-tab walkthrough.
 
 ## Apps
 

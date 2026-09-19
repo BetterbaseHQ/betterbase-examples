@@ -13,7 +13,7 @@ import {
 import { Users, ChevronDown, ChevronUp, X, Check } from "lucide-react";
 import { useMembers, usePeers } from "betterbase/sync/react";
 import type { Member, SpaceRole } from "betterbase/sync";
-import { useAuth } from "../auth.js";
+import { useAuth } from "betterbase/auth/react";
 import { truncateDid } from "./did.js";
 
 interface MembersPanelProps {

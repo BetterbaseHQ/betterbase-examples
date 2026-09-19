@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { MessageCircle } from "lucide-react";
-import { Box, Button, Loader } from "@mantine/core";
-import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { Box, Button } from "@mantine/core";
+import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import {
   LessAppShell,
+  SyncedAppGate,
   useAuth,
-  useHeaderSyncStatus,
   EmptyState,
   InvitationBanner,
   reportError,
@@ -62,7 +62,7 @@ function SignInGate() {
 function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { error: syncError } = useSync();
-  const syncStatus = useHeaderSyncStatus();
+  const syncStatus = useConnectionStatus();
 
   // Selection is remembered per account so switching accounts doesn't leak
   // (or flash) another account's conversation.
@@ -187,22 +187,6 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// SyncGuard — waits for LessContext to be ready before rendering ChatApp.
-// ---------------------------------------------------------------------------
-
-function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
-  const ready = useSyncReady();
-  if (!ready) {
-    return (
-      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
-        <Loader />
-      </Box>
-    );
-  }
-  return <ChatApp personalSpaceId={personalSpaceId} />;
-}
-
-// ---------------------------------------------------------------------------
 // App — wraps ChatApp in BetterbaseProvider when authenticated, sign-in gate otherwise
 // ---------------------------------------------------------------------------
 
@@ -220,7 +204,9 @@ export default function App() {
       domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
       onAuthError={logout}
     >
-      <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
+      <SyncedAppGate>
+        <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
+      </SyncedAppGate>
     </BetterbaseProvider>
   );
 }

@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Box, Loader } from "@mantine/core";
-import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
-import {
-  useAuth,
-  useHeaderSyncStatus,
-  InvitationBanner,
-  reportError,
-} from "@betterbase/examples-shared";
+import { useAuth, SyncedAppGate, InvitationBanner, reportError } from "@betterbase/examples-shared";
 import { db, notebooks, notes } from "@/lib/db";
 import type { Note } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
@@ -72,9 +66,8 @@ function LocalNotesApp() {
 
 function NotesApp() {
   const { session } = useAuth();
-  const { phase } = useSync();
-  const syncStatus = useHeaderSyncStatus();
-  const { error: syncError } = useSync();
+  const { phase, error: syncError } = useSync();
+  const syncStatus = useConnectionStatus();
   const autoCreated = useRef(false);
 
   const {
@@ -155,22 +148,6 @@ function NotesApp() {
 }
 
 // ---------------------------------------------------------------------------
-// SyncGuard — waits for LessContext to be ready before rendering NotesApp.
-// ---------------------------------------------------------------------------
-
-function SyncGuard() {
-  const ready = useSyncReady();
-  if (!ready) {
-    return (
-      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
-        <Loader />
-      </Box>
-    );
-  }
-  return <NotesApp />;
-}
-
-// ---------------------------------------------------------------------------
 // App — wraps NotesApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
@@ -186,7 +163,9 @@ export default function App() {
         domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
         onAuthError={logout}
       >
-        <SyncGuard />
+        <SyncedAppGate>
+          <NotesApp />
+        </SyncedAppGate>
       </BetterbaseProvider>
     );
   }

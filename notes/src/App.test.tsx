@@ -39,7 +39,7 @@ describe("Notes local flow", () => {
     renderWithProviders(<App />, { db }); // unauthenticated → local notes
 
     // No auto-create on the local path — set up a notebook and first note
-    await user.click(screen.getByRole("button", { name: "New notebook" }));
+    // (the sidebar's create input is always visible)
     await user.type(screen.getByRole("textbox", { name: /new notebook/i }), "Notebook");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
@@ -68,7 +68,6 @@ describe("Notes local flow", () => {
     const user = userEvent.setup();
     renderWithProviders(<App />, { db });
 
-    await user.click(screen.getByRole("button", { name: "New notebook" }));
     await user.type(screen.getByRole("textbox", { name: /new notebook/i }), "Notebook");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });

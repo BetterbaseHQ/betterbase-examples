@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { LessAppShell, useAuth } from "@betterbase/examples-shared";
 import type { ReactNode } from "react";
-
 const apps: {
   name: string;
   description: string;
@@ -119,6 +118,7 @@ export default function App() {
     <LessAppShell
       appName="Betterbase"
       appIcon={<LayoutGrid size={22} color="var(--mantine-color-indigo-6)" />}
+      authMode="auth"
       isAuthenticated={isAuthenticated}
       handle={handle}
       onLogin={login}

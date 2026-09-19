@@ -1,13 +1,8 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import { Box } from "@mantine/core";
-import {
-  LessAppShell,
-  useAuth,
-  EmptyState,
-  reportError,
-  type SyncStatus,
-} from "@betterbase/examples-shared";
+import type { ConnectionStatus } from "betterbase/sync/react";
+import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
 import type { Note, Notebook } from "@/lib/db";
 import { extractText, getExcerpt } from "@/lib/tiptap-text";
 import { NotebookSidebar } from "./NotebookSidebar";
@@ -43,7 +38,7 @@ interface NotesWorkspaceProps {
   api: NotesApi;
   sharing?: NotesSharing;
   banner?: ReactNode;
-  syncStatus?: SyncStatus;
+  syncStatus?: ConnectionStatus;
   syncError?: string;
 }
 

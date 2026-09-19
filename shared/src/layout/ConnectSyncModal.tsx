@@ -9,9 +9,17 @@ interface ConnectSyncModalProps {
   onConnect: () => Promise<void>;
   /** Login error to display inside the modal (from useAuth().error). */
   error?: string | null;
+  /** "sync" (default) shows sync/E2EE copy; "auth" shows sign-in-only copy. */
+  mode?: "sync" | "auth";
 }
 
-export function ConnectSyncModal({ opened, onClose, onConnect, error }: ConnectSyncModalProps) {
+export function ConnectSyncModal({
+  opened,
+  onClose,
+  onConnect,
+  error,
+  mode = "sync",
+}: ConnectSyncModalProps) {
   const [connecting, setConnecting] = useState(false);
   const [attempted, setAttempted] = useState(false);
 
@@ -38,47 +46,56 @@ export function ConnectSyncModal({ opened, onClose, onConnect, error }: ConnectS
     <Modal
       opened={opened}
       onClose={handleClose}
-      title="Sync your data securely"
+      title={mode === "auth" ? "Sign in with Betterbase" : "Sync your data securely"}
       centered
       size="sm"
       closeOnEscape={!connecting}
       closeOnClickOutside={!connecting}
     >
       <Stack gap="lg">
-        <Text size="sm" c="dimmed">
-          Your data is encrypted on your device before syncing. The server only stores encrypted
-          blobs — it never sees your data.
-        </Text>
+        {mode === "auth" ? (
+          <Text size="sm" c="dimmed">
+            Sign in with your Betterbase account. This app uses your account for sign-in only — your
+            data never leaves this device.
+          </Text>
+        ) : (
+          <>
+            <Text size="sm" c="dimmed">
+              Your data is encrypted on your device before syncing. The server only stores encrypted
+              blobs — it never sees your data.
+            </Text>
 
-        <List spacing="sm" size="sm">
-          <List.Item
-            icon={
-              <ThemeIcon size={24} variant="light" radius="xl">
-                <HardDrive size={14} />
-              </ThemeIcon>
-            }
-          >
-            Data lives on your device first
-          </List.Item>
-          <List.Item
-            icon={
-              <ThemeIcon size={24} variant="light" radius="xl">
-                <Lock size={14} />
-              </ThemeIcon>
-            }
-          >
-            End-to-end encrypted sync
-          </List.Item>
-          <List.Item
-            icon={
-              <ThemeIcon size={24} variant="light" radius="xl">
-                <WifiOff size={14} />
-              </ThemeIcon>
-            }
-          >
-            Works offline, syncs when online
-          </List.Item>
-        </List>
+            <List spacing="sm" size="sm">
+              <List.Item
+                icon={
+                  <ThemeIcon size={24} variant="light" radius="xl">
+                    <HardDrive size={14} />
+                  </ThemeIcon>
+                }
+              >
+                Data lives on your device first
+              </List.Item>
+              <List.Item
+                icon={
+                  <ThemeIcon size={24} variant="light" radius="xl">
+                    <Lock size={14} />
+                  </ThemeIcon>
+                }
+              >
+                End-to-end encrypted sync
+              </List.Item>
+              <List.Item
+                icon={
+                  <ThemeIcon size={24} variant="light" radius="xl">
+                    <WifiOff size={14} />
+                  </ThemeIcon>
+                }
+              >
+                Works offline, syncs when online
+              </List.Item>
+            </List>
+          </>
+        )}
 
         {/* Only show the error once the user has attempted a connect here —
             session restore errors from a past visit aren't actionable now */}

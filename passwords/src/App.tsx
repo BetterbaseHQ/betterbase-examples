@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import { Box, Loader } from "@mantine/core";
-import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
-import { useAuth, useHeaderSyncStatus, InvitationBanner } from "@betterbase/examples-shared";
+import { useAuth, InvitationBanner, SyncedAppGate } from "@betterbase/examples-shared";
 import { db, entries } from "@/lib/db";
 import { useEntries } from "@/lib/sync";
 import { EntriesScreen, type EntriesApi } from "@/components/EntriesScreen";
@@ -41,7 +40,7 @@ function LocalPasswordsApp() {
 function PasswordsApp() {
   const { session } = useAuth();
   const { error: syncError } = useSync();
-  const syncStatus = useHeaderSyncStatus();
+  const syncStatus = useConnectionStatus();
 
   const {
     entries: allEntries,
@@ -101,22 +100,6 @@ function PasswordsApp() {
 }
 
 // ---------------------------------------------------------------------------
-// SyncGuard — waits for LessContext to be ready before rendering PasswordsApp.
-// ---------------------------------------------------------------------------
-
-function SyncGuard() {
-  const ready = useSyncReady();
-  if (!ready) {
-    return (
-      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
-        <Loader />
-      </Box>
-    );
-  }
-  return <PasswordsApp />;
-}
-
-// ---------------------------------------------------------------------------
 // App — wraps PasswordsApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
@@ -132,7 +115,9 @@ export default function App() {
         domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
         onAuthError={logout}
       >
-        <SyncGuard />
+        <SyncedAppGate>
+          <PasswordsApp />
+        </SyncedAppGate>
       </BetterbaseProvider>
     );
   }

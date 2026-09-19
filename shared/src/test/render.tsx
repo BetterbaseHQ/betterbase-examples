@@ -6,7 +6,7 @@ import type { ReactElement, ReactNode } from "react";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
-import { MockAuthProvider, type MockAuthOverrides } from "./mock-auth.js";
+import { MockAuthProvider, type MockAuthOverrides } from "betterbase/testing";
 import { DatabaseProvider } from "betterbase/db/react";
 import { lessTheme } from "../theme.js";
 // Mantine's stylesheet — without it ScrollArea/AppShell layout rules are
@@ -47,5 +47,5 @@ export function renderWithProviders(
   });
 }
 
-export { MockAuthProvider } from "./mock-auth.js";
+export { MockAuthProvider } from "betterbase/testing";
 export { render } from "@testing-library/react";

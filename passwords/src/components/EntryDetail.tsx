@@ -11,6 +11,7 @@ import {
   Badge,
 } from "@mantine/core";
 import { ArrowLeft, Pencil, Trash2, Copy, Check, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { isShared } from "betterbase/sync";
 import { ConfirmDialog, ShareButton, MembersPanel } from "@betterbase/examples-shared";
 import { copySecret, cancelPendingClear } from "@/lib/clipboard";
 import type { Entry } from "@/lib/db";
@@ -72,8 +73,8 @@ export function EntryDetail({
     setShowPassword(false);
   }, [entry.id]);
 
-  const isPersonal = entry._spaceId == null || entry._spaceId === personalSpaceId;
-  const isShared = entry._spaceId != null && !isPersonal;
+  const shared = isShared(entry, personalSpaceId);
+  const isPersonal = !shared;
 
   return (
     <Stack gap="md">
@@ -91,7 +92,7 @@ export function EntryDetail({
         </Group>
         <Group gap="xs">
           {isPersonal && onShare && <ShareButton onShare={onShare} />}
-          {isShared && entry._spaceId && onInvite && onRemoveMember && (
+          {shared && entry._spaceId && onInvite && onRemoveMember && (
             <MembersPanel
               spaceId={entry._spaceId}
               isAdmin={isAdmin}
@@ -194,7 +195,7 @@ export function EntryDetail({
         opened={confirmDelete}
         title="Delete entry"
         message={
-          isShared ? (
+          shared ? (
             <>
               Delete <b>{entry.site || "Untitled"}</b>? It is shared — this deletes it for everyone
               and cannot be undone.

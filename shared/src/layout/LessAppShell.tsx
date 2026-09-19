@@ -26,6 +26,8 @@ interface LessAppShellProps {
   syncError?: string;
   onLogin: () => Promise<void>;
   onLogout: () => void;
+  /** "sync" (default) shows sync copy in the header/modal; "auth" shows sign-in-only copy. */
+  authMode?: "sync" | "auth";
   /** URL for launchpad icon link (default http://localhost:5380) */
   launchpadUrl?: string;
 }
@@ -44,6 +46,7 @@ export function LessAppShell({
   syncError,
   onLogin,
   onLogout,
+  authMode,
   launchpadUrl,
 }: LessAppShellProps) {
   const [opened, { toggle }] = useDisclosure();
@@ -72,6 +75,7 @@ export function LessAppShell({
           syncError={syncError}
           onLogin={onLogin}
           onLogout={onLogout}
+          authMode={authMode}
           navbarOpened={navbar ? opened : undefined}
           onNavbarToggle={navbar ? toggle : undefined}
           launchpadUrl={launchpadUrl}

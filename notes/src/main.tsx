@@ -3,7 +3,8 @@ import { createRoot } from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { DatabaseProvider } from "betterbase/db/react";
-import { lessTheme, AuthProvider } from "@betterbase/examples-shared";
+import { AuthProvider } from "betterbase/auth/react";
+import { lessTheme } from "@betterbase/examples-shared";
 import { db } from "@/lib/db";
 import App from "./App.tsx";
 

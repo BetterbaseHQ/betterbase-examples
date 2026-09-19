@@ -13,8 +13,8 @@ export default defineConfig({
     dedupe: ["react", "react-dom", "@mantine/core", "@mantine/hooks", "@mantine/notifications"],
     alias: {
       "@betterbase/examples-shared": resolve(__dirname, "src"),
-      // Component tests stub the sync boundary (see src/test/mock-sync.tsx)
-      "betterbase/sync/react": resolve(__dirname, "src/test/mock-sync.tsx"),
+      // Component tests stub the sync boundary (SDK testing double)
+      "betterbase/sync/react": "betterbase/testing/mock-sync",
     },
   },
   server: {

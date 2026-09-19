@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Checkbox, TextInput, ActionIcon, Group, Stack, Text, Paper } from "@mantine/core";
 import { Plus, Trash2 } from "lucide-react";
 import { EmptyState, ShareButton, MembersPanel } from "@betterbase/examples-shared";
+import { isShared } from "betterbase/sync";
 import { CheckSquare } from "lucide-react";
 import type { List, TodoItem } from "@/lib/db";
 
@@ -40,8 +41,8 @@ export function TaskList({
   const active = list.todos.filter((t) => !t.completed);
   const completed = list.todos.filter((t) => t.completed);
 
-  const isPersonal = list._spaceId == null || list._spaceId === personalSpaceId;
-  const isShared = list._spaceId != null && list._spaceId !== personalSpaceId;
+  const shared = isShared(list, personalSpaceId);
+  const isPersonal = !shared;
 
   return (
     <Stack gap="md">
@@ -50,7 +51,7 @@ export function TaskList({
           {list.name}
         </Text>
         {isPersonal && onShare && <ShareButton onShare={onShare} />}
-        {isShared && list._spaceId && onInvite && onRemoveMember && (
+        {shared && list._spaceId && onInvite && onRemoveMember && (
           <MembersPanel
             spaceId={list._spaceId}
             isAdmin={isAdmin}

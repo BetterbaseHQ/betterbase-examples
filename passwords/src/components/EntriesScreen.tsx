@@ -1,13 +1,8 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { Box, Loader } from "@mantine/core";
-import {
-  LessAppShell,
-  useAuth,
-  EmptyState,
-  reportError,
-  type SyncStatus,
-} from "@betterbase/examples-shared";
+import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
+import type { ConnectionStatus } from "betterbase/sync/react";
 import type { Entry } from "@/lib/db";
 import { CategoriesSidebar, type Category } from "./CategoriesSidebar";
 import { EntryList } from "./EntryList";
@@ -40,7 +35,7 @@ interface EntriesScreenProps {
   api: EntriesApi;
   sharing?: EntriesSharing;
   banner?: ReactNode;
-  syncStatus?: SyncStatus;
+  syncStatus?: ConnectionStatus;
   syncError?: string;
 }
 

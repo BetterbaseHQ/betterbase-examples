@@ -1,121 +1,25 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Image } from "lucide-react";
-import { Box, Loader } from "@mantine/core";
 import {
   BetterbaseProvider,
   FileStoreProvider,
+  useConnectionStatus,
   useSync,
-  useSyncReady,
 } from "betterbase/sync/react";
 import { FileStore } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
-  useHeaderSyncStatus,
   InvitationBanner,
+  SyncedAppGate,
   reportError,
 } from "@betterbase/examples-shared";
 import { db, albums, photos } from "@/lib/db";
-import type { Photo } from "@/lib/db";
-import { generateThumbnail } from "@/lib/thumbnail";
-
-/** Minimal db shape putPhotoFiles needs. */
-interface PhotoDb {
-  get(collection: typeof photos, id: string): Promise<unknown>;
-}
-
-/** All FileStore ids backing a photo record (full blob + thumbnail). */
-function photoFileIds(photo: Photo): string[] {
-  return photo.thumbFileId ? [photo.fileId, photo.thumbFileId] : [photo.fileId];
-}
 import { useAlbums } from "@/lib/sync";
+import { usePhotoOps, computePhotoCounts } from "@/lib/photo-ops";
 import { AlbumSidebar } from "@/components/AlbumSidebar";
 import { PhotoGallery } from "@/components/PhotoGallery";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Read image dimensions by loading into an Image element. */
-function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new window.Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to load image"));
-    };
-    img.src = url;
-  });
-}
-
-/**
- * Upload one photo: full blob + grid thumbnail (best-effort — a thumbnail
- * failure downgrades to rendering the full image, never fails the upload).
- */
-export async function putPhotoFiles(
-  db: PhotoDb,
-  fileStore: FileStore,
-  recordId: string,
-  file: File,
-  fileId: string,
-): Promise<string | undefined> {
-  await fileStore.put(fileId, new Uint8Array(await file.arrayBuffer()), recordId);
-  try {
-    const thumb = await generateThumbnail(file);
-    // The photo may have been deleted while the full blob was uploading —
-    // skip the thumbnail quietly instead of failing the whole upload
-    const record = await db.get(photos, recordId);
-    if (!record) return undefined;
-    const thumbFileId = crypto.randomUUID();
-    await fileStore.put(thumbFileId, thumb, recordId);
-    return thumbFileId;
-  } catch (err) {
-    console.warn("Thumbnail generation failed", err);
-    return undefined;
-  }
-}
-
-/**
- * Upload files one at a time; a bad file skips to the next instead of aborting
- * the batch. Returns the filenames that failed.
- */
-async function uploadOneByOne(
-  files: File[],
-  addOne: (file: File) => Promise<void>,
-): Promise<string[]> {
-  const failed: string[] = [];
-  for (const file of files) {
-    try {
-      await addOne(file);
-    } catch (err) {
-      console.error(`Upload failed for ${file.name}`, err);
-      failed.push(file.name);
-    }
-  }
-  return failed;
-}
-
-function reportFailedUploads(failed: string[], total: number): void {
-  if (failed.length === 0) return;
-  reportError(
-    new Error(
-      failed.length === total
-        ? "Upload failed"
-        : `${failed.length} of ${total} photos failed to upload`,
-    ),
-    failed.length === total ? "Upload failed" : "Some photos failed to upload",
-  );
-}
-
-// NOTE: deleting a photo removes the record and the local file cache, but the
-// sync service keeps the encrypted blob (the SDK's FileStore has no remote
-// delete yet). Orphaned blobs are invisible but consume server storage.
 
 // ---------------------------------------------------------------------------
 // View types for sidebar navigation
@@ -130,6 +34,7 @@ export type View = { kind: "all" } | { kind: "album"; id: string };
 function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const [view, setView] = useState<View>({ kind: "all" });
+  const ops = usePhotoOps(db, fileStore);
 
   const albumResult = useQuery(albums, {
     sort: [
@@ -167,69 +72,25 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
   );
 
   const deleteAlbum = useCallback(
-    async (id: string) => {
-      const toDelete = allPhotos.filter((p) => p.albumId === id);
-      await Promise.all(toDelete.map((p) => db.delete(photos, p.id)));
-      await db.delete(albums, id);
-      fileStore.evictAll(toDelete.flatMap(photoFileIds));
-      if (view.kind === "album" && view.id === id) setView({ kind: "all" });
+    (id: string) => {
+      ops.deleteAlbum(
+        id,
+        allPhotos.filter((p) => p.albumId === id),
+        () => {
+          if (view.kind === "album" && view.id === id) setView({ kind: "all" });
+        },
+      );
     },
-    [allPhotos, view, fileStore],
+    [ops, allPhotos, view],
   );
 
   const handleUpload = useCallback(
-    async (files: File[]) => {
-      const albumId = view.kind === "album" ? view.id : "";
-      const failed = await uploadOneByOne(files, async (file) => {
-        const fileId = crypto.randomUUID();
-        const { width, height } = await getImageDimensions(file);
-        const record = await db.put(photos, {
-          albumId,
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
-          width,
-          height,
-          fileId,
-          caption: "",
-        });
-        const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
-        if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
-      });
-      reportFailedUploads(failed, files.length);
-    },
-    [view, fileStore],
-  );
-
-  const deletePhoto = useCallback(
-    async (photo: Photo) => {
-      await db.delete(photos, photo.id);
-      photoFileIds(photo).forEach((fid) => fileStore.evict(fid));
-    },
-    [fileStore],
-  );
-
-  const guardedDeleteAlbum = useCallback(
-    (id: string) => {
-      deleteAlbum(id).catch((err) => reportError(err, "Couldn't delete album"));
-    },
-    [deleteAlbum],
-  );
-
-  const guardedDeletePhoto = useCallback(
-    (photo: Photo) => {
-      deletePhoto(photo).catch((err) => reportError(err, "Couldn't delete photo"));
-    },
-    [deletePhoto],
+    (files: File[]) => ops.upload(files, view.kind === "album" ? view.id : ""),
+    [ops, view],
   );
 
   const photoCounts = useMemo(
-    () => ({
-      all: allPhotos.length,
-      byAlbum: Object.fromEntries(
-        allAlbums.map((a) => [a.id, allPhotos.filter((p) => p.albumId === a.id).length]),
-      ),
-    }),
+    () => computePhotoCounts(allAlbums, allPhotos),
     [allAlbums, allPhotos],
   );
 
@@ -243,7 +104,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
           view={view}
           onViewChange={setView}
           onCreate={createAlbum}
-          onDelete={guardedDeleteAlbum}
+          onDelete={deleteAlbum}
           counts={photoCounts}
         />
       }
@@ -253,7 +114,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
       onLogin={login}
       onLogout={logout}
     >
-      <PhotoGallery photos={filteredPhotos} onUpload={handleUpload} onDelete={guardedDeletePhoto} />
+      <PhotoGallery photos={filteredPhotos} onUpload={handleUpload} onDelete={ops.deletePhoto} />
     </LessAppShell>
   );
 }
@@ -271,7 +132,7 @@ function PhotosApp({
 }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { error: syncError } = useSync();
-  const syncStatus = useHeaderSyncStatus();
+  const syncStatus = useConnectionStatus();
   const [view, setView] = useState<View>({ kind: "all" });
 
   const {
@@ -279,16 +140,15 @@ function PhotosApp({
     photos: allPhotos,
     invitations,
     createAlbum,
-    deleteAlbum: hookDeleteAlbum,
     shareAlbum,
     inviteToAlbum,
     acceptInvitation,
     declineInvitation,
     removeMember,
     isAdmin,
-    addPhoto: hookAddPhoto,
-    deletePhoto: hookDeletePhoto,
+    addPhoto,
   } = useAlbums();
+  const ops = usePhotoOps(db, fileStore, addPhoto);
 
   useEffect(() => {
     if (view.kind === "album" && !allAlbums.find((a) => a.id === view.id)) {
@@ -300,72 +160,29 @@ function PhotosApp({
     view.kind === "album" ? allPhotos.filter((p) => p.albumId === view.id) : allPhotos;
 
   const deleteAlbum = useCallback(
-    async (id: string) => {
-      const deletedPhotos = await hookDeleteAlbum(id);
-      fileStore.evictAll(deletedPhotos.flatMap(photoFileIds));
-      if (view.kind === "album" && view.id === id) setView({ kind: "all" });
+    (id: string) => {
+      ops.deleteAlbum(
+        id,
+        allPhotos.filter((p) => p.albumId === id),
+        () => {
+          if (view.kind === "album" && view.id === id) setView({ kind: "all" });
+        },
+      );
     },
-    [hookDeleteAlbum, view, fileStore],
+    [ops, allPhotos, view],
   );
 
   const handleUpload = useCallback(
-    async (files: File[]) => {
+    (files: File[]) => {
       const albumId = view.kind === "album" ? view.id : "";
       const album = albumId ? allAlbums.find((a) => a.id === albumId) : undefined;
-
-      const failed = await uploadOneByOne(files, async (file) => {
-        const fileId = crypto.randomUUID();
-        const { width, height } = await getImageDimensions(file);
-        const record = await hookAddPhoto(
-          {
-            albumId,
-            filename: file.name,
-            mimeType: file.type,
-            size: file.size,
-            width,
-            height,
-            fileId,
-            caption: "",
-          },
-          album,
-        );
-        const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
-        if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
-      });
-      reportFailedUploads(failed, files.length);
+      return ops.upload(files, albumId, album);
     },
-    [view, allAlbums, hookAddPhoto, fileStore],
-  );
-
-  const deletePhoto = useCallback(
-    async (photo: Photo) => {
-      await hookDeletePhoto(photo.id);
-      photoFileIds(photo).forEach((fid) => fileStore.evict(fid));
-    },
-    [hookDeletePhoto, fileStore],
-  );
-
-  const guardedDeleteAlbum = useCallback(
-    (id: string) => {
-      deleteAlbum(id).catch((err) => reportError(err, "Couldn't delete album"));
-    },
-    [deleteAlbum],
-  );
-
-  const guardedDeletePhoto = useCallback(
-    (photo: Photo) => {
-      deletePhoto(photo).catch((err) => reportError(err, "Couldn't delete photo"));
-    },
-    [deletePhoto],
+    [ops, view, allAlbums],
   );
 
   const photoCounts = useMemo(
-    () => ({
-      all: allPhotos.length,
-      byAlbum: Object.fromEntries(
-        allAlbums.map((a) => [a.id, allPhotos.filter((p) => p.albumId === a.id).length]),
-      ),
-    }),
+    () => computePhotoCounts(allAlbums, allPhotos),
     [allAlbums, allPhotos],
   );
 
@@ -394,7 +211,7 @@ function PhotosApp({
           view={view}
           onViewChange={setView}
           onCreate={createAlbum}
-          onDelete={guardedDeleteAlbum}
+          onDelete={deleteAlbum}
           counts={photoCounts}
         />
       }
@@ -409,7 +226,7 @@ function PhotosApp({
       <PhotoGallery
         photos={filteredPhotos}
         onUpload={handleUpload}
-        onDelete={guardedDeletePhoto}
+        onDelete={ops.deletePhoto}
         album={selectedAlbum}
         personalSpaceId={personalSpaceId}
         isAdmin={selectedAlbum?._spaceId != null && isAdmin(selectedAlbum._spaceId)}
@@ -431,28 +248,6 @@ function PhotosApp({
 }
 
 // ---------------------------------------------------------------------------
-// SyncGuard — waits for LessContext to be ready before rendering PhotosApp.
-// ---------------------------------------------------------------------------
-
-function SyncGuard({
-  personalSpaceId,
-  fileStore,
-}: {
-  personalSpaceId: string | null;
-  fileStore: FileStore;
-}) {
-  const ready = useSyncReady();
-  if (!ready) {
-    return (
-      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
-        <Loader />
-      </Box>
-    );
-  }
-  return <PhotosApp personalSpaceId={personalSpaceId} fileStore={fileStore} />;
-}
-
-// ---------------------------------------------------------------------------
 // App — wraps PhotosApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
@@ -471,7 +266,9 @@ export default function App() {
         onAuthError={logout}
         fileStore={fileStore}
       >
-        <SyncGuard personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
+        <SyncedAppGate>
+          <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
+        </SyncedAppGate>
       </BetterbaseProvider>
     );
   }

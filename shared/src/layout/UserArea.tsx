@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Menu, Avatar, Group, Text, Divider, UnstyledButton } from "@mantine/core";
 import { LogOut, ExternalLink } from "lucide-react";
-import { useAuth } from "../auth.js";
+import { useAuth } from "betterbase/auth/react";
 import { ConnectSyncModal } from "./ConnectSyncModal.js";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge.js";
 
@@ -11,6 +11,11 @@ interface UserAreaProps {
   syncStatus?: SyncStatus;
   onLogin: () => Promise<void>;
   onLogout: () => void;
+  /**
+   * "sync" (default) — the app syncs data; button/copy say "Connect Sync".
+   * "auth" — sign-in only (no sync scope); button/copy say "Sign in".
+   */
+  mode?: "sync" | "auth";
 }
 
 function getInitials(handle: string): string {
@@ -43,6 +48,7 @@ export function UserArea({
   syncStatus = "synced",
   onLogin,
   onLogout,
+  mode = "sync",
 }: UserAreaProps) {
   const [modalOpened, setModalOpened] = useState(false);
   const { error: authError } = useAuth();
@@ -56,13 +62,14 @@ export function UserArea({
           rightSection={<ExternalLink size={14} />}
           onClick={() => setModalOpened(true)}
         >
-          Connect Sync
+          {mode === "auth" ? "Sign in" : "Connect Sync"}
         </Button>
         <ConnectSyncModal
           opened={modalOpened}
           onClose={() => setModalOpened(false)}
           onConnect={onLogin}
           error={authError}
+          mode={mode}
         />
       </>
     );

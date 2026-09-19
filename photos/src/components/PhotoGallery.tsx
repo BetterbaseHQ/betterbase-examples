@@ -5,6 +5,7 @@ import { Upload, ImagePlus } from "lucide-react";
 import { RowsPhotoAlbum } from "react-photo-album";
 import Lightbox from "yet-another-react-lightbox";
 import { EmptyState, ShareButton, MembersPanel, reportError } from "@betterbase/examples-shared";
+import { isShared } from "betterbase/sync";
 import type { Photo, Album } from "@/lib/db";
 import { PhotoCard } from "@/components/PhotoCard";
 import { LightboxSlide } from "@/components/LightboxSlide";
@@ -55,8 +56,8 @@ export function PhotoGallery({
 
   const photoByFileId = useMemo(() => new Map(photos.map((p) => [p.fileId, p])), [photos]);
 
-  const isPersonal = album == null || album._spaceId == null || album._spaceId === personalSpaceId;
-  const isShared = album != null && album._spaceId != null && !isPersonal;
+  const isSharedAlbum = album != null && isShared(album, personalSpaceId);
+  const isPersonal = !isSharedAlbum;
 
   // Map photos to react-photo-album format.
   // src is a placeholder — PhotoCard handles actual image loading via render.photo.
@@ -80,7 +81,7 @@ export function PhotoGallery({
           >
             <Text fw={600}>{album.name}</Text>
             {isPersonal && onShare && <ShareButton onShare={onShare} />}
-            {isShared && album._spaceId && onInvite && onRemoveMember && (
+            {isSharedAlbum && album._spaceId && onInvite && onRemoveMember && (
               <MembersPanel
                 spaceId={album._spaceId}
                 isAdmin={isAdmin}
@@ -134,7 +135,7 @@ export function PhotoGallery({
             {photos.length} {photos.length === 1 ? "photo" : "photos"}
           </Text>
           {isPersonal && onShare && <ShareButton onShare={onShare} />}
-          {isShared && album!._spaceId && onInvite && onRemoveMember && (
+          {isSharedAlbum && album!._spaceId && onInvite && onRemoveMember && (
             <MembersPanel
               spaceId={album!._spaceId}
               isAdmin={isAdmin}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { vi } from "vitest";
-import { putPhotoFiles } from "./App";
+import { putPhotoFiles } from "@/lib/photo-ops";
 
 function fakeFileStore() {
   const puts: Array<{ id: string; bytes: Uint8Array; recordId: string | undefined }> = [];

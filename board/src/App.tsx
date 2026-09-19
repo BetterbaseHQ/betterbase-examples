@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Kanban } from "lucide-react";
-import { Box, Loader } from "@mantine/core";
-import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
+  SyncedAppGate,
   useAuth,
-  useHeaderSyncStatus,
   EmptyState,
   InvitationBanner,
   reportError,
@@ -182,7 +181,7 @@ function LocalBoardApp() {
 function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { phase, error: syncError } = useSync();
-  const syncStatus = useHeaderSyncStatus();
+  const syncStatus = useConnectionStatus();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -336,22 +335,6 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// SyncGuard — waits for LessContext to be ready before rendering BoardApp.
-// ---------------------------------------------------------------------------
-
-function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
-  const ready = useSyncReady();
-  if (!ready) {
-    return (
-      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
-        <Loader />
-      </Box>
-    );
-  }
-  return <BoardApp personalSpaceId={personalSpaceId} />;
-}
-
-// ---------------------------------------------------------------------------
 // App — wraps BoardApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
@@ -367,7 +350,9 @@ export default function App() {
         domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
         onAuthError={logout}
       >
-        <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
+        <SyncedAppGate>
+          <BoardApp personalSpaceId={session.getPersonalSpaceId()} />
+        </SyncedAppGate>
       </BetterbaseProvider>
     );
   }

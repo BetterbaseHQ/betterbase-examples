@@ -13,20 +13,19 @@
 
 import { useRef, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { moveToSpace, spaceOf, type SpaceFields } from "betterbase/sync";
+import { shareTree, ShareTreeError, spaceOf, type SpaceFields } from "betterbase/sync";
 import { conversations, messages, type Conversation, type Message } from "@/lib/db";
 
 export function useConversations() {
   const db = useSyncDb();
+  const spaces = useSpaces();
   const {
-    userExists,
-    createSpace,
     invite,
     accept: acceptInvitation,
     decline: declineInvitation,
     removeMember,
     isAdmin,
-  } = useSpaces();
+  } = spaces;
 
   const convResult = useQuery(conversations, {
     // id tie-breaker: wall-clock timestamps can tie or skew across devices
@@ -53,50 +52,47 @@ export function useConversations() {
 
   /**
    * Start a new conversation with another user.
-   * Creates a shared space, puts the conversation in it, and invites the
-   * recipient — all in one step. name defaults to the recipient's handle.
+   * Creates the conversation in the personal space, then shares it in one
+   * step — shareTree checks the recipient exists, creates a shared space,
+   * moves the conversation into it, and invites them. name defaults to the
+   * recipient's handle.
    */
   const startConversation = useCallback(
     async (recipientHandle: string, name?: string): Promise<Conversation & SpaceFields> => {
-      const exists = await userExists(recipientHandle);
-      if (!exists) throw new Error(`User "${recipientHandle}" not found`);
-
       // Store name as-is: empty string means "auto — compute from members".
       // spaceName in the invite is always non-empty so the invitation banner
       // shows something useful to the recipient.
       const customName = name?.trim() ?? "";
       const spaceLabel = customName || recipientHandle;
-      const spaceId = await createSpace();
 
-      // Create in personal space then move, so we get a properly typed SpaceFields result
-      // @ts-expect-error TS2589: type depth limit
+      // Create in personal space then share, so we get a properly typed
+      // SpaceFields result back (moves assign a fresh ID in the shared space).
       const draft = await db.put(conversations, {
         name: customName,
         lastMessageText: "",
         lastMessageAt: Date.now(),
       });
 
-      // Each failure path cleans up the records it created so retries don't
-      // accumulate orphans. (The space itself can't be torn down — the SDK
-      // exposes no space deletion via useSpaces yet.)
-      let newConv;
       try {
-        newConv = await moveToSpace(db, conversations, draft.id, spaceId);
+        const { parent: newConv } = await shareTree(db, spaces, {
+          collection: conversations,
+          id: draft.id,
+          invitee: recipientHandle,
+          spaceName: spaceLabel,
+        });
+        return newConv as Conversation & SpaceFields;
       } catch (err) {
-        await db.delete(conversations, draft.id).catch(() => {});
+        // Clean up so retries don't accumulate orphans. Once the move
+        // succeeded the draft is already tombstoned — the ShareTreeError
+        // carries the moved record so we delete that instead. (The space
+        // itself can't be torn down — the SDK exposes no space deletion via
+        // useSpaces yet.)
+        const orphanId = err instanceof ShareTreeError && err.parent ? err.parent.id : draft.id;
+        await db.delete(conversations, orphanId).catch(() => {});
         throw err;
       }
-
-      try {
-        await invite(spaceId, recipientHandle, { spaceName: spaceLabel });
-      } catch (err) {
-        await db.delete(conversations, newConv.id).catch(() => {});
-        throw err;
-      }
-
-      return newConv;
     },
-    [db, userExists, createSpace, invite],
+    [db, spaces],
   );
 
   const deleteConversation = useCallback(

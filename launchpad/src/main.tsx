@@ -2,7 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
-import { lessTheme, AuthProvider } from "@betterbase/examples-shared";
+import { AuthProvider } from "betterbase/auth/react";
+import { lessTheme } from "@betterbase/examples-shared";
 import App from "./App.tsx";
 
 import "@mantine/core/styles.css";

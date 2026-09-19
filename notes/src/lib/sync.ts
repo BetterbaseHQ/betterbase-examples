@@ -2,9 +2,9 @@
  * useNotebooks — domain-specific sync hook for the Notes app.
  *
  * Wraps useSpaces() sharing primitives with the notebooks + notes collections
- * to provide a unified API for notebook management + sharing. Child notes are
- * migrated to the shared space on share via bulkMoveToSpace, with the
- * notebookId FK updated to point to the new notebook ID.
+ * to provide a unified API for notebook management + sharing. Sharing uses
+ * shareTree to move the notebook and its child notes into a shared space in
+ * one call, with the notebookId FK rewritten to the new notebook ID.
  *
  * Local mutations auto-sync via SyncEngine's db.onChange listener — no manual
  * scheduleSync() calls needed.
@@ -14,20 +14,13 @@
 
 import { useRef, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { moveToSpace, bulkMoveToSpace, spaceOf, type SpaceFields } from "betterbase/sync";
+import { shareTree, spaceOf, type SpaceFields } from "betterbase/sync";
 import { notebooks, notes, type Notebook, type Note } from "@/lib/db";
 
 export function useNotebooks() {
   const db = useSyncDb();
-  const {
-    userExists,
-    createSpace,
-    invite,
-    accept: acceptInvitation,
-    decline: declineInvitation,
-    removeMember,
-    isAdmin,
-  } = useSpaces();
+  const spaces = useSpaces();
+  const { invite } = spaces;
 
   const notebookResult = useQuery(notebooks, {
     sort: [{ field: "sortOrder", direction: "asc" }],
@@ -48,7 +41,6 @@ export function useNotebooks() {
   const createNotebook = useCallback(
     async (name: string) => {
       const maxOrder = allNotebooks.reduce((max, nb) => Math.max(max, nb.sortOrder), 0);
-      // @ts-expect-error TS2589: type depth limit
       await db.put(notebooks, { name, sortOrder: maxOrder + 1 });
     },
     [db, allNotebooks],
@@ -65,31 +57,34 @@ export function useNotebooks() {
 
   /**
    * Share a personal notebook with another user.
-   * Creates a new shared space, moves the notebook to it, migrates all child
-   * notes (with updated notebookId FK), and invites the user.
+   * shareTree creates a new shared space, moves the notebook and its child
+   * notes to it (rewriting notebookId to the new notebook's ID), and invites
+   * the user. Returns the new notebook record (with a new ID in the shared
+   * space).
    */
   const shareNotebook = useCallback(
     async (
       notebook: Notebook & { _spaceId?: string },
       handle: string,
     ): Promise<Notebook & SpaceFields> => {
-      const exists = await userExists(handle);
-      if (!exists) throw new Error(`User "${handle}" not found`);
-
-      const spaceId = await createSpace();
-      const newNotebook = await moveToSpace(db, notebooks, notebook.id, spaceId);
-
       const childNoteIds = allNotesRef.current
         .filter((n) => n.notebookId === notebook.id)
         .map((n) => n.id);
-      await bulkMoveToSpace(db, notes, childNoteIds, spaceId, {
-        notebookId: newNotebook.id,
-      });
 
-      await invite(spaceId, handle, { spaceName: notebook.name });
-      return newNotebook;
+      const { parent: newNotebook } = await shareTree(db, spaces, {
+        collection: notebooks,
+        id: notebook.id,
+        invitee: handle,
+        spaceName: notebook.name,
+        children: {
+          collection: notes,
+          ids: childNoteIds,
+          overrides: (newParent) => ({ notebookId: (newParent as Notebook).id }),
+        },
+      });
+      return newNotebook as Notebook & SpaceFields;
     },
-    [db, userExists, createSpace, invite],
+    [db, spaces],
   );
 
   const inviteToNotebook = useCallback(
@@ -135,10 +130,10 @@ export function useNotebooks() {
     deleteNotebook,
     shareNotebook,
     inviteToNotebook,
-    acceptInvitation,
-    declineInvitation,
-    removeMember,
-    isAdmin,
+    acceptInvitation: spaces.accept,
+    declineInvitation: spaces.decline,
+    removeMember: spaces.removeMember,
+    isAdmin: spaces.isAdmin,
     createNote,
     updateNote,
     deleteNote,

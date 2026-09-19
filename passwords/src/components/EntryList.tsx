@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { TextInput, ActionIcon, Stack, Text, Group, Button } from "@mantine/core";
 import { Search, Plus, Globe, CreditCard, StickyNote, User, Users } from "lucide-react";
+import { isShared } from "betterbase/sync";
 import type { Entry } from "@/lib/db";
 
 const CATEGORY_ICONS: Record<string, ReactNode> = {
@@ -72,8 +73,6 @@ function EntryRow({
   personalSpaceId?: string | null;
   onSelect: (id: string) => void;
 }) {
-  const isShared = entry._spaceId != null && entry._spaceId !== personalSpaceId;
-
   return (
     // div, not button: the row contains a decorative ActionIcon (itself a
     // button element) — interactive elements can't nest in HTML
@@ -117,7 +116,9 @@ function EntryRow({
             {entry.username}
           </Text>
         </Stack>
-        {isShared && <Users size={12} color="var(--mantine-color-blue-5)" />}
+        {isShared(entry, personalSpaceId) && (
+          <Users size={12} color="var(--mantine-color-blue-5)" />
+        )}
       </Group>
     </div>
   );

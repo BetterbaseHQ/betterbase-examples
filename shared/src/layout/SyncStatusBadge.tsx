@@ -1,7 +1,9 @@
 import { Badge } from "@mantine/core";
 import { WifiOff, AlertTriangle } from "lucide-react";
+import type { ConnectionStatus } from "betterbase/sync/react";
 
-export type SyncStatus = "synced" | "syncing" | "offline" | "error";
+/** Kept as an alias of the SDK's ConnectionStatus for component consumers. */
+export type SyncStatus = ConnectionStatus;
 
 interface SyncStatusBadgeProps {
   status: SyncStatus;

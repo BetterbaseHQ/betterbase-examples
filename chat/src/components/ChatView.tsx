@@ -6,9 +6,8 @@ import {
   MembersPanel,
   PresenceAvatars,
   TypingIndicator,
-  useTyping,
 } from "@betterbase/examples-shared";
-import { usePresence } from "betterbase/sync/react";
+import { usePresence, useTyping } from "betterbase/sync/react";
 import type { Conversation, Message } from "@/lib/db";
 import { MessageBubble } from "./MessageBubble";
 import { shortHandle } from "@/lib/handle";

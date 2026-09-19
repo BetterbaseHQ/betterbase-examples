@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
-import { Box, Loader } from "@mantine/core";
-import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
+import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
+  SyncedAppGate,
   useAuth,
-  useHeaderSyncStatus,
   EmptyState,
   InvitationBanner,
   reportError,
@@ -106,7 +105,7 @@ function LocalTasksApp() {
 function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { phase, error: syncError } = useSync();
-  const syncStatus = useHeaderSyncStatus();
+  const syncStatus = useConnectionStatus();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -212,25 +211,6 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// SyncGuard — waits for LessContext to be ready before rendering TasksApp.
-// BetterbaseProvider always renders children immediately but LessContext is null
-// until async session key derivation completes. All useLists hooks throw on
-// a null context, so we gate here rather than inside each hook.
-// ---------------------------------------------------------------------------
-
-function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
-  const ready = useSyncReady();
-  if (!ready) {
-    return (
-      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
-        <Loader />
-      </Box>
-    );
-  }
-  return <TasksApp personalSpaceId={personalSpaceId} />;
-}
-
-// ---------------------------------------------------------------------------
 // App — wraps TasksApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
@@ -246,7 +226,9 @@ export default function App() {
         domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
         onAuthError={logout}
       >
-        <SyncGuard personalSpaceId={session.getPersonalSpaceId()} />
+        <SyncedAppGate>
+          <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
+        </SyncedAppGate>
       </BetterbaseProvider>
     );
   }

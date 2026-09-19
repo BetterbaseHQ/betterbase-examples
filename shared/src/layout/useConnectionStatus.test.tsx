@@ -1,13 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
-import { useHeaderSyncStatus, type SyncStatus } from "./useHeaderSyncStatus";
+import { useConnectionStatus, type ConnectionStatus } from "betterbase/sync/react";
 import { renderWithProviders, setSyncState } from "../test";
 
-// `betterbase/sync/react` resolves to the harness stub via the test config's
-// alias — no vi.mock needed.
+// `betterbase/sync/react` resolves to the SDK testing stub via the test
+// config's alias; the stub derives from the same pure function as the real
+// hook, driven here by setSyncState + navigator.onLine.
 
 function StatusProbe() {
-  const status: SyncStatus = useHeaderSyncStatus();
+  const status: ConnectionStatus = useConnectionStatus();
   return <div data-testid="status">{status}</div>;
 }
 
@@ -23,7 +24,7 @@ afterEach(() => {
   setSyncState({ phase: "ready", syncing: false, error: null });
 });
 
-describe("useHeaderSyncStatus", () => {
+describe("useConnectionStatus (via SDK testing stub)", () => {
   it("reports offline when the browser is offline", () => {
     setOnline(false);
     renderWithProviders(<StatusProbe />);
@@ -42,8 +43,7 @@ describe("useHeaderSyncStatus", () => {
     expect(screen.getByTestId("status")).toHaveTextContent("syncing");
   });
 
-  it("regression: reports syncing during the connecting/bootstrap phases, not 'synced'", () => {
-    // Before the fix, phase was ignored and a connecting engine showed "Synced"
+  it("reports syncing during the connecting/bootstrap phases, not 'synced'", () => {
     setSyncState({ phase: "connecting", syncing: false });
     const { rerender } = renderWithProviders(<StatusProbe />);
     expect(screen.getByTestId("status")).toHaveTextContent("syncing");

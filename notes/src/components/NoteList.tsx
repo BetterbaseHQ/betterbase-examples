@@ -1,5 +1,6 @@
 import { TextInput, ActionIcon, Text, Group, UnstyledButton } from "@mantine/core";
 import { Search, Plus, Pin, Star } from "lucide-react";
+import { isShared } from "betterbase/sync";
 import { ShareButton, MembersPanel } from "@betterbase/examples-shared";
 import type { Note, Notebook } from "@/lib/db";
 
@@ -49,9 +50,7 @@ export function NoteList({
   onInvite,
   onRemoveMember,
 }: NoteListProps) {
-  const isPersonal =
-    notebook == null || notebook._spaceId == null || notebook._spaceId === personalSpaceId;
-  const isShared = notebook != null && notebook._spaceId != null && !isPersonal;
+  const notebookIsShared = notebook != null && isShared(notebook, personalSpaceId);
 
   return (
     <div
@@ -76,8 +75,8 @@ export function NoteList({
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" lineClamp={1}>
               {notebook.name}
             </Text>
-            {isPersonal && onShare && <ShareButton onShare={onShare} />}
-            {isShared && notebook._spaceId && onInvite && onRemoveMember && (
+            {!notebookIsShared && onShare && <ShareButton onShare={onShare} />}
+            {notebookIsShared && notebook._spaceId && onInvite && onRemoveMember && (
               <MembersPanel
                 spaceId={notebook._spaceId}
                 isAdmin={isAdmin}

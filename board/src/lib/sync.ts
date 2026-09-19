@@ -60,7 +60,6 @@ export function useBoards() {
 
   const createBoard = useCallback(
     async (name: string) => {
-      // @ts-expect-error TS2589: type depth limit
       const board = await db.put(boards, { name });
       const defaults = ["To Do", "In Progress", "Done"];
       for (let i = 0; i < defaults.length; i++) {
