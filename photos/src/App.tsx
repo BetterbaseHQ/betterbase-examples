@@ -18,6 +18,12 @@ import {
 } from "@betterbase/examples-shared";
 import { db, albums, photos } from "@/lib/db";
 import type { Photo } from "@/lib/db";
+import { generateThumbnail } from "@/lib/thumbnail";
+
+/** All FileStore ids backing a photo record (full blob + thumbnail). */
+function photoFileIds(photo: Photo): string[] {
+  return photo.thumbFileId ? [photo.fileId, photo.thumbFileId] : [photo.fileId];
+}
 import { useAlbums } from "@/lib/sync";
 import { AlbumSidebar } from "@/components/AlbumSidebar";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -41,6 +47,28 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
     };
     img.src = url;
   });
+}
+
+/**
+ * Upload one photo: full blob + grid thumbnail (best-effort — a thumbnail
+ * failure downgrades to rendering the full image, never fails the upload).
+ */
+async function putPhotoFiles(
+  fileStore: FileStore,
+  recordId: string,
+  file: File,
+  fileId: string,
+): Promise<string | undefined> {
+  await fileStore.put(fileId, new Uint8Array(await file.arrayBuffer()), recordId);
+  try {
+    const thumb = await generateThumbnail(file);
+    const thumbFileId = crypto.randomUUID();
+    await fileStore.put(thumbFileId, thumb, recordId);
+    return thumbFileId;
+  } catch (err) {
+    console.warn("Thumbnail generation failed", err);
+    return undefined;
+  }
 }
 
 /**
@@ -133,7 +161,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
       const toDelete = allPhotos.filter((p) => p.albumId === id);
       await Promise.all(toDelete.map((p) => db.delete(photos, p.id)));
       await db.delete(albums, id);
-      fileStore.evictAll(toDelete.map((p) => p.fileId));
+      fileStore.evictAll(toDelete.flatMap(photoFileIds));
       if (view.kind === "album" && view.id === id) setView({ kind: "all" });
     },
     [allPhotos, view, fileStore],
@@ -144,7 +172,6 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
       const albumId = view.kind === "album" ? view.id : "";
       const failed = await uploadOneByOne(files, async (file) => {
         const fileId = crypto.randomUUID();
-        const data = new Uint8Array(await file.arrayBuffer());
         const { width, height } = await getImageDimensions(file);
         const record = await db.put(photos, {
           albumId,
@@ -156,7 +183,8 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
           fileId,
           caption: "",
         });
-        await fileStore.put(fileId, data, record.id);
+        const thumbFileId = await putPhotoFiles(fileStore, record.id, file, fileId);
+        if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
       });
       reportFailedUploads(failed, files.length);
     },
@@ -166,7 +194,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
   const deletePhoto = useCallback(
     async (photo: Photo) => {
       await db.delete(photos, photo.id);
-      fileStore.evict(photo.fileId);
+      photoFileIds(photo).forEach((fid) => fileStore.evict(fid));
     },
     [fileStore],
   );
@@ -264,7 +292,7 @@ function PhotosApp({
   const deleteAlbum = useCallback(
     async (id: string) => {
       const deletedPhotos = await hookDeleteAlbum(id);
-      fileStore.evictAll(deletedPhotos.map((p) => p.fileId));
+      fileStore.evictAll(deletedPhotos.flatMap(photoFileIds));
       if (view.kind === "album" && view.id === id) setView({ kind: "all" });
     },
     [hookDeleteAlbum, view, fileStore],
@@ -277,7 +305,6 @@ function PhotosApp({
 
       const failed = await uploadOneByOne(files, async (file) => {
         const fileId = crypto.randomUUID();
-        const data = new Uint8Array(await file.arrayBuffer());
         const { width, height } = await getImageDimensions(file);
         const record = await hookAddPhoto(
           {
@@ -292,7 +319,8 @@ function PhotosApp({
           },
           album,
         );
-        await fileStore.put(fileId, data, record.id);
+        const thumbFileId = await putPhotoFiles(fileStore, record.id, file, fileId);
+        if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
       });
       reportFailedUploads(failed, files.length);
     },
@@ -302,7 +330,7 @@ function PhotosApp({
   const deletePhoto = useCallback(
     async (photo: Photo) => {
       await hookDeletePhoto(photo.id);
-      fileStore.evict(photo.fileId);
+      photoFileIds(photo).forEach((fid) => fileStore.evict(fid));
     },
     [hookDeletePhoto, fileStore],
   );

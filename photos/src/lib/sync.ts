@@ -120,6 +120,7 @@ export function useAlbums() {
         width: number;
         height: number;
         fileId: string;
+        thumbFileId?: string;
         caption: string;
       },
       album?: Album & { _spaceId?: string },

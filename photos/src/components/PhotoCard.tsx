@@ -14,7 +14,8 @@ interface PhotoCardProps {
 }
 
 export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
-  const { url, status } = useFile(photo.fileId, photo.mimeType);
+  // Grid renders the thumbnail when available; the lightbox uses the full blob
+  const { url, status } = useFile(photo.thumbFileId ?? photo.fileId, photo.mimeType);
   const [hovered, setHovered] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
