@@ -58,7 +58,7 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
  * Upload one photo: full blob + grid thumbnail (best-effort — a thumbnail
  * failure downgrades to rendering the full image, never fails the upload).
  */
-async function putPhotoFiles(
+export async function putPhotoFiles(
   db: PhotoDb,
   fileStore: FileStore,
   recordId: string,

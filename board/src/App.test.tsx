@@ -7,20 +7,14 @@ import {
   renderWithProviders,
   makeFakeSession,
   setSyncDb,
+  wipeCollections,
   lastProviderProps,
 } from "@betterbase/examples-shared/test";
 
 // One db per file — tests share it, so wipe records between tests to keep
 // them independent (the auto-created board belongs to whichever test ran first)
-async function wipeRecords() {
-  for (const collection of [cards, columns, boards]) {
-    const all = await db.query(collection, {});
-    await Promise.all(all.records.map((r) => db.delete(collection, r.id)));
-  }
-}
-
 afterEach(async () => {
-  await wipeRecords();
+  await wipeCollections(db, [cards, columns, boards]);
 });
 
 describe("Board app sync wiring", () => {

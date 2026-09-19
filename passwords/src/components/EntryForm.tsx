@@ -155,14 +155,14 @@ function randomIndex(len: number): number {
   return n % len;
 }
 
-interface GeneratorOptions {
+export interface GeneratorOptions {
   lowercase: boolean;
   uppercase: boolean;
   numbers: boolean;
   symbols: boolean;
 }
 
-function generatePassword(length: number, options: GeneratorOptions): string {
+export function generatePassword(length: number, options: GeneratorOptions): string {
   const groups: string[] = [];
   if (options.lowercase) groups.push("abcdefghijklmnopqrstuvwxyz");
   if (options.uppercase) groups.push("ABCDEFGHIJKLMNOPQRSTUVWXYZ");

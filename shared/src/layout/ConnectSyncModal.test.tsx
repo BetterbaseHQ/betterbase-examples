@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConnectSyncModal } from "./ConnectSyncModal";
@@ -34,9 +33,7 @@ describe("ConnectSyncModal", () => {
     });
     await user.click(screen.getByRole("button", { name: /continue with betterbase account/i }));
     // Modal must still be open (dialog in the document, not closed)
-    await waitFor(() =>
-      expect(screen.getByText("network down")).toBeVisible(),
-    );
+    await waitFor(() => expect(screen.getByText("network down")).toBeVisible());
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeVisible();
   });
@@ -47,9 +44,7 @@ describe("ConnectSyncModal", () => {
     expect(screen.queryByText("stale session error")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /continue with betterbase account/i }));
-    await waitFor(() =>
-      expect(screen.getByText("stale session error")).toBeVisible(),
-    );
+    await waitFor(() => expect(screen.getByText("stale session error")).toBeVisible());
   });
 
   it("escape while connecting does not close the modal", async () => {

@@ -53,7 +53,15 @@ export function ChatView({
     const convKey = conversation?.id ?? null;
     if (jumpedFor.current !== convKey) {
       jumpedFor.current = convKey;
-      el.scrollTo({ top: el.scrollHeight });
+      const jump = () => {
+        const viewport = viewportRef.current;
+        viewport?.scrollTo({ top: viewport.scrollHeight });
+      };
+      jump();
+      // The ref may not be attached yet (ScrollArea mounts the viewport
+      // child), and content may not have laid out on first paint with cached
+      // history — re-apply once both settle.
+      requestAnimationFrame(jump);
       return;
     }
     // Follow new messages, but only when already near the bottom (so reading

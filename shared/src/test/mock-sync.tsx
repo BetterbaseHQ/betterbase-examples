@@ -24,13 +24,7 @@ import { vi } from "vitest";
 import { useRef, type ReactNode } from "react";
 
 // Re-exported from the real module — querying works without a server.
-import {
-  DatabaseProvider,
-  useQuery as useQueryBase,
-  type CollectionRead,
-  type SchemaShape,
-} from "betterbase/db/react";
-import type { CollectionDefHandle } from "betterbase/db";
+import { DatabaseProvider, useQuery as useQueryBase } from "betterbase/db/react";
 export type { EditHistoryEntry } from "betterbase/sync/react";
 
 /**
@@ -41,11 +35,18 @@ export type { EditHistoryEntry } from "betterbase/sync/react";
  */
 export const STUB_PERSONAL_SPACE_ID = "personal-space-1";
 
-export function useQuery<S extends SchemaShape>(
-  def: CollectionDefHandle<string, S>,
-  query?: Parameters<typeof useQueryBase>[1],
-): { records: Array<CollectionRead<S> & { _spaceId: string }> } {
-  const raw = useQueryBase(def, query);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub
+export function useQuery(
+  def: unknown,
+  query?: unknown,
+): {
+  records: any[];
+} {
+  // `never` casts on both ends: instantiating the raw hook's schema generics
+  // through a stub signature collapses into TS2589
+  const raw = useQueryBase(def as never, query as never) as
+    | { records: Array<Record<string, unknown>> }
+    | undefined;
   const cache = useRef<{ raw: unknown; mapped: { records: unknown[] } }>({
     raw: undefined,
     mapped: { records: [] },
@@ -60,7 +61,7 @@ export function useQuery<S extends SchemaShape>(
       },
     };
   }
-  return cache.current.mapped as { records: Array<CollectionRead<S> & { _spaceId: string }> };
+  return cache.current.mapped as { records: never[] };
 }
 
 // ---------------------------------------------------------------------------
@@ -94,9 +95,7 @@ export function BetterbaseProvider(props: Record<string, unknown>) {
   };
   // The real provider supplies the db context (useQuery/useDatabase) — mirror
   // that so app trees render unchanged
-  return (
-    <DatabaseProvider value={rest.adapter as never}>{children}</DatabaseProvider>
-  );
+  return <DatabaseProvider value={rest.adapter as never}>{children}</DatabaseProvider>;
 }
 
 export function FileStoreProvider({
@@ -181,7 +180,20 @@ export function usePendingInvitations() {
 // Presence / events / files — minimal inert shapes
 // ---------------------------------------------------------------------------
 
-export function useSync() {
+export interface SyncContextStub {
+  phase: "connecting" | "bootstrapping" | "ready";
+  syncing: boolean;
+  error: string | null;
+  sync: () => Promise<void>;
+  scheduleSync: (def: unknown) => void;
+  flushAll: () => Promise<void>;
+  resubscribe: () => void;
+  privateKeyJwk: JsonWebKey | null;
+  presenceManager: null;
+  eventManager: null;
+}
+
+export function useSync(): SyncContextStub {
   return {
     ...syncState,
     sync: vi.fn().mockResolvedValue(undefined),
@@ -215,15 +227,26 @@ export function useMembers(_spaceId: string | null | undefined) {
   return { members: [] as Array<{ id: string; handle: string }> };
 }
 
-export function useFile(_fileId: string | null | undefined, _mimeType?: string) {
-  return { url: null as string | null, status: "idle" as string };
+let fileUrls = new Map<string, string>();
+
+/** Make `useFile(fileId)` resolve to a url (e.g. a data: URL in tests). */
+export function setFileUrl(fileId: string, url: string | null) {
+  if (url === null) fileUrls.delete(fileId);
+  else fileUrls.set(fileId, url);
+}
+
+export function useFile(fileId: string | null | undefined, _mimeType?: string) {
+  const url = fileId ? (fileUrls.get(fileId) ?? null) : null;
+  return { url, status: url ? "loaded" : ("idle" as string) };
 }
 
 export function useEditChain(_record: unknown): unknown[] {
   return [];
 }
 
-export function useSendEvent(_spaceId: string | null | undefined) {
+export function useSendEvent(
+  _spaceId: string | null | undefined,
+): (type: string, data: unknown) => void {
   return vi.fn();
 }
 
@@ -232,3 +255,28 @@ export function useEvent(
   _type: string,
   _handler: (data: unknown) => void,
 ): void {}
+
+// ---------------------------------------------------------------------------
+// Test-data helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Delete every record in the given collections — used between tests so apps
+ * with fixed db names don't leak state (the auto-created board from one test
+ * would otherwise belong to the next).
+ */
+export async function wipeCollections(
+  // Both parameters are untyped on purpose: checking heterogeneous collection
+  // arrays or the app db against generic SDK signatures collapses into TS2589
+  adapter: unknown,
+  collections: readonly unknown[],
+): Promise<void> {
+  const db = adapter as {
+    query(collection: never, opts: unknown): Promise<{ records: Array<{ id: string }> }>;
+    delete(collection: never, id: string): Promise<unknown>;
+  };
+  for (const collection of collections) {
+    const all = await db.query(collection as never, {});
+    await Promise.all(all.records.map((r) => db.delete(collection as never, r.id)));
+  }
+}

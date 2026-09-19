@@ -74,4 +74,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
       - run: pnpm install --frozen-lockfile
+      # Browser-mode component tests run in a real Playwright chromium
+      - name: Install test browser
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm check

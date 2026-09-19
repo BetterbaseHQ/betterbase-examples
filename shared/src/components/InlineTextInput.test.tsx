@@ -20,12 +20,7 @@ describe("InlineTextInput", () => {
     const onSubmit = vi.fn();
     const onCancel = vi.fn();
     renderWithProviders(
-      <InlineTextInput
-        value="  "
-        onChange={vi.fn()}
-        onSubmit={onSubmit}
-        onCancel={onCancel}
-      />,
+      <InlineTextInput value="  " onChange={vi.fn()} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     await user.type(screen.getByRole("textbox"), "{Enter}");
     expect(onSubmit).not.toHaveBeenCalled();

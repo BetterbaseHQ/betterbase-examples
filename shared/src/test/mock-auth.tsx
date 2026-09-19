@@ -26,7 +26,9 @@ export function makeFakeSession(overrides: Partial<FakeSession> = {}): FakeSessi
   };
 }
 
-export type MockAuthOverrides = Partial<AuthContextValue>;
+export type MockAuthOverrides = Partial<Omit<AuthContextValue, "session">> & {
+  session?: unknown;
+};
 
 export function MockAuthProvider({
   children,
@@ -36,22 +38,23 @@ export function MockAuthProvider({
   auth?: MockAuthOverrides;
 }) {
   const value = useMemo<AuthContextValue>(
-    () => ({
-      session: null,
-      getToken: () => Promise.resolve(null),
-      encryptionKey: null,
-      epochKey: null,
-      personalSpaceId: "personal-space-1",
-      keypair: null,
-      handle: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-      login: vi.fn(),
-      logout: vi.fn(),
-      clientId: "test-client-id",
-      ...auth,
-    }),
+    () =>
+      ({
+        session: null,
+        getToken: () => Promise.resolve(null),
+        encryptionKey: null,
+        epochKey: null,
+        personalSpaceId: "personal-space-1",
+        keypair: null,
+        handle: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+        login: vi.fn(),
+        logout: vi.fn(),
+        clientId: "test-client-id",
+        ...auth,
+      }) as AuthContextValue,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- test double
     [JSON.stringify(auth)],
   );

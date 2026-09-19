@@ -13,30 +13,41 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "format": "prettier --write .",
-    "check": "prettier --write . && tsc -b && vite build"
+    "check": "prettier --write . && tsc -b && vite build && pnpm test",
+    "test": "vitest run --config vitest.browser.config.ts",
+    "test:watch": "vitest --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@betterbase/examples-shared": "link:../shared",
-    "betterbase": "link:../../betterbase/js",
     "@mantine/core": "^7.17.0",
     "@mantine/dropzone": "^7.17.0",
     "@mantine/hooks": "^7.17.0",
+    "@mantine/notifications": "^7.17.0",
+    "betterbase": "link:../../betterbase/js",
     "lucide-react": "^0.469.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-photo-album": "^3.0.2",
-    "yet-another-react-lightbox": "^3.21.7",
-    "@mantine/notifications": "^7.17.0"
+    "yet-another-react-lightbox": "^3.21.7"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/browser": "4.0.18",
+    "@vitest/browser-playwright": "4.0.18",
+    "playwright": "1.58.2",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "4.0.18"
   },
   "packageManager": "pnpm@12.4.2"
 }

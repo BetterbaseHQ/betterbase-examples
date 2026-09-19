@@ -23,7 +23,8 @@
     "allowUnusedLabels": false,
     "jsx": "react-jsx",
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "types": ["@testing-library/jest-dom/vitest"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

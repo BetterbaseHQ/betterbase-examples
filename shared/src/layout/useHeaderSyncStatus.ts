@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useSync } from "betterbase/sync/react";
 import type { SyncStatus } from "./SyncStatusBadge.js";
 
+export type { SyncStatus };
+
 /**
  * Derive the header sync status from the sync engine state plus browser
  * connectivity. Must be used inside a `BetterbaseProvider` tree.

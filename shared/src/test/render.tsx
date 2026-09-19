@@ -3,12 +3,16 @@
  * Mantine + notifications + a controllable auth context.
  */
 import type { ReactElement, ReactNode } from "react";
-import { render, type RenderOptions } from "@testing-library/react";
+import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { MockAuthProvider, type MockAuthOverrides } from "./mock-auth.js";
 import { DatabaseProvider } from "betterbase/db/react";
 import { lessTheme } from "../theme.js";
+// Mantine's stylesheet — without it ScrollArea/AppShell layout rules are
+// missing and height-bounded scrolling doesn't work in tests
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 
 export interface RenderWithProvidersOptions extends RenderOptions {
   auth?: MockAuthOverrides;
@@ -24,12 +28,10 @@ export interface RenderWithProvidersOptions extends RenderOptions {
 export function renderWithProviders(
   ui: ReactElement,
   { auth, db, wrap, ...renderOptions }: RenderWithProvidersOptions = {},
-) {
+): RenderResult {
   return render(ui, {
     wrapper: ({ children }) => {
-      let tree: ReactNode = (
-        <MockAuthProvider auth={auth}>{children}</MockAuthProvider>
-      );
+      let tree: ReactNode = <MockAuthProvider auth={auth}>{children}</MockAuthProvider>;
       if (db !== undefined) {
         tree = <DatabaseProvider value={db as never}>{tree}</DatabaseProvider>;
       }
