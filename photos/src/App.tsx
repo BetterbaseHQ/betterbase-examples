@@ -142,7 +142,7 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
 
   return (
     <LessAppShell
-      appName="Betterbase Photos"
+      appName="Photos"
       appIcon={<Image size={22} color="var(--mantine-color-indigo-6)" />}
       navbar={
         <AlbumSidebar
@@ -282,7 +282,7 @@ function PhotosApp({
 
   return (
     <LessAppShell
-      appName="Betterbase Photos"
+      appName="Photos"
       appIcon={<Image size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={

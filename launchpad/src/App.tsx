@@ -88,7 +88,7 @@ function AppCard({ name, description, icon, port, ready }: (typeof apps)[number]
         </ThemeIcon>
         <div>
           <Text fw={600} size="md">
-            Betterbase {name}
+            {name}
           </Text>
           {!ready && (
             <Text size="xs" c="dimmed">

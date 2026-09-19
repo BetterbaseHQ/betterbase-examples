@@ -87,7 +87,7 @@ function LocalBoardApp() {
 
   return (
     <LessAppShell
-      appName="Betterbase Board"
+      appName="Board"
       appIcon={<Kanban size={22} color="var(--mantine-color-indigo-6)" />}
       navbar={
         <BoardSidebar
@@ -213,7 +213,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   return (
     <LessAppShell
-      appName="Betterbase Board"
+      appName="Board"
       appIcon={<Kanban size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={

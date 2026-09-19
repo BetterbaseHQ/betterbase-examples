@@ -86,7 +86,7 @@ function LocalTasksApp() {
 
   return (
     <LessAppShell
-      appName="Betterbase Tasks"
+      appName="Tasks"
       appIcon={<CheckSquare size={22} color="var(--mantine-color-indigo-6)" />}
       navbar={
         <TasksSidebar
@@ -180,7 +180,7 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   return (
     <LessAppShell
-      appName="Betterbase Tasks"
+      appName="Tasks"
       appIcon={<CheckSquare size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={

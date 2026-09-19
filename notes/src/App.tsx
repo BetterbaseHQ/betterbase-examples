@@ -149,7 +149,7 @@ function LocalNotesApp() {
 
   return (
     <LessAppShell
-      appName="Betterbase Notes"
+      appName="Notes"
       appIcon={<FileText size={22} color="var(--mantine-color-indigo-6)" />}
       navbar={
         <NotebookSidebar
@@ -325,7 +325,7 @@ function NotesApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   return (
     <LessAppShell
-      appName="Betterbase Notes"
+      appName="Notes"
       appIcon={<FileText size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={
