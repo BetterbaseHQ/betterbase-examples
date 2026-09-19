@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Stack, NavLink, TextInput, ActionIcon, Group, Text } from "@mantine/core";
+import { Stack, NavLink, ActionIcon, Group, Text, Box } from "@mantine/core";
 import { Image, FolderOpen, Plus, Trash2, Users } from "lucide-react";
-import { ConfirmDialog } from "@betterbase/examples-shared";
+import { ConfirmDialog, InlineTextInput } from "@betterbase/examples-shared";
 import type { Album } from "@/lib/db";
 import type { View } from "@/App";
 
@@ -73,30 +73,19 @@ export function AlbumSidebar({
       </Group>
 
       {creating && (
-        <TextInput
-          size="xs"
-          placeholder="Album name"
-          aria-label="New album name"
-          value={newName}
-          onChange={(e) => setNewName(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreate();
-            if (e.key === "Escape") {
+        <Box mx="xs" mb={4}>
+          <InlineTextInput
+            placeholder="Album name"
+            ariaLabel="New album name"
+            value={newName}
+            onChange={setNewName}
+            onSubmit={handleCreate}
+            onCancel={() => {
               setCreating(false);
               setNewName("");
-            }
-          }}
-          onBlur={() => {
-            if (newName.trim()) handleCreate();
-            else {
-              setCreating(false);
-              setNewName("");
-            }
-          }}
-          mx="xs"
-          mb={4}
-          autoFocus
-        />
+            }}
+          />
+        </Box>
       )}
 
       {albums.map((album) => {

@@ -1,8 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
-import { Group, TextInput, Button, Box, Text } from "@mantine/core";
+import { Group, Button, Box, Text } from "@mantine/core";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
-import { ShareButton, MembersPanel, reportError } from "@betterbase/examples-shared";
+import {
+  ShareButton,
+  MembersPanel,
+  InlineTextInput,
+  reportError,
+} from "@betterbase/examples-shared";
 import { db, cards } from "@/lib/db";
 import type { Board, Card } from "@/lib/db";
 import { Column } from "./Column";
@@ -249,28 +254,17 @@ export function BoardView({
 
           {/* Add column */}
           {addingColumn ? (
-            <TextInput
-              size="xs"
+            <InlineTextInput
               placeholder="Column name"
-              aria-label="New column name"
+              ariaLabel="New column name"
               value={newColumnName}
-              onChange={(e) => setNewColumnName(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddColumn();
-                if (e.key === "Escape") {
-                  setAddingColumn(false);
-                  setNewColumnName("");
-                }
-              }}
-              onBlur={() => {
-                if (newColumnName.trim()) handleAddColumn();
-                else {
-                  setAddingColumn(false);
-                  setNewColumnName("");
-                }
+              onChange={setNewColumnName}
+              onSubmit={handleAddColumn}
+              onCancel={() => {
+                setAddingColumn(false);
+                setNewColumnName("");
               }}
               style={{ minWidth: 200, flexShrink: 0 }}
-              autoFocus
             />
           ) : (
             <Button

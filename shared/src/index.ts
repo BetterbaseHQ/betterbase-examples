@@ -18,6 +18,7 @@ export type { SyncStatus } from "./layout/SyncStatusBadge.js";
 // Components
 export { EmptyState } from "./components/EmptyState.js";
 export { ConfirmDialog } from "./components/ConfirmDialog.js";
+export { InlineTextInput } from "./components/InlineTextInput.js";
 
 // Utilities
 export { reportError } from "./notify.js";

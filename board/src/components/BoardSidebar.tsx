@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Stack, NavLink, TextInput, ActionIcon, Group, Text } from "@mantine/core";
+import { Stack, NavLink, ActionIcon, Group, Text, Box } from "@mantine/core";
 import { LayoutDashboard, Plus, Trash2, Users } from "lucide-react";
-import { ConfirmDialog } from "@betterbase/examples-shared";
+import { ConfirmDialog, InlineTextInput } from "@betterbase/examples-shared";
 import type { Board } from "@/lib/db";
 
 interface BoardSidebarProps {
@@ -57,30 +57,19 @@ export function BoardSidebar({
       </Group>
 
       {creating && (
-        <TextInput
-          size="xs"
-          placeholder="Board name"
-          aria-label="New board name"
-          value={newName}
-          onChange={(e) => setNewName(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreate();
-            if (e.key === "Escape") {
+        <Box mx={4} mb={2}>
+          <InlineTextInput
+            placeholder="Board name"
+            ariaLabel="New board name"
+            value={newName}
+            onChange={setNewName}
+            onSubmit={handleCreate}
+            onCancel={() => {
               setCreating(false);
               setNewName("");
-            }
-          }}
-          onBlur={() => {
-            if (newName.trim()) handleCreate();
-            else {
-              setCreating(false);
-              setNewName("");
-            }
-          }}
-          mx={4}
-          mb={2}
-          autoFocus
-        />
+            }}
+          />
+        </Box>
       )}
 
       {boards.map((board) => {

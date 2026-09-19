@@ -12,7 +12,7 @@ import {
 } from "@mantine/core";
 import { Droppable } from "@hello-pangea/dnd";
 import { Plus, Trash2 } from "lucide-react";
-import { ConfirmDialog, reportError } from "@betterbase/examples-shared";
+import { ConfirmDialog, InlineTextInput, reportError } from "@betterbase/examples-shared";
 import { db, cards } from "@/lib/db";
 import type { Card as CardType } from "@/lib/db";
 import { Card } from "./Card";
@@ -107,16 +107,11 @@ export function Column({
         onBlur={() => setHeaderHovered(false)}
       >
         {editingName ? (
-          <TextInput
-            size="xs"
+          <InlineTextInput
             value={draftName}
-            onChange={(e) => setDraftName(e.currentTarget.value)}
-            onBlur={saveColumnName}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveColumnName();
-              if (e.key === "Escape") setEditingName(false);
-            }}
-            autoFocus
+            onChange={setDraftName}
+            onSubmit={saveColumnName}
+            onCancel={() => setEditingName(false)}
             style={{ flex: 1 }}
           />
         ) : (

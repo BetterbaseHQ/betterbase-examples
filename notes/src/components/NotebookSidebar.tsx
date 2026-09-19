@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Stack, NavLink, TextInput, ActionIcon, Group, Text } from "@mantine/core";
+import { Stack, NavLink, ActionIcon, Group, Text, Box } from "@mantine/core";
 import { FileText, Star, Book, Plus, Trash2, Users } from "lucide-react";
-import { ConfirmDialog } from "@betterbase/examples-shared";
+import { ConfirmDialog, InlineTextInput } from "@betterbase/examples-shared";
 import type { Notebook } from "@/lib/db";
 
 type View = { kind: "all" } | { kind: "favorites" } | { kind: "notebook"; id: string };
@@ -88,30 +88,19 @@ export function NotebookSidebar({
       </Group>
 
       {creating && (
-        <TextInput
-          size="xs"
-          placeholder="Notebook name"
-          aria-label="New notebook name"
-          value={newName}
-          onChange={(e) => setNewName(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreate();
-            if (e.key === "Escape") {
+        <Box mx="xs" mb={4}>
+          <InlineTextInput
+            placeholder="Notebook name"
+            ariaLabel="New notebook name"
+            value={newName}
+            onChange={setNewName}
+            onSubmit={handleCreate}
+            onCancel={() => {
               setCreating(false);
               setNewName("");
-            }
-          }}
-          onBlur={() => {
-            if (newName.trim()) handleCreate();
-            else {
-              setCreating(false);
-              setNewName("");
-            }
-          }}
-          mx="xs"
-          mb={4}
-          autoFocus
-        />
+            }}
+          />
+        </Box>
       )}
 
       {notebooks.map((nb) => {
