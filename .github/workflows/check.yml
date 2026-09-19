@@ -53,6 +53,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: |
             betterbase-examples/${{ matrix.app }}/pnpm-lock.yaml
+            betterbase-examples/shared/pnpm-lock.yaml
             betterbase/js/pnpm-lock.yaml
       # The SDK is consumed as linked TS source: its imports resolve from its
       # own node_modules, and tsc/vite need the wasm-pack pkg/ output that the
@@ -62,5 +63,13 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm build:wasm
+      # Apps resolve @betterbase/examples-shared types from shared/dist, which
+      # is gitignored — build it in this job (each matrix job is isolated).
+      - name: Build shared package
+        if: matrix.app != 'shared'
+        working-directory: betterbase-examples/shared
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
