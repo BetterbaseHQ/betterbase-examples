@@ -1,10 +1,12 @@
-import { TextInput, ActionIcon, Text, Group } from "@mantine/core";
+import { TextInput, ActionIcon, Text, Group, UnstyledButton } from "@mantine/core";
 import { Search, Plus, Pin, Star } from "lucide-react";
 import { ShareButton, MembersPanel } from "@betterbase/examples-shared";
 import type { Note, Notebook } from "@/lib/db";
 
 interface NoteListProps {
   notes: Note[];
+  /** Precomputed excerpts keyed by note id (avoids re-parsing bodies per render). */
+  excerpts: Map<string, string>;
   selectedNoteId: string | null;
   search: string;
   onSearchChange: (search: string) => void;
@@ -32,25 +34,9 @@ function formatRelativeDate(date: Date): string {
   return date.toLocaleDateString();
 }
 
-function getExcerpt(body: string): string {
-  if (!body) return "No content";
-  try {
-    const doc = JSON.parse(body);
-    const texts: string[] = [];
-    function walk(node: { type?: string; text?: string; content?: unknown[] }) {
-      if (node.text) texts.push(node.text);
-      if (node.content) (node.content as (typeof node)[]).forEach(walk);
-    }
-    walk(doc);
-    const text = texts.join("").trim();
-    return text ? text.slice(0, 80) : "No content";
-  } catch {
-    return body.slice(0, 80) || "No content";
-  }
-}
-
 export function NoteList({
   notes,
+  excerpts,
   selectedNoteId,
   search,
   onSearchChange,
@@ -108,12 +94,13 @@ export function NoteList({
         <TextInput
           size="xs"
           placeholder="Search notes..."
+          aria-label="Search notes"
           leftSection={<Search size={14} />}
           value={search}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
           style={{ flex: 1 }}
         />
-        <ActionIcon variant="light" size="md" onClick={onCreate}>
+        <ActionIcon variant="light" size="md" aria-label="New note" onClick={onCreate}>
           <Plus size={16} />
         </ActionIcon>
       </div>
@@ -121,13 +108,16 @@ export function NoteList({
       {/* Note list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px" }}>
         {notes.map((note) => (
-          <div
+          <UnstyledButton
             key={note.id}
             onClick={() => onSelect(note.id)}
+            aria-current={note.id === selectedNoteId ? "true" : undefined}
             style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
               padding: "8px 10px",
               borderRadius: 6,
-              cursor: "pointer",
               backgroundColor:
                 note.id === selectedNoteId ? "var(--mantine-color-indigo-light)" : undefined,
               marginBottom: 2,
@@ -143,12 +133,12 @@ export function NoteList({
               </Group>
             </Group>
             <Text size="xs" c="dimmed" lineClamp={1}>
-              {getExcerpt(note.body)}
+              {excerpts.get(note.id) ?? "No content"}
             </Text>
             <Text size="xs" c="dimmed" mt={2}>
               {formatRelativeDate(note.updatedAt)}
             </Text>
-          </div>
+          </UnstyledButton>
         ))}
 
         {notes.length === 0 && (

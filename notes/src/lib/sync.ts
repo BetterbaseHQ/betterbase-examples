@@ -69,7 +69,10 @@ export function useNotebooks() {
    * notes (with updated notebookId FK), and invites the user.
    */
   const shareNotebook = useCallback(
-    async (notebook: Notebook & SpaceFields, handle: string): Promise<Notebook & SpaceFields> => {
+    async (
+      notebook: Notebook & { _spaceId?: string },
+      handle: string,
+    ): Promise<Notebook & SpaceFields> => {
       const exists = await userExists(handle);
       if (!exists) throw new Error(`User "${handle}" not found`);
 
@@ -90,7 +93,7 @@ export function useNotebooks() {
   );
 
   const inviteToNotebook = useCallback(
-    async (notebook: Notebook & SpaceFields, handle: string) => {
+    async (notebook: Notebook & { _spaceId?: string }, handle: string) => {
       if (!notebook._spaceId) throw new Error("Cannot invite to a personal notebook");
 
       await invite(notebook._spaceId, handle, { spaceName: notebook.name });
@@ -99,7 +102,7 @@ export function useNotebooks() {
   );
 
   const createNote = useCallback(
-    async (notebookId: string, notebook?: Notebook & SpaceFields) => {
+    async (notebookId: string, notebook?: Notebook & { _spaceId?: string }) => {
       const record = await db.put(
         notes,
         { notebookId, title: "", body: "", pinned: false, favorite: false },

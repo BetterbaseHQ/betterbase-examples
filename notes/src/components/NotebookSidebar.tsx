@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Stack, NavLink, TextInput, ActionIcon, Group, Text } from "@mantine/core";
 import { FileText, Star, Book, Plus, Trash2, Users } from "lucide-react";
+import { ConfirmDialog } from "@betterbase/examples-shared";
 import type { Notebook } from "@/lib/db";
 
 type View = { kind: "all" } | { kind: "favorites" } | { kind: "notebook"; id: string };
@@ -30,6 +31,9 @@ export function NotebookSidebar({
 }: NotebookSidebarProps) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<(Notebook & { _spaceId?: string }) | null>(
+    null,
+  );
 
   const handleCreate = () => {
     const name = newName.trim();
@@ -38,6 +42,11 @@ export function NotebookSidebar({
     setNewName("");
     setCreating(false);
   };
+
+  const pendingDeleteIsShared =
+    pendingDelete != null &&
+    pendingDelete._spaceId != null &&
+    pendingDelete._spaceId !== personalSpaceId;
 
   return (
     <Stack gap={0} p="xs">
@@ -68,7 +77,12 @@ export function NotebookSidebar({
         <Text size="xs" fw={600} c="dimmed" tt="uppercase">
           Notebooks
         </Text>
-        <ActionIcon size="xs" variant="subtle" onClick={() => setCreating(true)}>
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          aria-label="New notebook"
+          onClick={() => setCreating(true)}
+        >
           <Plus size={14} />
         </ActionIcon>
       </Group>
@@ -77,6 +91,7 @@ export function NotebookSidebar({
         <TextInput
           size="xs"
           placeholder="Notebook name"
+          aria-label="New notebook name"
           value={newName}
           onChange={(e) => setNewName(e.currentTarget.value)}
           onKeyDown={(e) => {
@@ -116,11 +131,10 @@ export function NotebookSidebar({
                   size="xs"
                   variant="subtle"
                   color="red"
+                  aria-label={`Delete notebook ${nb.name}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`Delete "${nb.name}" and all its notes?`)) {
-                      onDelete(nb.id);
-                    }
+                    setPendingDelete(nb);
                   }}
                 >
                   <Trash2 size={12} />
@@ -132,6 +146,28 @@ export function NotebookSidebar({
           />
         );
       })}
+
+      <ConfirmDialog
+        opened={pendingDelete != null}
+        title="Delete notebook"
+        message={
+          pendingDeleteIsShared ? (
+            <>
+              Delete <b>{pendingDelete?.name}</b> and all its notes? It is shared — this deletes it
+              for everyone and cannot be undone.
+            </>
+          ) : (
+            <>
+              Delete <b>{pendingDelete?.name}</b> and all its notes? This cannot be undone.
+            </>
+          )
+        }
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) onDelete(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+      />
     </Stack>
   );
 }
