@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { TextInput, ActionIcon, Stack, Text, Paper, Group, Button } from "@mantine/core";
+import { TextInput, ActionIcon, Stack, Text, UnstyledButton, Group, Button } from "@mantine/core";
 import { Search, Plus, Globe, CreditCard, StickyNote, User, Users } from "lucide-react";
 import type { Entry } from "@/lib/db";
 
@@ -34,6 +34,7 @@ export function EntryList({
       <Group justify="space-between">
         <TextInput
           placeholder="Search passwords..."
+          aria-label="Search passwords"
           leftSection={<Search size={16} />}
           value={search}
           onChange={(e) => onSearchChange(e.currentTarget.value)}
@@ -74,9 +75,27 @@ function EntryRow({
   const isShared = entry._spaceId != null && entry._spaceId !== personalSpaceId;
 
   return (
-    <Paper p="sm" withBorder style={{ cursor: "pointer" }} onClick={() => onSelect(entry.id)}>
+    <UnstyledButton
+      onClick={() => onSelect(entry.id)}
+      aria-label={`Open ${entry.site || "Untitled"}`}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        padding: "var(--mantine-spacing-sm)",
+        borderRadius: "var(--mantine-radius-sm)",
+        border: "1px solid var(--mantine-color-gray-3)",
+      }}
+    >
       <Group gap="sm" wrap="nowrap">
-        <ActionIcon variant="light" color="gray" size="lg" radius="md">
+        <ActionIcon
+          variant="light"
+          color="gray"
+          size="lg"
+          radius="md"
+          aria-hidden
+          style={{ pointerEvents: "none" }}
+        >
           {CATEGORY_ICONS[entry.category] ?? <Globe size={16} />}
         </ActionIcon>
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
@@ -89,6 +108,6 @@ function EntryRow({
         </Stack>
         {isShared && <Users size={12} color="var(--mantine-color-blue-5)" />}
       </Group>
-    </Paper>
+    </UnstyledButton>
   );
 }

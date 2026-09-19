@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Stack,
   Text,
@@ -6,13 +6,13 @@ import {
   Button,
   Paper,
   ActionIcon,
-  CopyButton,
   Tooltip,
   TextInput,
   Badge,
 } from "@mantine/core";
 import { ArrowLeft, Pencil, Trash2, Copy, Check, Eye, EyeOff, ExternalLink } from "lucide-react";
-import { ShareButton, MembersPanel } from "@betterbase/examples-shared";
+import { ConfirmDialog, ShareButton, MembersPanel } from "@betterbase/examples-shared";
+import { copySecret } from "@/lib/clipboard";
 import type { Entry } from "@/lib/db";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -21,6 +21,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   note: "Secure Note",
   identity: "Identity",
 };
+
+/** Re-mask a revealed secret after this long, even if the user walks away. */
+const REVEAL_TIMEOUT_MS = 60_000;
 
 interface EntryDetailProps {
   entry: Entry & { _spaceId?: string };
@@ -46,6 +49,28 @@ export function EntryDetail({
   onRemoveMember,
 }: EntryDetailProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Never leave a revealed secret on screen: re-mask when the tab is hidden
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") setShowPassword(false);
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
+
+  // ...and after a bounded reveal window
+  useEffect(() => {
+    if (!showPassword) return;
+    const t = setTimeout(() => setShowPassword(false), REVEAL_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [showPassword]);
+
+  // ...or when switching entries
+  useEffect(() => {
+    setShowPassword(false);
+  }, [entry.id]);
 
   const isPersonal = entry._spaceId == null || entry._spaceId === personalSpaceId;
   const isShared = entry._spaceId != null && !isPersonal;
@@ -54,7 +79,7 @@ export function EntryDetail({
     <Stack gap="md">
       <Group justify="space-between">
         <Group gap="xs">
-          <ActionIcon variant="subtle" onClick={onBack}>
+          <ActionIcon variant="subtle" aria-label="Back to list" onClick={onBack}>
             <ArrowLeft size={18} />
           </ActionIcon>
           <Text fw={600} size="xl">
@@ -82,7 +107,7 @@ export function EntryDetail({
             color="red"
             leftSection={<Trash2 size={14} />}
             size="sm"
-            onClick={onDelete}
+            onClick={() => setConfirmDelete(true)}
           >
             Delete
           </Button>
@@ -101,6 +126,7 @@ export function EntryDetail({
                   variant="subtle"
                   size="sm"
                   component="a"
+                  aria-label="Open site"
                   href={entry.url.startsWith("http") ? entry.url : `https://${entry.url}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -128,13 +154,20 @@ export function EntryDetail({
                 readOnly
                 variant="unstyled"
                 size="sm"
+                aria-label="Password"
+                autoComplete="off"
                 style={{ flex: 1 }}
                 styles={{ input: { cursor: "default" } }}
               />
-              <ActionIcon variant="subtle" size="sm" onClick={() => setShowPassword((v) => !v)}>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+              >
                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </ActionIcon>
-              {entry.password && <CopyField value={entry.password} />}
+              {entry.password && <CopyField value={entry.password} secret />}
             </Group>
           </FieldRow>
 
@@ -156,6 +189,28 @@ export function EntryDetail({
           </Group>
         </Stack>
       </Paper>
+
+      <ConfirmDialog
+        opened={confirmDelete}
+        title="Delete entry"
+        message={
+          isShared ? (
+            <>
+              Delete <b>{entry.site || "Untitled"}</b>? It is shared — this deletes it for everyone
+              and cannot be undone.
+            </>
+          ) : (
+            <>
+              Delete <b>{entry.site || "Untitled"}</b>? This cannot be undone.
+            </>
+          )
+        }
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDelete();
+        }}
+      />
     </Stack>
   );
 }
@@ -171,16 +226,32 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-function CopyField({ value }: { value: string }) {
+function CopyField({ value, secret = false }: { value: string; secret?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      if (secret) {
+        await copySecret(value);
+      } else {
+        await navigator.clipboard.writeText(value);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard access denied — nothing to do
+    }
+  };
   return (
-    <CopyButton value={value} timeout={1500}>
-      {({ copied, copy }) => (
-        <Tooltip label={copied ? "Copied" : "Copy"} withArrow>
-          <ActionIcon variant="subtle" size="sm" color={copied ? "teal" : "gray"} onClick={copy}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-          </ActionIcon>
-        </Tooltip>
-      )}
-    </CopyButton>
+    <Tooltip label={copied ? "Copied" : "Copy"} withArrow>
+      <ActionIcon
+        variant="subtle"
+        size="sm"
+        color={copied ? "teal" : "gray"}
+        aria-label={`Copy ${secret ? "password" : "value"} to clipboard`}
+        onClick={handleCopy}
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </ActionIcon>
+    </Tooltip>
   );
 }

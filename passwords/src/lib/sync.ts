@@ -29,7 +29,10 @@ export function useEntries() {
   } = useSpaces();
 
   const result = useQuery(entries, {
-    sort: [{ field: "site", direction: "asc" }],
+    sort: [
+      { field: "site", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allEntries = result.records;
 
@@ -62,7 +65,7 @@ export function useEntries() {
    * Returns the new entry record (with a new ID in the shared space).
    */
   const shareEntry = useCallback(
-    async (entry: Entry & SpaceFields, handle: string): Promise<Entry & SpaceFields> => {
+    async (entry: Entry & { _spaceId?: string }, handle: string): Promise<Entry & SpaceFields> => {
       const exists = await userExists(handle);
       if (!exists) throw new Error(`User "${handle}" not found`);
 
@@ -75,7 +78,7 @@ export function useEntries() {
   );
 
   const inviteToEntry = useCallback(
-    async (entry: Entry & SpaceFields, handle: string) => {
+    async (entry: Entry & { _spaceId?: string }, handle: string) => {
       if (!entry._spaceId) throw new Error("Cannot invite to a personal entry");
 
       await invite(entry._spaceId, handle, { spaceName: entry.site });
