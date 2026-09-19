@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Text,
@@ -12,6 +12,7 @@ import {
 } from "@mantine/core";
 import { Draggable } from "@hello-pangea/dnd";
 import { Trash2, Palette, AlignLeft } from "lucide-react";
+import { ConfirmDialog, reportError } from "@betterbase/examples-shared";
 import type { Card as CardType } from "@/lib/db";
 import { db, cards } from "@/lib/db";
 
@@ -39,8 +40,7 @@ export function Card({ card, index }: CardProps) {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description);
   const [hovered, setHovered] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
-  const descRef = useRef<HTMLTextAreaElement>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Sync local state when card changes from external source (sync)
   useEffect(() => {
@@ -55,7 +55,9 @@ export function Card({ card, index }: CardProps) {
     setEditingTitle(false);
     const trimmed = title.trim();
     if (trimmed && trimmed !== card.title) {
-      db.patch(cards, { id: card.id, title: trimmed });
+      db.patch(cards, { id: card.id, title: trimmed }).catch((err) =>
+        reportError(err, "Couldn't save card"),
+      );
     } else {
       setTitle(card.title);
     }
@@ -64,16 +66,18 @@ export function Card({ card, index }: CardProps) {
   const saveDescription = () => {
     setEditingDesc(false);
     if (description !== card.description) {
-      db.patch(cards, { id: card.id, description });
+      db.patch(cards, { id: card.id, description }).catch((err) =>
+        reportError(err, "Couldn't save card"),
+      );
     }
   };
 
   const setColor = (color: string) => {
-    db.patch(cards, { id: card.id, color });
+    db.patch(cards, { id: card.id, color }).catch((err) => reportError(err, "Couldn't save card"));
   };
 
   const deleteCard = () => {
-    db.delete(cards, card.id);
+    db.delete(cards, card.id).catch((err) => reportError(err, "Couldn't delete card"));
   };
 
   return (
@@ -89,6 +93,8 @@ export function Card({ card, index }: CardProps) {
           mb={4}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
+          onFocus={() => setHovered(true)}
+          onBlur={() => setHovered(false)}
           style={{
             ...provided.draggableProps.style,
             borderLeft:
@@ -97,7 +103,6 @@ export function Card({ card, index }: CardProps) {
         >
           {editingTitle ? (
             <TextInput
-              ref={titleRef}
               size="xs"
               value={title}
               onChange={(e) => setTitle(e.currentTarget.value)}
@@ -124,7 +129,6 @@ export function Card({ card, index }: CardProps) {
 
           {editingDesc ? (
             <Textarea
-              ref={descRef}
               size="xs"
               mt={2}
               value={description}
@@ -167,6 +171,7 @@ export function Card({ card, index }: CardProps) {
                 size="xs"
                 variant="subtle"
                 color="gray"
+                aria-label="Add description"
                 onClick={() => setEditingDesc(true)}
               >
                 <AlignLeft size={12} />
@@ -174,7 +179,7 @@ export function Card({ card, index }: CardProps) {
             )}
             <Popover position="bottom" withArrow shadow="md">
               <Popover.Target>
-                <ActionIcon size="xs" variant="subtle" color="gray">
+                <ActionIcon size="xs" variant="subtle" color="gray" aria-label="Set card color">
                   <Palette size={12} />
                 </ActionIcon>
               </Popover.Target>
@@ -185,6 +190,8 @@ export function Card({ card, index }: CardProps) {
                       key={c || "none"}
                       color={c || "var(--mantine-color-gray-2)"}
                       size={20}
+                      component="button"
+                      aria-label={c ? `Set color ${c}` : "Clear color"}
                       onClick={() => setColor(c)}
                       style={{
                         cursor: "pointer",
@@ -197,10 +204,26 @@ export function Card({ card, index }: CardProps) {
                 </SimpleGrid>
               </Popover.Dropdown>
             </Popover>
-            <ActionIcon size="xs" variant="subtle" color="gray" onClick={deleteCard}>
+            <ActionIcon
+              size="xs"
+              variant="subtle"
+              color="gray"
+              aria-label={`Delete card ${card.title}`}
+              onClick={() => setConfirmDelete(true)}
+            >
               <Trash2 size={12} />
             </ActionIcon>
           </Group>
+          <ConfirmDialog
+            opened={confirmDelete}
+            title="Delete card"
+            message={`Delete "${card.title || "Untitled"}"? This cannot be undone.`}
+            onCancel={() => setConfirmDelete(false)}
+            onConfirm={() => {
+              setConfirmDelete(false);
+              deleteCard();
+            }}
+          />
         </Paper>
       )}
     </Draggable>

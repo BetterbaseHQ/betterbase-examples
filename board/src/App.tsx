@@ -1,20 +1,29 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Kanban } from "lucide-react";
+import { Box, Loader } from "@mantine/core";
 import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
-import { useQuery, useSyncStatus } from "betterbase/db/react";
+import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
+  useHeaderSyncStatus,
   EmptyState,
   InvitationBanner,
-  type SyncStatus,
+  reportError,
 } from "@betterbase/examples-shared";
 import { db, boards, cards } from "@/lib/db";
 import type { Board } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
-import type { SpaceFields } from "betterbase/sync";
+
+function defaultColumns() {
+  return [
+    { id: crypto.randomUUID(), name: "To Do" },
+    { id: crypto.randomUUID(), name: "In Progress" },
+    { id: crypto.randomUUID(), name: "Done" },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // LocalBoardApp — offline-first, no sharing (unauthenticated path)
@@ -22,16 +31,22 @@ import type { SpaceFields } from "betterbase/sync";
 
 function LocalBoardApp() {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { syncing, error: syncError } = useSyncStatus();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const autoCreated = useRef(false);
 
   const boardResult = useQuery(boards, {
-    sort: [{ field: "createdAt", direction: "asc" }],
+    sort: [
+      { field: "createdAt", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allBoards = boardResult?.records ?? [];
 
   const cardResult = useQuery(cards, {
-    sort: [{ field: "order", direction: "asc" }],
+    sort: [
+      { field: "order", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allCards = cardResult?.records ?? [];
 
@@ -44,21 +59,29 @@ function LocalBoardApp() {
     }
   }, [allBoards, selectedBoardId]);
 
+  // Auto-create a default board on first run (parity with the synced path)
+  useEffect(() => {
+    if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
+      autoCreated.current = true;
+      db.put(boards, { name: "My Board", columns: defaultColumns() }).catch((err) =>
+        reportError(err, "Couldn't create board"),
+      );
+    }
+  }, [boardResult]);
+
   const createBoard = (name: string) => {
-    const defaultColumns = [
-      { id: crypto.randomUUID(), name: "To Do" },
-      { id: crypto.randomUUID(), name: "In Progress" },
-      { id: crypto.randomUUID(), name: "Done" },
-    ];
-    db.put(boards, { name, columns: defaultColumns }).then((record) =>
-      setSelectedBoardId(record.id),
-    );
+    db.put(boards, { name, columns: defaultColumns() })
+      .then((record) => setSelectedBoardId(record.id))
+      .catch((err) => reportError(err, "Couldn't create board"));
   };
 
   const deleteBoard = (id: string) => {
-    if (!window.confirm("Delete this board and all its cards?")) return;
-    allCards.filter((c) => c.boardId === id).forEach((c) => db.delete(cards, c.id));
-    db.delete(boards, id);
+    allCards
+      .filter((c) => c.boardId === id)
+      .forEach((c) =>
+        db.delete(cards, c.id).catch((err) => reportError(err, "Couldn't delete card")),
+      );
+    db.delete(boards, id).catch((err) => reportError(err, "Couldn't delete board"));
     if (selectedBoardId === id) setSelectedBoardId(null);
   };
 
@@ -66,7 +89,7 @@ function LocalBoardApp() {
     id: string,
     patch: Partial<Omit<Board, "id" | "createdAt" | "updatedAt">>,
   ) => {
-    db.patch(boards, { id, ...patch });
+    db.patch(boards, { id, ...patch }).catch((err) => reportError(err, "Couldn't save board"));
   };
 
   const cardCounts = useMemo(
@@ -76,14 +99,6 @@ function LocalBoardApp() {
       ),
     [allBoards, allCards],
   );
-
-  const headerSyncStatus: SyncStatus | undefined = isAuthenticated
-    ? syncError
-      ? "error"
-      : syncing
-        ? "syncing"
-        : "synced"
-    : undefined;
 
   return (
     <LessAppShell
@@ -102,8 +117,6 @@ function LocalBoardApp() {
       navbarWidth={200}
       isAuthenticated={isAuthenticated}
       handle={handle}
-      syncStatus={headerSyncStatus}
-      syncError={syncError ?? undefined}
       onLogin={login}
       onLogout={logout}
     >
@@ -136,7 +149,8 @@ function LocalBoardApp() {
 
 function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, syncing, error: syncError } = useSync();
+  const { phase, error: syncError } = useSync();
+  const syncStatus = useHeaderSyncStatus();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -172,10 +186,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     }
   }, [allBoards, selectedBoardId]);
 
-  const selectedBoard =
-    (allBoards.find((b) => b.id === selectedBoardId) as
-      | ((typeof allBoards)[number] & SpaceFields)
-      | undefined) ?? null;
+  const selectedBoard = allBoards.find((b) => b.id === selectedBoardId) ?? null;
   const boardCards = allCards.filter((c) => c.boardId === selectedBoardId);
 
   const cardCounts = useMemo(
@@ -186,9 +197,8 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     [allBoards, allCards],
   );
 
-  const handleDeleteBoard = async (id: string) => {
-    if (!window.confirm("Delete this board and all its cards?")) return;
-    await deleteBoard(id);
+  const handleDeleteBoard = (id: string) => {
+    deleteBoard(id).catch((err) => reportError(err, "Couldn't delete board"));
     if (selectedBoardId === id) setSelectedBoardId(null);
   };
 
@@ -199,7 +209,11 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     description: string,
     order: number,
   ) => {
-    if (selectedBoard) addCard(selectedBoard, columnId, title, description, order);
+    if (selectedBoard) {
+      addCard(selectedBoard, columnId, title, description, order).catch((err) =>
+        reportError(err, "Couldn't add card"),
+      );
+    }
   };
 
   const banner =
@@ -222,7 +236,11 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           personalSpaceId={personalSpaceId}
           selectedBoardId={selectedBoardId}
           onSelect={setSelectedBoardId}
-          onCreate={(name) => createBoard(name).then((r) => setSelectedBoardId(r.id))}
+          onCreate={(name) =>
+            createBoard(name)
+              .then((r) => setSelectedBoardId(r.id))
+              .catch((err) => reportError(err, "Couldn't create board"))
+          }
           onDelete={handleDeleteBoard}
           cardCounts={cardCounts}
         />
@@ -230,7 +248,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
       navbarWidth={200}
       isAuthenticated={isAuthenticated}
       handle={handle}
-      syncStatus={syncError ? "error" : syncing ? "syncing" : "synced"}
+      syncStatus={syncStatus}
       syncError={syncError ?? undefined}
       onLogin={login}
       onLogout={logout}
@@ -280,7 +298,13 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
   const ready = useSyncReady();
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
+        <Loader />
+      </Box>
+    );
+  }
   return <BoardApp personalSpaceId={personalSpaceId} />;
 }
 

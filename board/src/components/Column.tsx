@@ -1,7 +1,18 @@
 import { useState, useRef } from "react";
-import { Paper, Text, TextInput, Textarea, ActionIcon, Button, Group, Box } from "@mantine/core";
+import {
+  Paper,
+  Text,
+  TextInput,
+  Textarea,
+  ActionIcon,
+  Button,
+  Group,
+  Box,
+  UnstyledButton,
+} from "@mantine/core";
 import { Droppable } from "@hello-pangea/dnd";
 import { Plus, Trash2 } from "lucide-react";
+import { ConfirmDialog, reportError } from "@betterbase/examples-shared";
 import { db, cards } from "@/lib/db";
 import type { Card as CardType } from "@/lib/db";
 import { Card } from "./Card";
@@ -35,6 +46,7 @@ export function Column({
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [headerHovered, setHeaderHovered] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
   const handleAddCard = () => {
@@ -54,7 +66,7 @@ export function Column({
         description,
         color: "",
         order,
-      });
+      }).catch((err) => reportError(err, "Couldn't add card"));
     }
 
     setNewCardTitle("");
@@ -91,6 +103,8 @@ export function Column({
         px={4}
         onMouseEnter={() => setHeaderHovered(true)}
         onMouseLeave={() => setHeaderHovered(false)}
+        onFocus={() => setHeaderHovered(true)}
+        onBlur={() => setHeaderHovered(false)}
       >
         {editingName ? (
           <TextInput
@@ -107,17 +121,20 @@ export function Column({
           />
         ) : (
           <Group gap={4}>
-            <Text
-              fw={600}
-              size="sm"
+            <UnstyledButton
+              aria-label={`Rename column ${columnName}`}
+              style={{
+                fontWeight: 600,
+                fontSize: "var(--mantine-font-size-sm)",
+                color: "var(--mantine-color-text)",
+              }}
               onClick={() => {
                 setDraftName(columnName);
                 setEditingName(true);
               }}
-              style={{ cursor: "text" }}
             >
               {columnName}
-            </Text>
+            </UnstyledButton>
             <Text size="xs" c="dimmed">
               {columnCards.length}
             </Text>
@@ -130,18 +147,20 @@ export function Column({
             transition: "opacity 150ms",
           }}
         >
-          <ActionIcon size="xs" variant="subtle" onClick={() => setAddingCard(true)}>
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            aria-label={`Add card to ${columnName}`}
+            onClick={() => setAddingCard(true)}
+          >
             <Plus size={14} />
           </ActionIcon>
           <ActionIcon
             size="xs"
             variant="subtle"
             color="gray"
-            onClick={() => {
-              if (window.confirm(`Delete "${columnName}" and all its cards?`)) {
-                onDeleteColumn();
-              }
-            }}
+            aria-label={`Delete column ${columnName}`}
+            onClick={() => setConfirmDelete(true)}
           >
             <Trash2 size={12} />
           </ActionIcon>
@@ -174,6 +193,7 @@ export function Column({
           <TextInput
             size="xs"
             placeholder="Card title"
+            aria-label="New card title"
             value={newCardTitle}
             onChange={(e) => setNewCardTitle(e.currentTarget.value)}
             onKeyDown={(e) => {
@@ -243,6 +263,20 @@ export function Column({
           Add card
         </Button>
       )}
+      <ConfirmDialog
+        opened={confirmDelete}
+        title="Delete column"
+        message={
+          <>
+            Delete <b>{columnName}</b> and all its cards? This cannot be undone.
+          </>
+        }
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDeleteColumn();
+        }}
+      />
     </Paper>
   );
 }

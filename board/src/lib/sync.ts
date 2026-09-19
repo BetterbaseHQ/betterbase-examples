@@ -30,12 +30,18 @@ export function useBoards() {
   } = useSpaces();
 
   const boardResult = useQuery(boards, {
-    sort: [{ field: "createdAt", direction: "asc" }],
+    sort: [
+      { field: "createdAt", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allBoards = boardResult.records;
 
   const cardResult = useQuery(cards, {
-    sort: [{ field: "order", direction: "asc" }],
+    sort: [
+      { field: "order", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allCards = cardResult.records;
 
@@ -81,7 +87,7 @@ export function useBoards() {
    * cards (with updated boardId FK), and invites the user.
    */
   const shareBoard = useCallback(
-    async (board: Board & SpaceFields, handle: string): Promise<Board & SpaceFields> => {
+    async (board: Board & { _spaceId?: string }, handle: string): Promise<Board & SpaceFields> => {
       const exists = await userExists(handle);
       if (!exists) throw new Error(`User "${handle}" not found`);
 
@@ -102,7 +108,7 @@ export function useBoards() {
   );
 
   const inviteToBoard = useCallback(
-    async (board: Board & SpaceFields, handle: string) => {
+    async (board: Board & { _spaceId?: string }, handle: string) => {
       if (!board._spaceId) throw new Error("Cannot invite to a personal board");
 
       await invite(board._spaceId, handle, { spaceName: board.name });
@@ -113,7 +119,7 @@ export function useBoards() {
   /** Add a card to a column in the correct space for the given board. */
   const addCard = useCallback(
     async (
-      board: Board & SpaceFields,
+      board: Board & { _spaceId?: string },
       columnId: string,
       title: string,
       description: string,

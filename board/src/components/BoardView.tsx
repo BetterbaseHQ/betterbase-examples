@@ -2,10 +2,15 @@ import { useState, useMemo, useEffect } from "react";
 import { Group, TextInput, Button, Box, Text } from "@mantine/core";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
-import { ShareButton, MembersPanel } from "@betterbase/examples-shared";
+import { ShareButton, MembersPanel, reportError } from "@betterbase/examples-shared";
 import { db, cards } from "@/lib/db";
 import type { Board, Card } from "@/lib/db";
 import { Column } from "./Column";
+
+/** Deterministic card ordering: fractional order first, id as tie-breaker. */
+function compareCards(a: Card, b: Card): number {
+  return a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
 
 interface BoardViewProps {
   board: Board & { _spaceId?: string };
@@ -27,7 +32,7 @@ interface BoardViewProps {
   /** Called when cards are deleted (column deletion) in the synced path. */
   onDeleteColumnCards?: (cardIds: string[]) => void;
   /** Called when a card is moved via drag-and-drop in the synced path. */
-  onMoveCard?: (cardId: string, columnId: string, order: number) => void;
+  onMoveCard?: (cardId: string, columnId: string, order: number) => void | Promise<void>;
   onShare?: (handle: string) => Promise<void>;
   onInvite?: (handle: string) => Promise<void>;
   onRemoveMember?: (did: string) => Promise<void>;
@@ -55,26 +60,45 @@ export function BoardView({
 }: BoardViewProps) {
   const [addingColumn, setAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
-  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  // Optimistic overrides keyed by card id: applied immediately on drag so
+  // there's no flicker, cleared per-card once the DB catches up (or on failure).
+  const [pendingMoves, setPendingMoves] = useState<Map<string, PendingMove>>(() => new Map());
 
-  // Merge optimistic move into the card list so there's no flicker
   const effectiveCards = useMemo(() => {
-    if (!pendingMove) return boardCards;
-    return boardCards.map((c) =>
-      c.id === pendingMove.cardId
-        ? { ...c, columnId: pendingMove.columnId, order: pendingMove.order }
-        : c,
-    );
-  }, [boardCards, pendingMove]);
+    if (pendingMoves.size === 0) return boardCards;
+    return boardCards.map((c) => {
+      const p = pendingMoves.get(c.id);
+      return p ? { ...c, columnId: p.columnId, order: p.order } : c;
+    });
+  }, [boardCards, pendingMoves]);
 
-  // Clear optimistic state once the DB has caught up
+  // Drop overrides that the DB has caught up with
   useEffect(() => {
-    if (!pendingMove) return;
-    const card = boardCards.find((c) => c.id === pendingMove.cardId);
-    if (card && card.columnId === pendingMove.columnId && card.order === pendingMove.order) {
-      setPendingMove(null);
+    if (pendingMoves.size === 0) return;
+    const settled: string[] = [];
+    for (const p of pendingMoves.values()) {
+      const card = boardCards.find((c) => c.id === p.cardId);
+      if (card && card.columnId === p.columnId && card.order === p.order) {
+        settled.push(p.cardId);
+      }
     }
-  }, [boardCards, pendingMove]);
+    if (settled.length > 0) {
+      setPendingMoves((prev) => {
+        const next = new Map(prev);
+        for (const id of settled) next.delete(id);
+        return next;
+      });
+    }
+  }, [boardCards, pendingMoves]);
+
+  const clearPendingMove = (cardId: string) => {
+    setPendingMoves((prev) => {
+      if (!prev.has(cardId)) return prev;
+      const next = new Map(prev);
+      next.delete(cardId);
+      return next;
+    });
+  };
 
   const handleAddColumn = () => {
     const name = newColumnName.trim();
@@ -93,9 +117,13 @@ export function BoardView({
   const deleteColumn = (columnId: string) => {
     const cardIds = boardCards.filter((c) => c.columnId === columnId).map((c) => c.id);
     if (onDeleteColumnCards) {
-      onDeleteColumnCards(cardIds);
+      Promise.resolve(onDeleteColumnCards(cardIds)).catch((err) =>
+        reportError(err, "Couldn't delete column"),
+      );
     } else {
-      cardIds.forEach((id) => db.delete(cards, id));
+      cardIds.forEach((id) =>
+        db.delete(cards, id).catch((err) => reportError(err, "Couldn't delete card")),
+      );
     }
     const updated = board.columns.filter((c) => c.id !== columnId);
     onUpdateBoard(board.id, { columns: updated });
@@ -108,9 +136,7 @@ export function BoardView({
       return;
 
     const destColumnId = destination.droppableId;
-    const destCards = effectiveCards
-      .filter((c) => c.columnId === destColumnId)
-      .sort((a, b) => a.order - b.order);
+    const destCards = effectiveCards.filter((c) => c.columnId === destColumnId).sort(compareCards);
 
     // Remove the dragged card from dest list if moving within same column
     const filteredDest =
@@ -118,7 +144,8 @@ export function BoardView({
         ? destCards.filter((c) => c.id !== draggableId)
         : destCards;
 
-    // Calculate new order
+    // Calculate new order (midpoint of neighbors; float precision allows ~50
+    // consecutive inserts at one spot before orders need rebalancing)
     let newOrder: number;
     if (filteredDest.length === 0) {
       newOrder = 1;
@@ -133,21 +160,21 @@ export function BoardView({
     }
 
     // Apply optimistic update immediately, then persist
-    setPendingMove({
-      cardId: draggableId,
-      columnId: destColumnId,
-      order: newOrder,
-    });
-
-    if (onMoveCard) {
-      onMoveCard(draggableId, destColumnId, newOrder);
-    } else {
-      db.patch(cards, {
-        id: draggableId,
+    setPendingMoves((prev) =>
+      new Map(prev).set(draggableId, {
+        cardId: draggableId,
         columnId: destColumnId,
         order: newOrder,
-      });
-    }
+      }),
+    );
+
+    const persist = onMoveCard
+      ? onMoveCard(draggableId, destColumnId, newOrder)
+      : db.patch(cards, { id: draggableId, columnId: destColumnId, order: newOrder });
+    Promise.resolve(persist).catch((err) => {
+      reportError(err, "Couldn't move card");
+      clearPendingMove(draggableId);
+    });
   };
 
   const isPersonal = board._spaceId == null || board._spaceId === personalSpaceId;
@@ -200,9 +227,7 @@ export function BoardView({
           }}
         >
           {board.columns.map((col) => {
-            const colCards = effectiveCards
-              .filter((c) => c.columnId === col.id)
-              .sort((a, b) => a.order - b.order);
+            const colCards = effectiveCards.filter((c) => c.columnId === col.id).sort(compareCards);
             return (
               <Column
                 key={col.id}
@@ -227,6 +252,7 @@ export function BoardView({
             <TextInput
               size="xs"
               placeholder="Column name"
+              aria-label="New column name"
               value={newColumnName}
               onChange={(e) => setNewColumnName(e.currentTarget.value)}
               onKeyDown={(e) => {
