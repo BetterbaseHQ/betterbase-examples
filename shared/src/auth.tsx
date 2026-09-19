@@ -1,8 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
-import { OAuthClient } from "betterbase/auth";
+import { OAuthClient, type AuthSession } from "betterbase/auth";
 import { useAuth as useAuthBase } from "betterbase/auth/react";
-
-const CLIENT_ID_KEY = "oauth_client_id";
 
 export interface AuthProviderProps {
   children: ReactNode;
@@ -15,7 +13,7 @@ export interface AuthProviderProps {
 }
 
 export interface AuthContextValue {
-  session: import("betterbase/auth").AuthSession | null;
+  session: AuthSession | null;
   getToken: () => Promise<string | null>;
   encryptionKey: CryptoKey | null;
   epochKey: CryptoKey | null;
@@ -24,12 +22,12 @@ export interface AuthContextValue {
   handle: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** Login or session error, or null. Render this near the action that failed. */
   error: string | null;
   login: () => Promise<void>;
   logout: () => void;
+  /** The configured OAuth client ID (empty string when unset) */
   clientId: string;
-  setClientId: (id: string) => void;
-  hasBuiltInClientId: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,13 +35,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({
   children,
   domain = "localhost:5377",
-  clientId: bakedClientId = "",
+  clientId = "",
   scope = "openid email sync",
 }: AuthProviderProps) {
-  const [clientId, setClientIdState] = useState(
-    () => bakedClientId || localStorage.getItem(CLIENT_ID_KEY) || "",
-  );
-
   const client = useMemo(
     () =>
       clientId
@@ -73,11 +67,6 @@ export function AuthProvider({
 
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const setClientId = useCallback((id: string) => {
-    setClientIdState(id);
-    localStorage.setItem(CLIENT_ID_KEY, id);
-  }, []);
-
   const login = useCallback(async () => {
     if (!client) {
       setLoginError("Please configure a Client ID first");
@@ -96,29 +85,41 @@ export function AuthProvider({
     setLoginError(null);
   }, [sessionLogout]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        session,
-        getToken,
-        encryptionKey,
-        epochKey,
-        personalSpaceId,
-        keypair,
-        handle,
-        isAuthenticated,
-        isLoading: sessionLoading,
-        error: loginError ?? sessionError,
-        login,
-        logout,
-        clientId,
-        setClientId,
-        hasBuiltInClientId: !!bakedClientId,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session,
+      getToken,
+      encryptionKey,
+      epochKey,
+      personalSpaceId,
+      keypair,
+      handle,
+      isAuthenticated,
+      isLoading: sessionLoading,
+      error: loginError ?? sessionError,
+      login,
+      logout,
+      clientId,
+    }),
+    [
+      session,
+      getToken,
+      encryptionKey,
+      epochKey,
+      personalSpaceId,
+      keypair,
+      handle,
+      isAuthenticated,
+      sessionLoading,
+      loginError,
+      sessionError,
+      login,
+      logout,
+      clientId,
+    ],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

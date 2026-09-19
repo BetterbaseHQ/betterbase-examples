@@ -53,16 +53,18 @@ export function useTyping(
     );
   });
 
-  // Clean up all timers on unmount
+  // Clean up timers on unmount and reset peer state when the space changes,
+  // so peers typing in the previous space don't linger in the new one.
   useEffect(() => {
+    setTypingPeers([]);
     return () => {
       for (const t of timers.current.values()) clearTimeout(t);
       timers.current.clear();
     };
-  }, []);
+  }, [spaceId]);
 
   const sendTyping = useCallback(() => {
-    if (!myHandle || !send) return;
+    if (!myHandle) return;
     const now = Date.now();
     if (now - lastSent.current < SEND_INTERVAL) return;
     lastSent.current = now;

@@ -1,17 +1,20 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
 import { DatabaseProvider } from "betterbase/db/react";
 import { lessTheme, AuthProvider } from "@betterbase/examples-shared";
 import { db } from "@/lib/db";
 import App from "./App.tsx";
 
 import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 import "@mantine/dropzone/styles.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MantineProvider theme={lessTheme}>
+      <Notifications />
       <AuthProvider
         domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
         clientId={import.meta.env.VITE_OAUTH_CLIENT_ID || ""}

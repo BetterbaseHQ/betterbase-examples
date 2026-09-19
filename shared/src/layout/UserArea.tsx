@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Button, Menu, Avatar, Group, Text, Divider } from "@mantine/core";
+import { Button, Menu, Avatar, Group, Text, Divider, UnstyledButton } from "@mantine/core";
 import { LogOut, ExternalLink } from "lucide-react";
+import { useAuth } from "../auth.js";
 import { ConnectSyncModal } from "./ConnectSyncModal.js";
 import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge.js";
 
@@ -44,6 +45,7 @@ export function UserArea({
   onLogout,
 }: UserAreaProps) {
   const [modalOpened, setModalOpened] = useState(false);
+  const { error: authError } = useAuth();
 
   if (!isAuthenticated) {
     return (
@@ -59,10 +61,8 @@ export function UserArea({
         <ConnectSyncModal
           opened={modalOpened}
           onClose={() => setModalOpened(false)}
-          onConnect={async () => {
-            setModalOpened(false);
-            await onLogin();
-          }}
+          onConnect={onLogin}
+          error={authError}
         />
       </>
     );
@@ -76,9 +76,11 @@ export function UserArea({
       <SyncStatusBadge status={syncStatus} />
       <Menu shadow="md" width={200} position="bottom-end">
         <Menu.Target>
-          <Avatar size="sm" radius="xl" color="indigo" style={{ cursor: "pointer" }}>
-            {initials}
-          </Avatar>
+          <UnstyledButton aria-label="Account menu" style={{ borderRadius: "50%" }}>
+            <Avatar size="sm" radius="xl" color="indigo">
+              {initials}
+            </Avatar>
+          </UnstyledButton>
         </Menu.Target>
         <Menu.Dropdown>
           {handle && (

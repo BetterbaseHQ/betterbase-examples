@@ -44,6 +44,7 @@ export function ShareButton({ onShare }: ShareButtonProps) {
       <Modal opened={opened} onClose={handleClose} title="Share list" size="sm">
         <Stack gap="sm">
           <TextInput
+            label="User handle"
             placeholder="user@domain"
             value={handle}
             onChange={(e) => setHandle(e.currentTarget.value)}

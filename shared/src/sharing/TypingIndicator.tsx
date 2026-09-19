@@ -15,7 +15,7 @@ export function TypingIndicator({ typingPeers }: TypingIndicatorProps) {
   }
 
   return (
-    <Text size="xs" c="dimmed" style={{ minHeight: 20, lineHeight: "20px" }}>
+    <Text size="xs" c="dimmed" style={{ minHeight: 20, lineHeight: "20px" }} aria-live="polite">
       {message}
     </Text>
   );

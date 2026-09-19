@@ -20,6 +20,9 @@ interface HeaderBarProps {
   launchpadUrl?: string;
 }
 
+/** Default launchpad origin used when no `launchpadUrl` is provided. */
+export const DEFAULT_LAUNCHPAD_URL = "http://localhost:5380";
+
 export function HeaderBar({
   appName,
   appIcon,
@@ -31,7 +34,7 @@ export function HeaderBar({
   onLogout,
   navbarOpened,
   onNavbarToggle,
-  launchpadUrl = "http://localhost:5380",
+  launchpadUrl = DEFAULT_LAUNCHPAD_URL,
 }: HeaderBarProps) {
   return (
     <Group h="100%" px="md" justify="space-between" wrap="nowrap">
@@ -48,6 +51,7 @@ export function HeaderBar({
         <UnstyledButton
           component="a"
           href={launchpadUrl}
+          aria-label="Back to launchpad"
           style={{ display: "flex", alignItems: "center" }}
         >
           {appIcon}

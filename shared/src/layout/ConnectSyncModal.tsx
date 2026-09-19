@@ -1,13 +1,29 @@
+import { useState } from "react";
 import { Modal, Stack, Text, Button, List, ThemeIcon } from "@mantine/core";
 import { HardDrive, Lock, WifiOff } from "lucide-react";
 
 interface ConnectSyncModalProps {
   opened: boolean;
   onClose: () => void;
-  onConnect: () => void;
+  /** Starts the OAuth flow. The modal stays open with a loading state until it resolves. */
+  onConnect: () => Promise<void>;
+  /** Login error to display inside the modal (from useAuth().error). */
+  error?: string | null;
 }
 
-export function ConnectSyncModal({ opened, onClose, onConnect }: ConnectSyncModalProps) {
+export function ConnectSyncModal({ opened, onClose, onConnect, error }: ConnectSyncModalProps) {
+  const [connecting, setConnecting] = useState(false);
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    try {
+      await onConnect();
+      onClose();
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   return (
     <Modal opened={opened} onClose={onClose} title="Sync your data securely" centered size="sm">
       <Stack gap="lg">
@@ -46,11 +62,17 @@ export function ConnectSyncModal({ opened, onClose, onConnect }: ConnectSyncModa
           </List.Item>
         </List>
 
-        <Button fullWidth onClick={onConnect}>
+        {error && (
+          <Text size="sm" c="red">
+            {error}
+          </Text>
+        )}
+
+        <Button fullWidth loading={connecting} onClick={handleConnect}>
           Continue with Betterbase Account
         </Button>
 
-        <Button fullWidth variant="subtle" color="gray" onClick={onClose}>
+        <Button fullWidth variant="subtle" color="gray" onClick={onClose} disabled={connecting}>
           Maybe later
         </Button>
       </Stack>

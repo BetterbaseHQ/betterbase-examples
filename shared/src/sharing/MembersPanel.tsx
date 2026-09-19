@@ -14,6 +14,7 @@ import { Users, ChevronDown, ChevronUp, X, Check } from "lucide-react";
 import { useMembers, usePeers } from "betterbase/sync/react";
 import type { Member, SpaceRole } from "betterbase/sync";
 import { useAuth } from "../auth.js";
+import { truncateDid } from "./did.js";
 
 interface MembersPanelProps {
   spaceId: string;
@@ -46,14 +47,9 @@ function memberStatus(
   return isOnline ? { label: "online", color: "green" } : { label: "offline", color: "gray" };
 }
 
-function truncateDid(did: string): string {
-  if (did.length <= 24) return did;
-  return `${did.slice(0, 16)}...${did.slice(-8)}`;
-}
-
 export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: MembersPanelProps) {
   const { handle: myHandle } = useAuth();
-  const { members, loading } = useMembers(spaceId);
+  const { members, loading, error: membersError } = useMembers(spaceId);
   const peers = usePeers<{ handle: string }>(spaceId);
   const [open, setOpen] = useState(false);
   const [inviteHandle, setInviteHandle] = useState("");
@@ -168,7 +164,13 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
             );
           })}
 
-          {members.length === 0 && !loading && (
+          {membersError && (
+            <Text size="xs" c="red">
+              Couldn't refresh members: {membersError.message}
+            </Text>
+          )}
+
+          {members.length === 0 && !loading && !membersError && (
             <Text size="xs" c="dimmed">
               No members yet
             </Text>
@@ -185,6 +187,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
               <TextInput
                 size="xs"
                 placeholder="user@domain"
+                aria-label="Invite user by handle"
                 value={inviteHandle}
                 onChange={(e) => {
                   setInviteHandle(e.currentTarget.value);

@@ -4,6 +4,7 @@ import { History, ChevronDown, ChevronUp } from "lucide-react";
 import { useEditChain, useMembers, type EditHistoryEntry } from "betterbase/sync/react";
 import type { SpaceFields, Member } from "betterbase/sync";
 import type { EditDiff } from "betterbase/crypto";
+import { truncateDid } from "./did.js";
 
 interface EditHistoryProps {
   record: (SpaceFields & Record<string, unknown>) | null | undefined;
@@ -12,11 +13,11 @@ interface EditHistoryProps {
 
 function resolveAuthor(did: string, members: Member[]): string {
   const member = members.find((m) => m.did === did);
-  if (member?.handle) return member.handle;
-  if (did.length <= 24) return did;
-  return `${did.slice(0, 16)}...${did.slice(-8)}`;
+  return member?.handle ?? truncateDid(did);
 }
 
+// Computed at render time; labels go stale until the next render. Fine for a
+// history panel that re-renders on every chain update — do not add a ticker.
 function relativeTime(ms: number): string {
   const delta = Date.now() - ms;
   if (delta < 60_000) return "just now";
@@ -76,8 +77,8 @@ export function EditHistory({ record, fieldLabels }: EditHistoryProps) {
 
             <ScrollArea mah={300}>
               <Stack gap="xs">
-                {entries.map((entry: EditHistoryEntry) => (
-                  <Stack key={`${entry.author}-${entry.timestamp}`} gap={2}>
+                {entries.map((entry: EditHistoryEntry, i: number) => (
+                  <Stack key={`${entry.author}-${entry.timestamp}-${i}`} gap={2}>
                     <Group gap={4}>
                       <Text size="xs" fw={500}>
                         {resolveAuthor(entry.author, members)}
