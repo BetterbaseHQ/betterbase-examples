@@ -33,12 +33,18 @@ export function useAlbums() {
   } = useSpaces();
 
   const albumResult = useQuery(albums, {
-    sort: [{ field: "sortOrder", direction: "asc" }],
+    sort: [
+      { field: "sortOrder", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allAlbums = albumResult.records;
 
   const photoResult = useQuery(photos, {
-    sort: [{ field: "createdAt", direction: "desc" }],
+    sort: [
+      { field: "createdAt", direction: "desc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allPhotos = photoResult.records;
 
@@ -74,7 +80,7 @@ export function useAlbums() {
    * photos (with updated albumId FK), and invites the user.
    */
   const shareAlbum = useCallback(
-    async (album: Album & SpaceFields, handle: string): Promise<Album & SpaceFields> => {
+    async (album: Album & { _spaceId?: string }, handle: string): Promise<Album & SpaceFields> => {
       const exists = await userExists(handle);
       if (!exists) throw new Error(`User "${handle}" not found`);
 
@@ -95,7 +101,7 @@ export function useAlbums() {
   );
 
   const inviteToAlbum = useCallback(
-    async (album: Album & SpaceFields, handle: string) => {
+    async (album: Album & { _spaceId?: string }, handle: string) => {
       if (!album._spaceId) throw new Error("Cannot invite to a personal album");
 
       await invite(album._spaceId, handle, { spaceName: album.name });
@@ -116,7 +122,7 @@ export function useAlbums() {
         fileId: string;
         caption: string;
       },
-      album?: Album & SpaceFields,
+      album?: Album & { _spaceId?: string },
     ) => {
       const record = await db.put(photos, data, album ? spaceOf(album) : undefined);
       return record;

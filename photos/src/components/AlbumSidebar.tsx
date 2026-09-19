@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Stack, NavLink, TextInput, ActionIcon, Group, Text } from "@mantine/core";
 import { Image, FolderOpen, Plus, Trash2, Users } from "lucide-react";
+import { ConfirmDialog } from "@betterbase/examples-shared";
 import type { Album } from "@/lib/db";
 import type { View } from "@/App";
 
@@ -28,6 +29,7 @@ export function AlbumSidebar({
 }: AlbumSidebarProps) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<(Album & { _spaceId?: string }) | null>(null);
 
   const handleCreate = () => {
     const name = newName.trim();
@@ -36,6 +38,11 @@ export function AlbumSidebar({
     setNewName("");
     setCreating(false);
   };
+
+  const pendingDeleteIsShared =
+    pendingDelete != null &&
+    pendingDelete._spaceId != null &&
+    pendingDelete._spaceId !== personalSpaceId;
 
   return (
     <Stack gap={0} p="xs">
@@ -55,7 +62,12 @@ export function AlbumSidebar({
         <Text size="xs" fw={600} c="dimmed" tt="uppercase">
           Albums
         </Text>
-        <ActionIcon size="xs" variant="subtle" onClick={() => setCreating(true)}>
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          aria-label="New album"
+          onClick={() => setCreating(true)}
+        >
           <Plus size={14} />
         </ActionIcon>
       </Group>
@@ -64,6 +76,7 @@ export function AlbumSidebar({
         <TextInput
           size="xs"
           placeholder="Album name"
+          aria-label="New album name"
           value={newName}
           onChange={(e) => setNewName(e.currentTarget.value)}
           onKeyDown={(e) => {
@@ -103,11 +116,10 @@ export function AlbumSidebar({
                   size="xs"
                   variant="subtle"
                   color="red"
+                  aria-label={`Delete album ${album.name}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`Delete "${album.name}" and all its photos?`)) {
-                      onDelete(album.id);
-                    }
+                    setPendingDelete(album);
                   }}
                 >
                   <Trash2 size={12} />
@@ -119,6 +131,28 @@ export function AlbumSidebar({
           />
         );
       })}
+
+      <ConfirmDialog
+        opened={pendingDelete != null}
+        title="Delete album"
+        message={
+          pendingDeleteIsShared ? (
+            <>
+              Delete <b>{pendingDelete?.name}</b> and all its photos? It is shared — this deletes it
+              for everyone and cannot be undone.
+            </>
+          ) : (
+            <>
+              Delete <b>{pendingDelete?.name}</b> and all its photos? This cannot be undone.
+            </>
+          )
+        }
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) onDelete(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+      />
     </Stack>
   );
 }

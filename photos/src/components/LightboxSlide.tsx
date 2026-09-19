@@ -46,6 +46,7 @@ export function LightboxSlide({ photo }: LightboxSlideProps) {
     <img
       src={url}
       alt={photo.filename}
+      decoding="async"
       style={{
         maxWidth: "100%",
         maxHeight: "100%",

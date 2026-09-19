@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ActionIcon, Skeleton, Tooltip } from "@mantine/core";
+import { ActionIcon, Skeleton, Tooltip, UnstyledButton } from "@mantine/core";
 import { Trash2 } from "lucide-react";
 import { useFile } from "betterbase/sync/react";
+import { ConfirmDialog } from "@betterbase/examples-shared";
 import type { Photo } from "@/lib/db";
 
 interface PhotoCardProps {
@@ -15,6 +16,7 @@ interface PhotoCardProps {
 export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
   const { url, status } = useFile(photo.fileId, photo.mimeType);
   const [hovered, setHovered] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const dimensions = style ?? {
     width: photo.width,
@@ -54,22 +56,26 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
   }
 
   return (
-    <div
+    <UnstyledButton
+      onClick={onClick}
+      aria-label={`Open ${photo.filename}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       style={{
         position: "relative",
-        cursor: "pointer",
         borderRadius: 8,
         overflow: "hidden",
         width: dimensions.width,
         height: dimensions.height,
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={onClick}
     >
       <img
         src={url}
         alt={photo.filename}
+        loading="lazy"
+        decoding="async"
         style={{
           width: "100%",
           height: "100%",
@@ -106,11 +112,10 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
               size="sm"
               variant="filled"
               color="red"
+              aria-label={`Delete ${photo.filename}`}
               onClick={(e) => {
                 e.stopPropagation();
-                if (window.confirm("Delete this photo?")) {
-                  onDelete(photo);
-                }
+                setConfirmDelete(true);
               }}
             >
               <Trash2 size={12} />
@@ -118,6 +123,16 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
           </Tooltip>
         </div>
       )}
-    </div>
+      <ConfirmDialog
+        opened={confirmDelete}
+        title="Delete photo"
+        message={`Delete ${photo.filename}? This cannot be undone.`}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDelete(photo);
+        }}
+      />
+    </UnstyledButton>
   );
 }

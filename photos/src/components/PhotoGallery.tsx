@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Group, Text, ActionIcon, Button } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { Upload, ImagePlus } from "lucide-react";
 import { RowsPhotoAlbum } from "react-photo-album";
 import Lightbox from "yet-another-react-lightbox";
-import { EmptyState, ShareButton, MembersPanel } from "@betterbase/examples-shared";
+import { EmptyState, ShareButton, MembersPanel, reportError } from "@betterbase/examples-shared";
 import type { Photo, Album } from "@/lib/db";
 import { PhotoCard } from "@/components/PhotoCard";
 import { LightboxSlide } from "@/components/LightboxSlide";
@@ -44,12 +44,16 @@ export function PhotoGallery({
       setUploading(true);
       try {
         await onUpload(files);
+      } catch (err) {
+        reportError(err, "Upload failed");
       } finally {
         setUploading(false);
       }
     },
     [onUpload],
   );
+
+  const photoByFileId = useMemo(() => new Map(photos.map((p) => [p.fileId, p])), [photos]);
 
   const isPersonal = album == null || album._spaceId == null || album._spaceId === personalSpaceId;
   const isShared = album != null && album._spaceId != null && !isPersonal;
@@ -152,7 +156,7 @@ export function PhotoGallery({
             },
           }}
         >
-          <ActionIcon variant="light" size="md">
+          <ActionIcon variant="light" size="md" aria-label="Upload photos">
             <ImagePlus size={16} />
           </ActionIcon>
         </Dropzone>
@@ -185,7 +189,7 @@ export function PhotoGallery({
         slides={photos.map((p) => ({ src: p.fileId }))}
         render={{
           slide: ({ slide }) => {
-            const photo = photos.find((p) => p.fileId === slide.src);
+            const photo = photoByFileId.get(slide.src);
             if (!photo) return null;
             return <LightboxSlide photo={photo} />;
           },
