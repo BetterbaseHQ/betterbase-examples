@@ -3,6 +3,7 @@ import { Stack, NavLink, TextInput, ActionIcon, Group, Text, Modal, Button } fro
 import { useDisclosure } from "@mantine/hooks";
 import { useMembers } from "betterbase/sync/react";
 import { MessageCircle, Plus, Trash2, Pencil } from "lucide-react";
+import { ConfirmDialog } from "@betterbase/examples-shared";
 import type { Conversation } from "@/lib/db";
 import { shortHandle } from "@/lib/handle";
 
@@ -114,7 +115,7 @@ function ConversationNavItem({
   onDelete: () => void;
   onRename: (name: string) => void;
 }) {
-  const { members } = useMembers(conv._spaceId ?? "");
+  const { members } = useMembers(conv._spaceId);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
@@ -148,6 +149,7 @@ function ConversationNavItem({
         size="xs"
         value={renameValue}
         placeholder="Member names (auto)"
+        aria-label="Conversation name"
         onChange={(e) => setRenameValue(e.currentTarget.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") commitRename();
@@ -174,13 +176,19 @@ function ConversationNavItem({
       leftSection={<MessageCircle size={14} />}
       rightSection={
         <Group gap={2} wrap="nowrap">
-          <ActionIcon size="xs" variant="subtle" onClick={startRename}>
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            aria-label={`Rename ${displayName}`}
+            onClick={startRename}
+          >
             <Pencil size={11} />
           </ActionIcon>
           <ActionIcon
             size="xs"
             variant="subtle"
             color="red"
+            aria-label={`Delete ${displayName}`}
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
@@ -214,6 +222,9 @@ export function ConversationSidebar({
   onRename,
 }: ConversationSidebarProps) {
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+  const [pendingDelete, setPendingDelete] = useState<(Conversation & { _spaceId?: string }) | null>(
+    null,
+  );
 
   return (
     <Stack gap={0} p={4}>
@@ -221,7 +232,7 @@ export function ConversationSidebar({
         <Text size="xs" fw={600} c="dimmed" tt="uppercase">
           Conversations
         </Text>
-        <ActionIcon size="xs" variant="subtle" onClick={openModal}>
+        <ActionIcon size="xs" variant="subtle" aria-label="New conversation" onClick={openModal}>
           <Plus size={14} />
         </ActionIcon>
       </Group>
@@ -235,10 +246,21 @@ export function ConversationSidebar({
           currentHandle={currentHandle}
           isSelected={selectedConversationId === conv.id}
           onSelect={() => onSelect(conv.id)}
-          onDelete={() => onDelete(conv.id)}
+          onDelete={() => setPendingDelete(conv)}
           onRename={(name) => onRename(conv.id, name)}
         />
       ))}
+
+      <ConfirmDialog
+        opened={pendingDelete != null}
+        title="Delete conversation"
+        message="Delete this conversation and all its messages for all members? This cannot be undone."
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) onDelete(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+      />
     </Stack>
   );
 }

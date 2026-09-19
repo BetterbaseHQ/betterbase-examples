@@ -29,12 +29,19 @@ export function useConversations() {
   } = useSpaces();
 
   const convResult = useQuery(conversations, {
-    sort: [{ field: "lastMessageAt", direction: "desc" }],
+    // id tie-breaker: wall-clock timestamps can tie or skew across devices
+    sort: [
+      { field: "lastMessageAt", direction: "desc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allConversations = convResult.records;
 
   const msgResult = useQuery(messages, {
-    sort: [{ field: "sentAt", direction: "asc" }],
+    sort: [
+      { field: "sentAt", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
   });
   const allMessages = msgResult.records;
 
@@ -68,12 +75,21 @@ export function useConversations() {
         lastMessageText: "",
         lastMessageAt: Date.now(),
       });
-      const newConv = await moveToSpace(db, conversations, draft.id, spaceId);
+
+      // Each failure path cleans up the records it created so retries don't
+      // accumulate orphans. (The space itself can't be torn down — the SDK
+      // exposes no space deletion via useSpaces yet.)
+      let newConv;
+      try {
+        newConv = await moveToSpace(db, conversations, draft.id, spaceId);
+      } catch (err) {
+        await db.delete(conversations, draft.id).catch(() => {});
+        throw err;
+      }
 
       try {
         await invite(spaceId, recipientHandle, { spaceName: spaceLabel });
       } catch (err) {
-        // Invite failed — delete the orphaned conversation record before re-throwing
         await db.delete(conversations, newConv.id).catch(() => {});
         throw err;
       }
@@ -86,7 +102,9 @@ export function useConversations() {
   const deleteConversation = useCallback(
     async (id: string) => {
       const convMessages = allMessagesRef.current.filter((m) => m.conversationId === id);
-      await Promise.all(convMessages.map((m) => db.delete(messages, m.id)));
+      // allSettled: one failed message delete shouldn't block deleting the rest
+      // (Promise.all would abort remaining deletes on first failure)
+      await Promise.allSettled(convMessages.map((m) => db.delete(messages, m.id)));
       await db.delete(conversations, id);
     },
     [db],
@@ -110,14 +128,14 @@ export function useConversations() {
   );
 
   const renameConversation = useCallback(
-    async (conv: Conversation & SpaceFields, name: string) => {
+    async (conv: Conversation & { _spaceId?: string }, name: string) => {
       await db.patch(conversations, { id: conv.id, name });
     },
     [db],
   );
 
   const inviteToConversation = useCallback(
-    async (conv: Conversation & SpaceFields, handle: string) => {
+    async (conv: Conversation & { _spaceId?: string }, handle: string) => {
       if (!conv._spaceId) throw new Error("Cannot invite to a conversation without a space");
       await invite(conv._spaceId, handle, { spaceName: conv.name || handle });
     },

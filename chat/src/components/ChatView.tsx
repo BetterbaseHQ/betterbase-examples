@@ -21,7 +21,7 @@ interface ChatViewProps {
   messages: readonly Message[];
   currentHandle: string | null;
   isAdmin: boolean;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string) => Promise<void>;
   onInvite: (handle: string) => Promise<void>;
   onRemoveMember: (did: string) => Promise<void>;
 }
@@ -42,7 +42,16 @@ export function ChatView({
   usePresence(conversation?._spaceId, currentHandle ? { handle: currentHandle } : undefined);
   const { typingPeers, sendTyping } = useTyping(conversation?._spaceId, currentHandle);
 
-  // Auto-scroll to bottom only when already near the bottom
+  // Jump to the bottom on conversation switch / initial history load — without
+  // this the near-bottom guard below keeps the viewport at the oldest messages.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight });
+  }, [conversation?.id, conversation?._spaceId]);
+
+  // Follow new messages, but only when already near the bottom (so reading
+  // history isn't yanked around by incoming messages).
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -50,7 +59,7 @@ export function ChatView({
     if (isNearBottom) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
-  }, [messages.length]);
+  }, [messages]);
 
   const senderHandles = useMemo(
     () => [...new Set(messages.map((m) => m.senderHandle))],
@@ -80,8 +89,12 @@ export function ChatView({
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    onSendMessage(trimmed);
-    setText("");
+    // Clear only on success — a failed local write shouldn't eat the message
+    onSendMessage(trimmed)
+      .then(() => setText(""))
+      .catch(() => {
+        /* failure already reported by the caller */
+      });
   };
 
   return (
@@ -157,6 +170,7 @@ export function ChatView({
       >
         <TextInput
           placeholder="Type a message…"
+          aria-label="Message"
           value={text}
           onChange={(e) => {
             setText(e.currentTarget.value);
@@ -170,7 +184,13 @@ export function ChatView({
           }}
           style={{ flex: 1 }}
         />
-        <ActionIcon size="lg" variant="filled" disabled={!text.trim()} onClick={handleSend}>
+        <ActionIcon
+          size="lg"
+          variant="filled"
+          aria-label="Send message"
+          disabled={!text.trim()}
+          onClick={handleSend}
+        >
           <Send size={16} />
         </ActionIcon>
       </Group>

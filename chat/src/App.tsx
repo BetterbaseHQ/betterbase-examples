@@ -1,13 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MessageCircle } from "lucide-react";
-import { Box, Button } from "@mantine/core";
+import { Box, Button, Loader } from "@mantine/core";
 import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
-import { LessAppShell, useAuth, EmptyState, InvitationBanner } from "@betterbase/examples-shared";
+import {
+  LessAppShell,
+  useAuth,
+  useHeaderSyncStatus,
+  EmptyState,
+  InvitationBanner,
+  reportError,
+} from "@betterbase/examples-shared";
 import { db, conversations, messages } from "@/lib/db";
 import { useConversations } from "@/lib/sync";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { ChatView } from "@/components/ChatView";
-import type { SpaceFields } from "betterbase/sync";
 
 // ---------------------------------------------------------------------------
 // SignInGate — shown when the user is not authenticated
@@ -50,16 +56,25 @@ function SignInGate() {
 
 function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { syncing, error: syncError } = useSync();
+  const { error: syncError } = useSync();
+  const syncStatus = useHeaderSyncStatus();
+
+  // Selection is remembered per account so switching accounts doesn't leak
+  // (or flash) another account's conversation.
+  const storageKey = handle ? `chat-selected-conv:${handle}` : null;
   const [selectedConvId, setSelectedConvId] = useState<string | null>(() =>
-    localStorage.getItem("chat-selected-conv"),
+    storageKey ? localStorage.getItem(storageKey) : null,
   );
 
-  const selectConv = (id: string | null) => {
-    setSelectedConvId(id);
-    if (id) localStorage.setItem("chat-selected-conv", id);
-    else localStorage.removeItem("chat-selected-conv");
-  };
+  const selectConv = useCallback(
+    (id: string | null) => {
+      setSelectedConvId(id);
+      if (!storageKey) return;
+      if (id) localStorage.setItem(storageKey, id);
+      else localStorage.removeItem(storageKey);
+    },
+    [storageKey],
+  );
 
   const {
     conversations: allConversations,
@@ -82,27 +97,23 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     }
   }, [allConversations, selectedConvId]);
 
-  const selectedConv =
-    (allConversations.find((c) => c.id === selectedConvId) as
-      | ((typeof allConversations)[number] & SpaceFields)
-      | undefined) ?? null;
+  const selectedConv = allConversations.find((c) => c.id === selectedConvId) ?? null;
 
   const convMessages = allMessages.filter((m) => m.conversationId === selectedConvId);
 
-  const handleDeleteConversation = async (id: string) => {
-    if (
-      !window.confirm(
-        "Delete this conversation and all its messages for all members? This cannot be undone.",
-      )
-    )
-      return;
-    await deleteConversation(id);
-    if (selectedConvId === id) selectConv(null);
+  const handleDeleteConversation = (id: string) => {
+    deleteConversation(id)
+      .catch((err) => reportError(err, "Couldn't delete conversation"))
+      .finally(() => {
+        if (selectedConvId === id) selectConv(null);
+      });
   };
 
   const handleSendMessage = (text: string) => {
-    if (!selectedConv || !handle) return;
-    sendMessage(selectedConv, text, handle).catch(console.error);
+    if (!selectedConv || !handle) return Promise.resolve();
+    return sendMessage(selectedConv, text, handle).catch((err) => {
+      reportError(err, "Couldn't send message");
+    });
   };
 
   const banner =
@@ -133,15 +144,18 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           onDelete={handleDeleteConversation}
           onRename={(id, name) => {
             const conv = allConversations.find((c) => c.id === id);
-            if (conv)
-              renameConversation(conv as typeof conv & SpaceFields, name).catch(console.error);
+            if (conv) {
+              renameConversation(conv, name).catch((err) =>
+                reportError(err, "Couldn't rename conversation"),
+              );
+            }
           }}
         />
       }
       navbarWidth={220}
       isAuthenticated={isAuthenticated}
       handle={handle}
-      syncStatus={syncError ? "error" : syncing ? "syncing" : "synced"}
+      syncStatus={syncStatus}
       syncError={syncError ?? undefined}
       onLogin={login}
       onLogout={logout}
@@ -171,7 +185,13 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
   const ready = useSyncReady();
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
+        <Loader />
+      </Box>
+    );
+  }
   return <ChatApp personalSpaceId={personalSpaceId} />;
 }
 
@@ -187,7 +207,7 @@ export default function App() {
     <BetterbaseProvider
       adapter={db}
       collections={[conversations, messages]}
-      editChainCollections={["messages"]}
+      editChainCollections={[messages.name]}
       session={session}
       clientId={clientId}
       domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
