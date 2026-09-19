@@ -26,14 +26,14 @@ jobs:
       # Apps link the SDK TS source via link:../../betterbase/js, and the
       # SDK's betterbase-db crate path-depends on json-joy-rs — both must be
       # checked out as siblings of this repo.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: betterbase-examples
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/betterbase
           path: betterbase
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/json-joy-rs
           path: json-joy-rs
@@ -43,11 +43,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: betterbase
-      - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: pnpm/action-setup@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: betterbase-examples/${{ matrix.app }}/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
