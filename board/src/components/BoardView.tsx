@@ -8,7 +8,7 @@ import {
   InlineTextInput,
   reportError,
 } from "@betterbase/examples-shared";
-import { db, cards } from "@/lib/db";
+import { db, cards, type Column as ColumnType } from "@/lib/db";
 import type { Board, Card } from "@/lib/db";
 import { Column } from "./Column";
 
@@ -19,13 +19,13 @@ function compareCards(a: Card, b: Card): number {
 
 interface BoardViewProps {
   board: Board & { _spaceId?: string };
+  columns: ColumnType[];
   cards: Card[];
   personalSpaceId?: string | null;
   isAdmin?: boolean;
-  onUpdateBoard: (
-    id: string,
-    patch: Partial<Omit<Board, "id" | "createdAt" | "updatedAt">>,
-  ) => void;
+  onAddColumn: (name: string) => void;
+  onRenameColumn: (columnId: string, name: string) => void;
+  onDeleteColumn: (columnId: string) => void;
   /** Called when a card is added in the synced path; undefined in local path. */
   onAddCard?: (
     boardId: string,
@@ -34,8 +34,6 @@ interface BoardViewProps {
     description: string,
     order: number,
   ) => void;
-  /** Called when cards are deleted (column deletion) in the synced path. */
-  onDeleteColumnCards?: (cardIds: string[]) => void;
   /** Called when a card is moved via drag-and-drop in the synced path. */
   onMoveCard?: (cardId: string, columnId: string, order: number) => void | Promise<void>;
   onShare?: (handle: string) => Promise<void>;
@@ -52,12 +50,14 @@ type PendingMove = {
 
 export function BoardView({
   board,
+  columns: boardColumns,
   cards: boardCards,
   personalSpaceId,
   isAdmin = false,
-  onUpdateBoard,
+  onAddColumn,
+  onRenameColumn,
+  onDeleteColumn,
   onAddCard,
-  onDeleteColumnCards,
   onMoveCard,
   onShare,
   onInvite,
@@ -108,30 +108,9 @@ export function BoardView({
   const handleAddColumn = () => {
     const name = newColumnName.trim();
     if (!name) return;
-    const newColumn = { id: crypto.randomUUID(), name };
-    onUpdateBoard(board.id, { columns: [...board.columns, newColumn] });
+    onAddColumn(name);
     setNewColumnName("");
     setAddingColumn(false);
-  };
-
-  const renameColumn = (columnId: string, name: string) => {
-    const updated = board.columns.map((c) => (c.id === columnId ? { ...c, name } : c));
-    onUpdateBoard(board.id, { columns: updated });
-  };
-
-  const deleteColumn = (columnId: string) => {
-    const cardIds = boardCards.filter((c) => c.columnId === columnId).map((c) => c.id);
-    if (onDeleteColumnCards) {
-      Promise.resolve(onDeleteColumnCards(cardIds)).catch((err) =>
-        reportError(err, "Couldn't delete column"),
-      );
-    } else {
-      cardIds.forEach((id) =>
-        db.delete(cards, id).catch((err) => reportError(err, "Couldn't delete card")),
-      );
-    }
-    const updated = board.columns.filter((c) => c.id !== columnId);
-    onUpdateBoard(board.id, { columns: updated });
   };
 
   const handleDragEnd = (result: DropResult) => {
@@ -231,7 +210,7 @@ export function BoardView({
             paddingRight: 48,
           }}
         >
-          {board.columns.map((col) => {
+          {boardColumns.map((col) => {
             const colCards = effectiveCards.filter((c) => c.columnId === col.id).sort(compareCards);
             return (
               <Column
@@ -240,8 +219,8 @@ export function BoardView({
                 columnName={col.name}
                 boardId={board.id}
                 cards={colCards}
-                onRenameColumn={(name) => renameColumn(col.id, name)}
-                onDeleteColumn={() => deleteColumn(col.id)}
+                onRenameColumn={(name) => onRenameColumn(col.id, name)}
+                onDeleteColumn={() => onDeleteColumn(col.id)}
                 onAddCard={
                   onAddCard
                     ? (columnId, title, description, order) =>

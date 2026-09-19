@@ -11,18 +11,18 @@ import {
   InvitationBanner,
   reportError,
 } from "@betterbase/examples-shared";
-import { db, boards, cards } from "@/lib/db";
-import type { Board } from "@/lib/db";
+import { db, boards, columns, cards } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
-function defaultColumns() {
-  return [
-    { id: crypto.randomUUID(), name: "To Do" },
-    { id: crypto.randomUUID(), name: "In Progress" },
-    { id: crypto.randomUUID(), name: "Done" },
-  ];
+async function createBoardWithColumns(name: string) {
+  const board = await db.put(boards, { name });
+  const defaults = ["To Do", "In Progress", "Done"];
+  for (let i = 0; i < defaults.length; i++) {
+    await db.put(columns, { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 });
+  }
+  return board;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +42,14 @@ function LocalBoardApp() {
   });
   const allBoards = boardResult?.records ?? [];
 
+  const columnResult = useQuery(columns, {
+    sort: [
+      { field: "sortOrder", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ],
+  });
+  const allColumns = columnResult?.records ?? [];
+
   const cardResult = useQuery(cards, {
     sort: [
       { field: "order", direction: "asc" },
@@ -51,6 +59,7 @@ function LocalBoardApp() {
   const allCards = cardResult?.records ?? [];
 
   const selectedBoard = allBoards.find((b) => b.id === selectedBoardId) ?? null;
+  const boardColumns = allColumns.filter((c) => c.boardId === selectedBoardId);
   const boardCards = allCards.filter((c) => c.boardId === selectedBoardId);
 
   useEffect(() => {
@@ -63,14 +72,12 @@ function LocalBoardApp() {
   useEffect(() => {
     if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      db.put(boards, { name: "My Board", columns: defaultColumns() }).catch((err) =>
-        reportError(err, "Couldn't create board"),
-      );
+      createBoardWithColumns("My Board").catch((err) => reportError(err, "Couldn't create board"));
     }
   }, [boardResult]);
 
   const createBoard = (name: string) => {
-    db.put(boards, { name, columns: defaultColumns() })
+    createBoardWithColumns(name)
       .then((record) => setSelectedBoardId(record.id))
       .catch((err) => reportError(err, "Couldn't create board"));
   };
@@ -81,15 +88,37 @@ function LocalBoardApp() {
       .forEach((c) =>
         db.delete(cards, c.id).catch((err) => reportError(err, "Couldn't delete card")),
       );
+    allColumns
+      .filter((c) => c.boardId === id)
+      .forEach((c) =>
+        db.delete(columns, c.id).catch((err) => reportError(err, "Couldn't delete column")),
+      );
     db.delete(boards, id).catch((err) => reportError(err, "Couldn't delete board"));
     if (selectedBoardId === id) setSelectedBoardId(null);
   };
 
-  const updateBoard = (
-    id: string,
-    patch: Partial<Omit<Board, "id" | "createdAt" | "updatedAt">>,
-  ) => {
-    db.patch(boards, { id, ...patch }).catch((err) => reportError(err, "Couldn't save board"));
+  const addColumn = (name: string) => {
+    if (!selectedBoardId) return;
+    const boardColumns = allColumns.filter((c) => c.boardId === selectedBoardId);
+    const maxOrder = boardColumns.reduce((max, c) => Math.max(max, c.sortOrder), 0);
+    db.put(columns, { boardId: selectedBoardId, name, sortOrder: maxOrder + 1 }).catch((err) =>
+      reportError(err, "Couldn't add column"),
+    );
+  };
+
+  const renameColumn = (columnId: string, name: string) => {
+    db.patch(columns, { id: columnId, name }).catch((err) =>
+      reportError(err, "Couldn't rename column"),
+    );
+  };
+
+  const deleteColumn = (columnId: string) => {
+    allCards
+      .filter((c) => c.columnId === columnId)
+      .forEach((c) =>
+        db.delete(cards, c.id).catch((err) => reportError(err, "Couldn't delete card")),
+      );
+    db.delete(columns, columnId).catch((err) => reportError(err, "Couldn't delete column"));
   };
 
   const cardCounts = useMemo(
@@ -121,7 +150,14 @@ function LocalBoardApp() {
       onLogout={logout}
     >
       {selectedBoard ? (
-        <BoardView board={selectedBoard} cards={boardCards} onUpdateBoard={updateBoard} />
+        <BoardView
+          board={selectedBoard}
+          columns={boardColumns}
+          cards={boardCards}
+          onAddColumn={addColumn}
+          onRenameColumn={renameColumn}
+          onDeleteColumn={deleteColumn}
+        />
       ) : (
         <div
           style={{
@@ -156,11 +192,14 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   const {
     boards: allBoards,
+    columns: allColumns,
     cards: allCards,
     invitations,
     createBoard,
     deleteBoard,
-    updateBoard,
+    addColumn,
+    renameColumn,
+    deleteColumn,
     shareBoard,
     inviteToBoard,
     acceptInvitation,
@@ -168,7 +207,6 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     removeMember,
     isAdmin,
     addCard,
-    deleteCards,
     moveCard,
   } = useBoards();
 
@@ -187,6 +225,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   }, [allBoards, selectedBoardId]);
 
   const selectedBoard = allBoards.find((b) => b.id === selectedBoardId) ?? null;
+  const boardColumns = allColumns.filter((c) => c.boardId === selectedBoardId);
   const boardCards = allCards.filter((c) => c.boardId === selectedBoardId);
 
   const cardCounts = useMemo(
@@ -256,12 +295,20 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
       {selectedBoard ? (
         <BoardView
           board={selectedBoard}
+          columns={boardColumns}
           cards={boardCards}
           personalSpaceId={personalSpaceId}
           isAdmin={selectedBoard._spaceId ? isAdmin(selectedBoard._spaceId) : false}
-          onUpdateBoard={updateBoard}
+          onAddColumn={(name) =>
+            addColumn(selectedBoard, name).catch((err) => reportError(err, "Couldn't add column"))
+          }
+          onRenameColumn={(id, name) =>
+            renameColumn(id, name).catch((err) => reportError(err, "Couldn't rename column"))
+          }
+          onDeleteColumn={(id) =>
+            deleteColumn(id).catch((err) => reportError(err, "Couldn't delete column"))
+          }
           onAddCard={handleAddCard}
-          onDeleteColumnCards={deleteCards}
           onMoveCard={moveCard}
           onShare={(handle) =>
             shareBoard(selectedBoard, handle).then((newBoard) => setSelectedBoardId(newBoard.id))
