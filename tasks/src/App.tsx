@@ -1,18 +1,24 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
+import { Box, Loader } from "@mantine/core";
 import { BetterbaseProvider, useSync, useSyncReady } from "betterbase/sync/react";
-import { useQuery, useSyncStatus } from "betterbase/db/react";
+import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
+  useHeaderSyncStatus,
   EmptyState,
   InvitationBanner,
-  type SyncStatus,
+  reportError,
 } from "@betterbase/examples-shared";
 import { db, lists } from "@/lib/db";
 import { useLists } from "@/lib/sync";
+import { createTodoOps } from "@/lib/todos";
 import { TasksSidebar } from "@/components/TasksSidebar";
 import { TaskList } from "@/components/TaskList";
+
+// Local path writes go straight to the module db (no sync adapter).
+const localTodoOps = createTodoOps(db);
 
 // ---------------------------------------------------------------------------
 // LocalTasksApp — offline-first, no sharing (unauthenticated path)
@@ -20,7 +26,6 @@ import { TaskList } from "@/components/TaskList";
 
 function LocalTasksApp() {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { syncing, error: syncError } = useSyncStatus();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -30,57 +35,32 @@ function LocalTasksApp() {
   useEffect(() => {
     if (result && result.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      db.put(lists, { name: "My Tasks", color: "indigo", todos: [] });
+      db.put(lists, { name: "My Tasks", color: "indigo", todos: [] }).catch((err) =>
+        reportError(err, "Couldn't create default list"),
+      );
     }
   }, [result]);
 
+  const [firstList] = allLists;
   useEffect(() => {
-    if (!selectedListId && allLists.length > 0) setSelectedListId(allLists[0]!.id);
-  }, [selectedListId, allLists]);
+    if (!selectedListId && firstList) setSelectedListId(firstList.id);
+  }, [selectedListId, firstList]);
 
   const selectedList = allLists.find((l) => l.id === selectedListId);
   useEffect(() => {
-    if (selectedListId && !selectedList && allLists.length > 0) setSelectedListId(allLists[0]!.id);
-  }, [selectedListId, selectedList, allLists]);
+    if (selectedListId && !selectedList && firstList) setSelectedListId(firstList.id);
+  }, [selectedListId, selectedList, firstList]);
 
-  const headerSyncStatus: SyncStatus | undefined = isAuthenticated
-    ? syncError
-      ? "error"
-      : syncing
-        ? "syncing"
-        : "synced"
-    : undefined;
-
-  const addTodo = async (listId: string, text: string) => {
-    const list = await db.get(lists, listId);
-    if (!list) return;
-    db.patch(lists, {
-      id: listId,
-      todos: [...list.todos, { id: crypto.randomUUID(), text, completed: false }],
-    });
-  };
-
-  const toggleTodo = async (listId: string, todoId: string) => {
-    const list = await db.get(lists, listId);
-    if (!list) return;
-    db.patch(lists, {
-      id: listId,
-      todos: list.todos.map((t) => (t.id === todoId ? { ...t, completed: !t.completed } : t)),
-    });
-  };
-
-  const deleteTodo = async (listId: string, todoId: string) => {
-    const list = await db.get(lists, listId);
-    if (!list) return;
-    db.patch(lists, { id: listId, todos: list.todos.filter((t) => t.id !== todoId) });
-  };
+  const todoOps = useMemo(() => localTodoOps, []);
 
   const createList = (name: string, color: string) => {
-    db.put(lists, { name, color, todos: [] });
+    db.put(lists, { name, color, todos: [] }).catch((err) =>
+      reportError(err, "Couldn't create list"),
+    );
   };
 
   const deleteList = (id: string) => {
-    db.delete(lists, id);
+    db.delete(lists, id).catch((err) => reportError(err, "Couldn't delete list"));
     if (selectedListId === id) setSelectedListId(null);
   };
 
@@ -100,17 +80,15 @@ function LocalTasksApp() {
       navbarWidth={280}
       isAuthenticated={isAuthenticated}
       handle={handle}
-      syncStatus={headerSyncStatus}
-      syncError={syncError ?? undefined}
       onLogin={login}
       onLogout={logout}
     >
       {selectedList ? (
         <TaskList
           list={selectedList}
-          onAddTodo={addTodo}
-          onToggleTodo={toggleTodo}
-          onDeleteTodo={deleteTodo}
+          onAddTodo={todoOps.addTodo}
+          onToggleTodo={todoOps.toggleTodo}
+          onDeleteTodo={todoOps.deleteTodo}
         />
       ) : (
         <EmptyState
@@ -129,7 +107,8 @@ function LocalTasksApp() {
 
 function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, syncing, error: syncError } = useSync();
+  const { phase, error: syncError } = useSync();
+  const syncStatus = useHeaderSyncStatus();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
@@ -144,9 +123,7 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     declineInvitation,
     removeMember,
     isAdmin,
-    addTodo,
-    toggleTodo,
-    deleteTodo,
+    todoOps,
   } = useLists();
 
   // Auto-create a default list only after the full bootstrap sync completes.
@@ -160,14 +137,15 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     }
   }, [phase, allLists.length, createList]);
 
+  const [firstList] = allLists;
   useEffect(() => {
-    if (!selectedListId && allLists.length > 0) setSelectedListId(allLists[0]!.id);
-  }, [selectedListId, allLists]);
+    if (!selectedListId && firstList) setSelectedListId(firstList.id);
+  }, [selectedListId, firstList]);
 
   const selectedList = allLists.find((l) => l.id === selectedListId);
   useEffect(() => {
-    if (selectedListId && !selectedList && allLists.length > 0) setSelectedListId(allLists[0]!.id);
-  }, [selectedListId, selectedList, allLists]);
+    if (selectedListId && !selectedList && firstList) setSelectedListId(firstList.id);
+  }, [selectedListId, selectedList, firstList]);
 
   const banner =
     invitations.length > 0 ? (
@@ -192,14 +170,14 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           onCreate={createList}
           onDelete={(id) => {
             if (selectedListId === id) setSelectedListId(null);
-            deleteList(id);
+            deleteList(id).catch((err) => reportError(err, "Couldn't delete list"));
           }}
         />
       }
       navbarWidth={280}
       isAuthenticated={isAuthenticated}
       handle={handle}
-      syncStatus={syncError ? "error" : syncing ? "syncing" : "synced"}
+      syncStatus={syncStatus}
       syncError={syncError ?? undefined}
       onLogin={login}
       onLogout={logout}
@@ -209,9 +187,9 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           list={selectedList}
           personalSpaceId={personalSpaceId}
           isAdmin={isAdmin(selectedList._spaceId)}
-          onAddTodo={addTodo}
-          onToggleTodo={toggleTodo}
-          onDeleteTodo={deleteTodo}
+          onAddTodo={todoOps.addTodo}
+          onToggleTodo={todoOps.toggleTodo}
+          onDeleteTodo={todoOps.deleteTodo}
           onShare={(handle) =>
             shareList(selectedList, handle).then((newList) => setSelectedListId(newList.id))
           }
@@ -240,7 +218,13 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 function SyncGuard({ personalSpaceId }: { personalSpaceId: string | null }) {
   const ready = useSyncReady();
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <Box style={{ display: "grid", placeItems: "center", minHeight: "100dvh" }}>
+        <Loader />
+      </Box>
+    );
+  }
   return <TasksApp personalSpaceId={personalSpaceId} />;
 }
 

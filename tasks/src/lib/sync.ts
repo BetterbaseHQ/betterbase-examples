@@ -10,10 +10,11 @@
  * Must be called inside BetterbaseProvider (authenticated path only).
  */
 
-import { useRef, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
 import { moveToSpace, type SpaceFields } from "betterbase/sync";
 import { lists, type List } from "@/lib/db";
+import { createTodoOps } from "@/lib/todos";
 
 export function useLists() {
   const db = useSyncDb();
@@ -32,19 +33,7 @@ export function useLists() {
 
   const invitations = usePendingInvitations();
 
-  // Per-list write serialization: prevents read-modify-write races on todos array.
-  const mutexRef = useRef<Map<string, Promise<void>>>(new Map());
-
-  const withMutex = useCallback((listId: string, fn: () => Promise<void>) => {
-    const current = mutexRef.current.get(listId) ?? Promise.resolve();
-    const next = current.then(fn);
-    // Don't let errors block future mutations
-    mutexRef.current.set(
-      listId,
-      next.catch(() => {}),
-    );
-    return next;
-  }, []);
+  const todoOps = useMemo(() => createTodoOps(db), [db]);
 
   const createList = useCallback(
     async (name: string, color: string) => {
@@ -73,7 +62,7 @@ export function useLists() {
       const spaceId = await createSpace();
       const newList = await moveToSpace(db, lists, list.id, spaceId);
       await invite(spaceId, handle, { spaceName: list.name });
-      return newList as List & SpaceFields;
+      return newList;
     },
     [db, userExists, createSpace, invite],
   );
@@ -87,48 +76,6 @@ export function useLists() {
     [invite],
   );
 
-  const addTodo = useCallback(
-    (listId: string, text: string) => {
-      return withMutex(listId, async () => {
-        const list = await db.get(lists, listId);
-        if (!list) return;
-        await db.patch(lists, {
-          id: listId,
-          todos: [...list.todos, { id: crypto.randomUUID(), text, completed: false }],
-        });
-      });
-    },
-    [db, withMutex],
-  );
-
-  const toggleTodo = useCallback(
-    (listId: string, todoId: string) => {
-      return withMutex(listId, async () => {
-        const list = await db.get(lists, listId);
-        if (!list) return;
-        await db.patch(lists, {
-          id: listId,
-          todos: list.todos.map((t) => (t.id === todoId ? { ...t, completed: !t.completed } : t)),
-        });
-      });
-    },
-    [db, withMutex],
-  );
-
-  const deleteTodo = useCallback(
-    (listId: string, todoId: string) => {
-      return withMutex(listId, async () => {
-        const list = await db.get(lists, listId);
-        if (!list) return;
-        await db.patch(lists, {
-          id: listId,
-          todos: list.todos.filter((t) => t.id !== todoId),
-        });
-      });
-    },
-    [db, withMutex],
-  );
-
   return {
     lists: allLists,
     invitations: invitations.records,
@@ -140,8 +87,6 @@ export function useLists() {
     declineInvitation,
     removeMember,
     isAdmin,
-    addTodo,
-    toggleTodo,
-    deleteTodo,
+    todoOps,
   };
 }

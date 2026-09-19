@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, TextInput, ActionIcon, Group, Stack, Text, ScrollArea } from "@mantine/core";
 import { Plus, Trash2, Circle, Users } from "lucide-react";
+import { ConfirmDialog } from "@betterbase/examples-shared";
 import type { List } from "@/lib/db";
 
 const LIST_COLORS = [
@@ -14,10 +15,19 @@ const LIST_COLORS = [
   "pink",
   "grape",
   "violet",
-];
+] as const;
+
+type ListColor = (typeof LIST_COLORS)[number];
+
+/** Colors arrive from peers via CRDT merge — never interpolate them into CSS unvalidated. */
+function listColor(color: string): ListColor {
+  return (LIST_COLORS as readonly string[]).includes(color) ? (color as ListColor) : "indigo";
+}
+
+type SidebarList = List & { _spaceId?: string };
 
 interface TasksSidebarProps {
-  lists: readonly (List & { _spaceId?: string })[];
+  lists: readonly SidebarList[];
   personalSpaceId?: string | null;
   selectedListId: string | null;
   onSelect: (id: string) => void;
@@ -34,6 +44,7 @@ export function TasksSidebar({
   onDelete,
 }: TasksSidebarProps) {
   const [newListName, setNewListName] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<SidebarList | null>(null);
 
   const handleCreate = () => {
     const name = newListName.trim();
@@ -42,6 +53,11 @@ export function TasksSidebar({
     onCreate(name, color);
     setNewListName("");
   };
+
+  const pendingDeleteIsShared =
+    pendingDelete != null &&
+    pendingDelete._spaceId != null &&
+    pendingDelete._spaceId !== personalSpaceId;
 
   return (
     <Stack gap="xs" h="100%">
@@ -54,6 +70,7 @@ export function TasksSidebar({
           {lists.map((list) => {
             const activeCount = list.todos.filter((t) => !t.completed).length;
             const isShared = list._spaceId != null && list._spaceId !== personalSpaceId;
+            const color = listColor(list.color);
             return (
               <NavLink
                 key={list.id}
@@ -63,8 +80,8 @@ export function TasksSidebar({
                 leftSection={
                   <Circle
                     size={10}
-                    fill={`var(--mantine-color-${list.color}-6)`}
-                    color={`var(--mantine-color-${list.color}-6)`}
+                    fill={`var(--mantine-color-${color}-6)`}
+                    color={`var(--mantine-color-${color}-6)`}
                   />
                 }
                 rightSection={
@@ -79,9 +96,10 @@ export function TasksSidebar({
                       size="xs"
                       variant="subtle"
                       color="gray"
+                      aria-label={`Delete list ${list.name}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDelete(list.id);
+                        setPendingDelete(list);
                       }}
                     >
                       <Trash2 size={12} />
@@ -96,6 +114,7 @@ export function TasksSidebar({
 
       <TextInput
         placeholder="New list..."
+        aria-label="New list name"
         size="sm"
         value={newListName}
         onChange={(e) => setNewListName(e.currentTarget.value)}
@@ -106,12 +125,35 @@ export function TasksSidebar({
           <ActionIcon
             size="sm"
             variant="subtle"
+            aria-label="Create list"
             onClick={handleCreate}
             disabled={!newListName.trim()}
           >
             <Plus size={16} />
           </ActionIcon>
         }
+      />
+
+      <ConfirmDialog
+        opened={pendingDelete != null}
+        title="Delete list"
+        message={
+          pendingDeleteIsShared ? (
+            <>
+              Delete <b>{pendingDelete?.name}</b> and all its tasks? It is shared — this deletes it
+              for everyone and cannot be undone.
+            </>
+          ) : (
+            <>
+              Delete <b>{pendingDelete?.name}</b> and all its tasks? This cannot be undone.
+            </>
+          )
+        }
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) onDelete(pendingDelete.id);
+          setPendingDelete(null);
+        }}
       />
     </Stack>
   );

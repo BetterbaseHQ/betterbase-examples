@@ -9,9 +9,9 @@ interface TaskListProps {
   list: List & { _spaceId?: string };
   personalSpaceId?: string | null;
   isAdmin?: boolean;
-  onAddTodo: (listId: string, text: string) => void;
-  onToggleTodo: (listId: string, todoId: string) => void;
-  onDeleteTodo: (listId: string, todoId: string) => void;
+  onAddTodo: (listId: string, text: string) => void | Promise<void>;
+  onToggleTodo: (listId: string, todoId: string) => void | Promise<void>;
+  onDeleteTodo: (listId: string, todoId: string) => void | Promise<void>;
   onShare?: (handle: string) => Promise<void>;
   onInvite?: (handle: string) => Promise<void>;
   onRemoveMember?: (did: string) => Promise<void>;
@@ -98,6 +98,7 @@ export function TaskList({
 
       <TextInput
         placeholder="Add a task..."
+        aria-label="New task"
         size="md"
         value={newTodoText}
         onChange={(e) => setNewTodoText(e.currentTarget.value)}
@@ -105,7 +106,13 @@ export function TaskList({
           if (e.key === "Enter") handleAdd();
         }}
         rightSection={
-          <ActionIcon size="sm" variant="subtle" onClick={handleAdd} disabled={!newTodoText.trim()}>
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            aria-label="Add task"
+            onClick={handleAdd}
+            disabled={!newTodoText.trim()}
+          >
             <Plus size={16} />
           </ActionIcon>
         }
@@ -122,8 +129,8 @@ function TodoRow({
 }: {
   todo: TodoItem;
   listId: string;
-  onToggle: (listId: string, todoId: string) => void;
-  onDelete: (listId: string, todoId: string) => void;
+  onToggle: (listId: string, todoId: string) => void | Promise<void>;
+  onDelete: (listId: string, todoId: string) => void | Promise<void>;
 }) {
   return (
     <Paper p="xs" withBorder style={{ opacity: todo.completed ? 0.6 : 1 }}>
@@ -146,6 +153,7 @@ function TodoRow({
           size="sm"
           variant="subtle"
           color="gray"
+          aria-label={`Delete task ${todo.text}`}
           onClick={() => onDelete(listId, todo.id)}
         >
           <Trash2 size={14} />
