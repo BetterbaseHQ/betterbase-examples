@@ -7,3 +7,4 @@ test-results/
 
 # Per-machine OAuth client IDs (written by root setup-oauth-client.sh)
 .env
+src/__screenshots__/

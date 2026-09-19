@@ -30,7 +30,8 @@ export interface AuthContextValue {
   clientId: string;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+/** @internal Exported for the test harness (shared/src/test/mock-auth.tsx). */
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({
   children,
