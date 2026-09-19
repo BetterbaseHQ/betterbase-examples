@@ -49,7 +49,7 @@ export function ChatView({
   const jumpedFor = useRef<string | null>(null);
   useEffect(() => {
     const el = viewportRef.current;
-    if (!el || messages.length === 0) return;
+    if (!el || messages.length === 0) return undefined;
     const convKey = conversation?.id ?? null;
     if (jumpedFor.current !== convKey) {
       jumpedFor.current = convKey;
@@ -61,8 +61,8 @@ export function ChatView({
       // The ref may not be attached yet (ScrollArea mounts the viewport
       // child), and content may not have laid out on first paint with cached
       // history — re-apply once both settle.
-      requestAnimationFrame(jump);
-      return;
+      const frame = requestAnimationFrame(jump);
+      return () => cancelAnimationFrame(frame);
     }
     // Follow new messages, but only when already near the bottom (so reading
     // history isn't yanked around by incoming messages).
@@ -70,6 +70,7 @@ export function ChatView({
     if (isNearBottom) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
+    return undefined;
   }, [messages, conversation?.id]);
 
   const senderHandles = useMemo(

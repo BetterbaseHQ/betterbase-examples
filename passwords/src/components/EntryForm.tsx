@@ -170,8 +170,8 @@ export function generatePassword(length: number, options: GeneratorOptions): str
   if (options.symbols) groups.push("!@#$%^&*()_+-=[]{}|;:,.<>?");
   if (groups.length === 0) groups.push("abcdefghijklmnopqrstuvwxyz", "0123456789");
 
-  // The per-class guarantee can require more chars than a tiny length allows;
-  // the guarantee wins (callers asking for e.g. length 2 with 4 classes get 4)
+  // Document the size floor: the one-char-per-class guarantee already
+  // guarantees at least groups.length chars; the max() makes that explicit
   const targetLength = Math.max(length, groups.length);
   const all = groups.join("");
 
@@ -258,7 +258,12 @@ function PasswordGenerator({ onUse }: { onUse: (password: string) => void }) {
         </Text>
 
         <Group gap="xs" wrap="nowrap">
-          <Text size="sm" ff="monospace" style={{ flex: 1, wordBreak: "break-all" }}>
+          <Text
+            size="sm"
+            ff="monospace"
+            aria-label="Generated password"
+            style={{ flex: 1, wordBreak: "break-all" }}
+          >
             {generated}
           </Text>
           <ActionIcon

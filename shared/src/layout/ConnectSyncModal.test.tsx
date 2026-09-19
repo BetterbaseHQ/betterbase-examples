@@ -25,7 +25,7 @@ describe("ConnectSyncModal", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
-  it("regression: stays open and shows the error when connect fails", async () => {
+  it("a failed connect leaves the modal open with no unhandled rejection", async () => {
     const user = userEvent.setup();
     const { onClose } = renderModal({
       onConnect: vi.fn().mockRejectedValue(new Error("network down")),

@@ -48,10 +48,13 @@ describe("Notes local flow", () => {
     const title = screen.getByLabelText("Note title");
     await user.type(title, "first note title");
 
-    // Switch to another note IMMEDIATELY — the 300ms title debounce has not fired
+    // Switch to another note IMMEDIATELY and type in it — the new note's
+    // debounce replaces the pending timer, so without a flush-on-switch the
+    // first note's captured args would be dropped (the bug this pins)
     await user.click(screen.getByRole("button", { name: "New note" }));
+    await user.type(screen.getByLabelText("Note title"), "2");
 
-    // The first note's title must still be persisted (flush on switch)
+    // The first note's title must still be persisted despite the replaced timer
     await waitFor(
       async () => {
         const all = await db.query(notes, {});

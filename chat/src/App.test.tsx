@@ -135,7 +135,9 @@ describe("ChatView", () => {
     await waitFor(() => expect(screen.getByText(/message number 59/)).toBeVisible());
     await waitFor(() => {
       // The message list's viewport — located via the message it contains
-      // (other ScrollAreas exist in the tree)
+      // (other ScrollAreas exist in the tree). Uses Mantine's internal class
+      // deliberately: this is a layout test, and the class is stable across
+      // Mantine 7.x minors.
       const last = screen.getByText(/message number 59/);
       const viewport = last.closest(".mantine-ScrollArea-viewport") as HTMLElement | null;
       expect(viewport).toBeTruthy();

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { TextInput, ActionIcon, Stack, Text, UnstyledButton, Group, Button } from "@mantine/core";
+import { TextInput, ActionIcon, Stack, Text, Group, Button } from "@mantine/core";
 import { Search, Plus, Globe, CreditCard, StickyNote, User, Users } from "lucide-react";
 import type { Entry } from "@/lib/db";
 
@@ -75,8 +75,18 @@ function EntryRow({
   const isShared = entry._spaceId != null && entry._spaceId !== personalSpaceId;
 
   return (
-    <UnstyledButton
+    // div, not button: the row contains a decorative ActionIcon (itself a
+    // button element) — interactive elements can't nest in HTML
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(entry.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(entry.id);
+        }
+      }}
       aria-label={`Open ${entry.site || "Untitled"}`}
       style={{
         display: "block",
@@ -85,6 +95,7 @@ function EntryRow({
         padding: "var(--mantine-spacing-sm)",
         borderRadius: "var(--mantine-radius-sm)",
         border: "1px solid var(--mantine-color-gray-3)",
+        cursor: "pointer",
       }}
     >
       <Group gap="sm" wrap="nowrap">
@@ -108,6 +119,6 @@ function EntryRow({
         </Stack>
         {isShared && <Users size={12} color="var(--mantine-color-blue-5)" />}
       </Group>
-    </UnstyledButton>
+    </div>
   );
 }

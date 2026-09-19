@@ -46,9 +46,9 @@ describe("generatePassword", () => {
     expect(lettersOnly).toMatch(/^[a-z]+$/);
   });
 
-  it("regression: clamps tiny lengths below the class count instead of overflowing", () => {
-    // length 2 with 4 classes — the guarantee wins (previously produced 4+
-    // chars unpredictably or worse)
+  it("lets the per-class guarantee win for lengths below the class count", () => {
+    // Requesting length 2 with all four classes still yields one char per
+    // class — the guarantee dominates the requested length
     const pw = generatePassword(2, allOn);
     expect(pw.length).toBe(4);
     expect(classesOf(pw)).toEqual({

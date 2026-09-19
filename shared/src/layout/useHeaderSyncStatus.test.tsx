@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { describe, it, expect, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { useHeaderSyncStatus, type SyncStatus } from "./useHeaderSyncStatus";
@@ -8,7 +7,7 @@ import { renderWithProviders, setSyncState } from "../test";
 // alias — no vi.mock needed.
 
 function StatusProbe() {
-  const [status] = useState<SyncStatus>(useHeaderSyncStatus());
+  const status: SyncStatus = useHeaderSyncStatus();
   return <div data-testid="status">{status}</div>;
 }
 

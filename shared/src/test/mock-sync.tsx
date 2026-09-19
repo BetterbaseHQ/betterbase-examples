@@ -125,10 +125,6 @@ export function setSyncState(state: Partial<MockSyncState>) {
   syncState = { ...syncState, ...state };
 }
 
-export function getSyncState(): MockSyncState {
-  return syncState;
-}
-
 // ---------------------------------------------------------------------------
 // useSyncDb control — tests point it at the app's real local db
 // ---------------------------------------------------------------------------
@@ -145,9 +141,13 @@ export function setSyncDb(adapter: unknown) {
 // ---------------------------------------------------------------------------
 
 /**
- * Auto-stubbing space ops: any accessed method resolves to undefined and is
- * recorded, so tests can both drive (`spaceOp("createSpace").mockResolvedValue(...)`)
- * and assert (`expect(spaceOp("invite")).toHaveBeenCalledWith(...)`).
+ * Drive/assert handle for the useSpaces() proxy stub: any accessed method
+ * resolves to undefined and is recorded, so tests can both drive
+ * (`spaceOp("createSpace").mockResolvedValue(...)`) and assert
+ * (`expect(spaceOp("invite")).toHaveBeenCalledWith(...)`).
+ *
+ * Call counts accumulate for the life of the module — resetSyncMocks() clears
+ * them between tests.
  */
 const spaceOps: Record<string, ReturnType<typeof vi.fn>> = {};
 
@@ -236,8 +236,10 @@ export function setFileUrl(fileId: string, url: string | null) {
 }
 
 export function useFile(fileId: string | null | undefined, _mimeType?: string) {
+  // status mirrors the real FileStatus union ("idle" | "loading" | "ready" |
+  // "error" | "unavailable")
   const url = fileId ? (fileUrls.get(fileId) ?? null) : null;
-  return { url, status: url ? "loaded" : ("idle" as string) };
+  return { url, status: url ? "ready" : "idle" } as const;
 }
 
 export function useEditChain(_record: unknown): unknown[] {
@@ -255,6 +257,26 @@ export function useEvent(
   _type: string,
   _handler: (data: unknown) => void,
 ): void {}
+
+// ---------------------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------------------
+
+/**
+ * Reset all stub state (captured provider props, sync state, space-op
+ * recordings, file urls, invitations, db adapter). Without this, module-level
+ * state persists across tests in the same file and assertions can count calls
+ * from earlier tests. Called from each package's test/setup.ts afterEach.
+ */
+export function resetSyncMocks(): void {
+  captured = null;
+  syncState = { phase: "ready", syncing: false, error: null };
+  for (const fn of Object.values(spaceOps)) fn.mockClear();
+  for (const key of Object.keys(spaceOps)) delete spaceOps[key];
+  fileUrls = new Map();
+  pendingInvitations = [];
+  dbAdapter = null;
+}
 
 // ---------------------------------------------------------------------------
 // Test-data helpers
