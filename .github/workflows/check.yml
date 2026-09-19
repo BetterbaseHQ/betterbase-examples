@@ -1,0 +1,66 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [shared, launchpad, tasks, notes, photos, board, passwords, chat]
+    defaults:
+      run:
+        working-directory: betterbase-examples/${{ matrix.app }}
+    steps:
+      # Apps link the SDK TS source via link:../../betterbase/js, and the
+      # SDK's betterbase-db crate path-depends on json-joy-rs — both must be
+      # checked out as siblings of this repo.
+      - uses: actions/checkout@v4
+        with:
+          path: betterbase-examples
+      - uses: actions/checkout@v4
+        with:
+          repository: BetterbaseHQ/betterbase
+          path: betterbase
+      - uses: actions/checkout@v4
+        with:
+          repository: BetterbaseHQ/json-joy-rs
+          path: json-joy-rs
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: betterbase
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: betterbase-examples/${{ matrix.app }}/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            betterbase-examples/${{ matrix.app }}/pnpm-lock.yaml
+            betterbase/js/pnpm-lock.yaml
+      # The SDK is consumed as linked TS source: its imports resolve from its
+      # own node_modules, and tsc/vite need the wasm-pack pkg/ output that the
+      # SDK repo gitignores — install deps and build wasm before checking.
+      - name: Build SDK
+        working-directory: betterbase/js
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:wasm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
