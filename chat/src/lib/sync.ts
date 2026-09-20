@@ -11,7 +11,7 @@
  * Must be called inside BetterbaseProvider (authenticated path only).
  */
 
-import { useRef, useCallback } from "react";
+import { useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
 import { deleteTree, shareTree, ShareTreeError, spaceOf, type SpaceFields } from "betterbase/sync";
 import { conversations, messages, type Conversation, type Message } from "@/lib/db";
@@ -45,10 +45,6 @@ export function useConversations() {
   const allMessages = msgResult.records;
 
   const invitations = usePendingInvitations();
-
-  // Keep a ref to allMessages to avoid stale closure in deleteConversation
-  const allMessagesRef = useRef(allMessages);
-  allMessagesRef.current = allMessages;
 
   /**
    * Start a new conversation with another user.

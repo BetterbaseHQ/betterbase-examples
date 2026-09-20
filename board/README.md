@@ -9,6 +9,11 @@ An embedded array is one CRDT register — concurrent edits by two peers resolve
 single winner, silently dropping the other peer's column. As separate records, every
 peer's edit is an independent write that merges cleanly.
 
+Deleting a board cascades via the declared parent edges: `columns` declares `boardId`,
+`cards` declares `columnId`, and `deleteTree` walks the chain deepest-first. Note the
+descent follows the edges — a card whose column was already tombstoned (dangling
+`columnId`) survives a board delete; queries already tolerate such orphans.
+
 ## Fractional drag-drop ordering
 
 Dropping a card never renumbers the column: the card gets the midpoint order of its

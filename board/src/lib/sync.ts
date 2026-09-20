@@ -59,10 +59,9 @@ export function useBoards() {
   const invitations = usePendingInvitations();
 
   // Refs for stable callbacks that need fresh data
+  // Keep a ref to allColumns to avoid stale closure in addColumn
   const allColumnsRef = useRef(allColumns);
   allColumnsRef.current = allColumns;
-  const allCardsRef = useRef(allCards);
-  allCardsRef.current = allCards;
 
   const createBoard = useCallback(
     async (name: string) => {
