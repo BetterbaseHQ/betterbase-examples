@@ -20,8 +20,8 @@ function LocalPasswordsApp() {
       createEntry: async (data) => {
         await db.put(entries, data);
       },
-      updateEntry: async (data) => {
-        await db.patch(entries, data);
+      updateEntry: async (data, base) => {
+        await db.patch(entries, data, base ? { base } : undefined);
       },
       deleteEntry: async (id) => {
         await db.delete(entries, id);

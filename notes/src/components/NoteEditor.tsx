@@ -7,36 +7,55 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { RichTextEditor } from "@mantine/tiptap";
-import { ConfirmDialog } from "@betterbase/examples-shared";
+import { ConfirmDialog, reportError } from "@betterbase/examples-shared";
+import { useEditableRecord } from "betterbase/db/react";
+import { db, notes } from "@/lib/db";
 import type { Note } from "@/lib/db";
 
 interface NoteEditorProps {
   note: Note;
-  onUpdate: (id: string, patch: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">>) => void;
   onDelete: (id: string) => void;
 }
 
-export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
+export function NoteEditor({ note, onDelete }: NoteEditorProps) {
+  // Base-aware editing: the hook delivers the record and its CRDT binary as
+  // one atomic pair, so a save can anchor its diff to exactly the version
+  // the editor rendered — peer edits that land mid-edit merge instead of
+  // being tombstoned by a stale full-value write.
+  const { record: live, base } = useEditableRecord(notes, note.id);
+  const current = live ?? note;
+  const baseRef = useRef<Uint8Array | null>(null);
+  baseRef.current = base;
+
   const noteIdRef = useRef(note.id);
   const [localTitle, setLocalTitle] = useState(note.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const suppressNextUpdate = useRef(false);
 
-  // noteId is passed as argument (captured at call time) so switching notes
-  // can't cause saves to target the wrong record. flushOnUnmount writes
-  // through edits pending at unmount; the effect below flushes on note SWITCH
-  // (typing in the next note within the debounce window would otherwise
-  // replace the pending timer and drop the previous note's last edit).
+  // noteId and base are captured at keystroke time: the debounce replaces
+  // its args on every keystroke, so the trailing fire carries the value and
+  // the base it was derived from. A peer edit that lands mid-debounce resets
+  // the editor content (external-sync effect below) and subsequent
+  // keystrokes capture the newer base; if the user stops typing first, the
+  // pending write still anchors to the older base and merges.
+  //
+  // Saves go through db.patch with the explicit noteId (not update()) —
+  // flush-on-switch must target the previous note, while update() always
+  // patches the currently subscribed record.
   const debouncedSaveBody = useDebouncedCallback(
-    (noteId: string, body: string) => {
-      onUpdate(noteId, { body });
+    (noteId: string, body: string, base: Uint8Array | null) => {
+      db.patch(notes, { id: noteId, body }, base ? { base } : undefined).catch((err) =>
+        reportError(err, "Couldn't save note"),
+      );
     },
     { delay: 500, flushOnUnmount: true },
   );
 
   const debouncedSaveTitle = useDebouncedCallback(
-    (noteId: string, title: string) => {
-      onUpdate(noteId, { title });
+    (noteId: string, title: string, base: Uint8Array | null) => {
+      db.patch(notes, { id: noteId, title }, base ? { base } : undefined).catch((err) =>
+        reportError(err, "Couldn't save note"),
+      );
     },
     { delay: 300, flushOnUnmount: true },
   );
@@ -50,8 +69,8 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
       prevNoteId.current = note.id;
     }
     noteIdRef.current = note.id;
-    setLocalTitle(note.title);
-  }, [note.id, note.title, debouncedSaveTitle, debouncedSaveBody]);
+    setLocalTitle(current.title);
+  }, [note.id, current.title, debouncedSaveTitle, debouncedSaveBody]);
 
   const editor = useEditor(
     {
@@ -60,13 +79,13 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
         Link.configure({ openOnClick: false }),
         Placeholder.configure({ placeholder: "Start writing..." }),
       ],
-      content: parseBody(note.body),
+      content: parseBody(current.body),
       onUpdate: ({ editor: e }) => {
         if (suppressNextUpdate.current) {
           suppressNextUpdate.current = false;
           return;
         }
-        debouncedSaveBody(noteIdRef.current, JSON.stringify(e.getJSON()));
+        debouncedSaveBody(noteIdRef.current, JSON.stringify(e.getJSON()), baseRef.current);
       },
     },
     [note.id],
@@ -76,17 +95,17 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
   useEffect(() => {
     if (!editor) return;
     const currentJson = JSON.stringify(editor.getJSON());
-    const parsed = parseBody(note.body);
+    const parsed = parseBody(current.body);
     const parsedJson = JSON.stringify(parsed);
     if (parsedJson !== currentJson) {
       suppressNextUpdate.current = true;
       editor.commands.setContent(parsed);
     }
-  }, [editor, note.body]);
+  }, [editor, current.body]);
 
   const handleTitleChange = (title: string) => {
     setLocalTitle(title);
-    debouncedSaveTitle(noteIdRef.current, title);
+    debouncedSaveTitle(noteIdRef.current, title, baseRef.current);
   };
 
   return (
@@ -126,21 +145,31 @@ export function NoteEditor({ note, onUpdate, onDelete }: NoteEditorProps) {
           fw={600}
           style={{ flex: 1 }}
         />
-        <Tooltip label={note.pinned ? "Unpin" : "Pin"}>
+        <Tooltip label={current.pinned ? "Unpin" : "Pin"}>
           <ActionIcon
-            variant={note.pinned ? "filled" : "subtle"}
-            aria-label={note.pinned ? "Unpin note" : "Pin note"}
-            onClick={() => onUpdate(note.id, { pinned: !note.pinned })}
+            variant={current.pinned ? "filled" : "subtle"}
+            aria-label={current.pinned ? "Unpin note" : "Pin note"}
+            onClick={() =>
+              // LWW boolean — patch by id, no base and no loaded-check
+              // (clicks during the hook's initial delivery still save)
+              db
+                .patch(notes, { id: note.id, pinned: !current.pinned })
+                .catch((err) => reportError(err, "Couldn't save note"))
+            }
           >
             <Pin size={16} />
           </ActionIcon>
         </Tooltip>
-        <Tooltip label={note.favorite ? "Unfavorite" : "Favorite"}>
+        <Tooltip label={current.favorite ? "Unfavorite" : "Favorite"}>
           <ActionIcon
-            variant={note.favorite ? "filled" : "subtle"}
+            variant={current.favorite ? "filled" : "subtle"}
             color="yellow"
-            aria-label={note.favorite ? "Remove from favorites" : "Add to favorites"}
-            onClick={() => onUpdate(note.id, { favorite: !note.favorite })}
+            aria-label={current.favorite ? "Remove from favorites" : "Add to favorites"}
+            onClick={() =>
+              db
+                .patch(notes, { id: note.id, favorite: !current.favorite })
+                .catch((err) => reportError(err, "Couldn't save note"))
+            }
           >
             <Star size={16} />
           </ActionIcon>

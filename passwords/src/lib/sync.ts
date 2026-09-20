@@ -39,8 +39,11 @@ export function useEntries() {
   );
 
   const updateEntry = useCallback(
-    async (data: { id: string } & Omit<Entry, "id" | "createdAt" | "updatedAt">) => {
-      await db.patch(entries, data);
+    async (
+      data: { id: string } & Omit<Entry, "id" | "createdAt" | "updatedAt">,
+      base?: Uint8Array | null,
+    ) => {
+      await db.patch(entries, data, base ? { base } : undefined);
     },
     [db],
   );

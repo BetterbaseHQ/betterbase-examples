@@ -4,7 +4,6 @@ import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import { useAuth, SyncedAppGate, InvitationBanner, reportError } from "@betterbase/examples-shared";
 import { db, notebooks, notes } from "@/lib/db";
-import type { Note } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
 import { NotesWorkspace, type NotesApi } from "@/components/NotesWorkspace";
 
@@ -42,9 +41,6 @@ function LocalNotesApp() {
             favorite: false,
           })
           .then((record) => record.id),
-      updateNote: (id, patch: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">>) => {
-        db.patch(notes, { id, ...patch }).catch((err) => reportError(err, "Couldn't save note"));
-      },
       deleteNote: async (id) => {
         await db.delete(notes, id);
       },
@@ -78,7 +74,6 @@ function NotesApp() {
     removeMember,
     isAdmin,
     createNote,
-    updateNote,
     deleteNote,
   } = useNotebooks();
 
@@ -101,14 +96,9 @@ function NotesApp() {
       createNotebook,
       deleteNotebook,
       createNote: (notebookId, notebook) => createNote(notebookId, notebook).then((r) => r.id),
-      // NoteEditor's onUpdate is fire-and-forget (void) — catch here like the
-      // local adapter does, or failed saves become unhandled rejections
-      updateNote: (id, patch) => {
-        updateNote(id, patch).catch((err) => reportError(err, "Couldn't save note"));
-      },
       deleteNote,
     }),
-    [allNotebooks, allNotes, createNotebook, deleteNotebook, createNote, updateNote, deleteNote],
+    [allNotebooks, allNotes, createNotebook, deleteNotebook, createNote, deleteNote],
   );
 
   const sharing = useMemo(

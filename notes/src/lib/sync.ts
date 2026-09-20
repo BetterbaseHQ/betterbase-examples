@@ -15,7 +15,7 @@
 import { useRef, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
 import { deleteTree, shareTree, spaceOf, type SpaceFields } from "betterbase/sync";
-import { notebooks, notes, type Notebook, type Note } from "@/lib/db";
+import { notebooks, notes, type Notebook } from "@/lib/db";
 
 export function useNotebooks() {
   const db = useSyncDb();
@@ -106,13 +106,6 @@ export function useNotebooks() {
     [db],
   );
 
-  const updateNote = useCallback(
-    async (id: string, patch: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">>) => {
-      await db.patch(notes, { id, ...patch });
-    },
-    [db],
-  );
-
   const deleteNote = useCallback(
     async (id: string) => {
       await db.delete(notes, id);
@@ -133,7 +126,6 @@ export function useNotebooks() {
     removeMember: spaces.removeMember,
     isAdmin: spaces.isAdmin,
     createNote,
-    updateNote,
     deleteNote,
   };
 }

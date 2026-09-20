@@ -21,7 +21,6 @@ export interface NotesApi {
   deleteNotebook: (id: string) => void | Promise<void>;
   /** Creates a note in the given notebook (or the default) and resolves to its id. */
   createNote: (notebookId: string, notebook?: Spaced<Notebook>) => Promise<string> | string;
-  updateNote: (id: string, patch: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">>) => void;
   deleteNote: (id: string) => void | Promise<void>;
 }
 
@@ -196,7 +195,7 @@ export function NotesWorkspace({
           }
         />
         {selectedNote ? (
-          <NoteEditor note={selectedNote} onUpdate={api.updateNote} onDelete={deleteNote} />
+          <NoteEditor note={selectedNote} onDelete={deleteNote} />
         ) : (
           <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
             <EmptyState

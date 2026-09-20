@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { Box, Loader } from "@mantine/core";
 import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
 import type { ConnectionStatus } from "betterbase/sync/react";
+import { useEditableRecord } from "betterbase/db/react";
 import type { Entry } from "@/lib/db";
+import { entries } from "@/lib/db";
 import { CategoriesSidebar, type Category } from "./CategoriesSidebar";
 import { EntryList } from "./EntryList";
 import { EntryDetail } from "./EntryDetail";
@@ -19,7 +21,12 @@ export interface EntriesApi {
   /** True while the initial local query is still loading. */
   loading?: boolean;
   createEntry: (data: EntryData) => Promise<void> | void;
-  updateEntry: (data: EntryData & { id: string }) => Promise<void> | void;
+  /**
+   * `base` is the CRDT snapshot the edit session started from (when known) —
+   * patching against it merges concurrent peer edits instead of
+   * overwriting them with the form's stale full values.
+   */
+  updateEntry: (data: EntryData & { id: string }, base?: Uint8Array | null) => Promise<void> | void;
   deleteEntry: (id: string) => Promise<void> | void;
 }
 
@@ -87,12 +94,22 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
 
   const selectedEntry = allEntries.find((e) => e.id === selectedEntryId) ?? null;
 
+  // Atomic record+base for the selected entry. EntryForm initializes from
+  // `record` (not the query hit) so its values and the captured base come
+  // from the same delivery generation — anchoring the eventual save to
+  // exactly the version the form was populated from. The query hit remains
+  // the source for `_spaceId` (sharing) and the detail view.
+  const { record: liveSelected, base } = useEditableRecord(entries, selectedEntryId ?? undefined);
+  const baseRef = useRef<Uint8Array | null>(null);
+  baseRef.current = base;
+  const editBaseRef = useRef<Uint8Array | null>(null);
+
   // EntryForm displays save errors inline, so failures propagate to it and
   // the form stays open; success closes the form.
   const handleSave = (data: EntryData) =>
     Promise.resolve(
       editing && selectedEntry
-        ? api.updateEntry({ ...data, id: selectedEntry.id })
+        ? api.updateEntry({ ...data, id: selectedEntry.id }, editBaseRef.current)
         : api.createEntry(data),
     ).then(() => {
       setCreating(false);
@@ -148,13 +165,20 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
           onCancel={() => setCreating(false)}
         />
       ) : editing && selectedEntry ? (
-        <EntryForm entry={selectedEntry} onSave={handleSave} onCancel={() => setEditing(false)} />
+        <EntryForm
+          entry={liveSelected ?? selectedEntry}
+          onSave={handleSave}
+          onCancel={() => setEditing(false)}
+        />
       ) : selectedEntry ? (
         <EntryDetail
           entry={selectedEntry}
           personalSpaceId={sharing?.personalSpaceId}
           isAdmin={sharing ? sharing.isAdmin(selectedEntry._spaceId ?? null) : false}
-          onEdit={() => setEditing(true)}
+          onEdit={() => {
+            editBaseRef.current = baseRef.current;
+            setEditing(true);
+          }}
           onDelete={() => handleDelete(selectedEntry.id)}
           onBack={() => setSelectedEntryId(null)}
           onShare={

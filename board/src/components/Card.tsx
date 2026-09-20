@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Paper,
   Text,
@@ -13,6 +13,7 @@ import {
 import { Draggable } from "@hello-pangea/dnd";
 import { Trash2, Palette, AlignLeft } from "lucide-react";
 import { ConfirmDialog, reportError } from "@betterbase/examples-shared";
+import { useEditableRecord } from "betterbase/db/react";
 import type { Card as CardType } from "@/lib/db";
 import { db, cards } from "@/lib/db";
 
@@ -29,12 +30,27 @@ const LABEL_COLORS = [
 
 const SAFE_COLORS = new Set(LABEL_COLORS.filter(Boolean));
 
+function baseOpts(base: Uint8Array | null): { base: Uint8Array } | undefined {
+  return base ? { base } : undefined;
+}
+
 interface CardProps {
   card: CardType;
   index: number;
 }
 
 export function Card({ card, index }: CardProps) {
+  // Base-aware editing: the hook delivers the card and its CRDT binary as an
+  // atomic pair. Edits anchor to the base captured when the edit session
+  // began (the version the local state derived from), so a peer edit that
+  // lands while editing merges instead of being overwritten.
+  const { record: live, base } = useEditableRecord(cards, card.id);
+  const current = live ?? card;
+  const baseRef = useRef<Uint8Array | null>(null);
+  baseRef.current = base;
+  const titleBaseRef = useRef<Uint8Array | null>(null);
+  const descBaseRef = useRef<Uint8Array | null>(null);
+
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [title, setTitle] = useState(card.title);
@@ -44,29 +60,39 @@ export function Card({ card, index }: CardProps) {
 
   // Sync local state when card changes from external source (sync)
   useEffect(() => {
-    if (!editingTitle) setTitle(card.title);
-  }, [card.title, editingTitle]);
+    if (!editingTitle) setTitle(current.title);
+  }, [current.title, editingTitle]);
 
   useEffect(() => {
-    if (!editingDesc) setDescription(card.description);
-  }, [card.description, editingDesc]);
+    if (!editingDesc) setDescription(current.description);
+  }, [current.description, editingDesc]);
+
+  const startEditingTitle = () => {
+    titleBaseRef.current = baseRef.current;
+    setEditingTitle(true);
+  };
+
+  const startEditingDesc = () => {
+    descBaseRef.current = baseRef.current;
+    setEditingDesc(true);
+  };
 
   const saveTitle = () => {
     setEditingTitle(false);
     const trimmed = title.trim();
-    if (trimmed && trimmed !== card.title) {
-      db.patch(cards, { id: card.id, title: trimmed }).catch((err) =>
-        reportError(err, "Couldn't save card"),
+    if (trimmed && trimmed !== current.title) {
+      db.patch(cards, { id: card.id, title: trimmed }, baseOpts(titleBaseRef.current)).catch(
+        (err) => reportError(err, "Couldn't save card"),
       );
     } else {
-      setTitle(card.title);
+      setTitle(current.title);
     }
   };
 
   const saveDescription = () => {
     setEditingDesc(false);
-    if (description !== card.description) {
-      db.patch(cards, { id: card.id, description }).catch((err) =>
+    if (description !== current.description) {
+      db.patch(cards, { id: card.id, description }, baseOpts(descBaseRef.current)).catch((err) =>
         reportError(err, "Couldn't save card"),
       );
     }
@@ -98,7 +124,9 @@ export function Card({ card, index }: CardProps) {
           style={{
             ...provided.draggableProps.style,
             borderLeft:
-              card.color && SAFE_COLORS.has(card.color) ? `3px solid ${card.color}` : undefined,
+              current.color && SAFE_COLORS.has(current.color)
+                ? `3px solid ${current.color}`
+                : undefined,
           }}
         >
           {editingTitle ? (
@@ -110,20 +138,15 @@ export function Card({ card, index }: CardProps) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") saveTitle();
                 if (e.key === "Escape") {
-                  setTitle(card.title);
+                  setTitle(current.title);
                   setEditingTitle(false);
                 }
               }}
               autoFocus
             />
           ) : (
-            <Text
-              size="sm"
-              fw={500}
-              onClick={() => setEditingTitle(true)}
-              style={{ cursor: "text" }}
-            >
-              {card.title || "Untitled"}
+            <Text size="sm" fw={500} onClick={startEditingTitle} style={{ cursor: "text" }}>
+              {current.title || "Untitled"}
             </Text>
           )}
 
@@ -136,7 +159,7 @@ export function Card({ card, index }: CardProps) {
               onBlur={saveDescription}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
-                  setDescription(card.description);
+                  setDescription(current.description);
                   setEditingDesc(false);
                 }
               }}
@@ -145,15 +168,9 @@ export function Card({ card, index }: CardProps) {
               maxRows={4}
               autoFocus
             />
-          ) : card.description ? (
-            <Text
-              size="xs"
-              c="dimmed"
-              mt={2}
-              onClick={() => setEditingDesc(true)}
-              style={{ cursor: "text" }}
-            >
-              {card.description}
+          ) : current.description ? (
+            <Text size="xs" c="dimmed" mt={2} onClick={startEditingDesc} style={{ cursor: "text" }}>
+              {current.description}
             </Text>
           ) : null}
 
@@ -166,13 +183,13 @@ export function Card({ card, index }: CardProps) {
               transition: "opacity 150ms",
             }}
           >
-            {!card.description && (
+            {!current.description && (
               <ActionIcon
                 size="xs"
                 variant="subtle"
                 color="gray"
                 aria-label="Add description"
-                onClick={() => setEditingDesc(true)}
+                onClick={startEditingDesc}
               >
                 <AlignLeft size={12} />
               </ActionIcon>
@@ -196,7 +213,7 @@ export function Card({ card, index }: CardProps) {
                       style={{
                         cursor: "pointer",
                         outline:
-                          card.color === c ? "2px solid var(--mantine-color-blue-5)" : undefined,
+                          current.color === c ? "2px solid var(--mantine-color-blue-5)" : undefined,
                         outlineOffset: 1,
                       }}
                     />
@@ -208,7 +225,7 @@ export function Card({ card, index }: CardProps) {
               size="xs"
               variant="subtle"
               color="gray"
-              aria-label={`Delete card ${card.title}`}
+              aria-label={`Delete card ${current.title}`}
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 size={12} />
@@ -217,7 +234,7 @@ export function Card({ card, index }: CardProps) {
           <ConfirmDialog
             opened={confirmDelete}
             title="Delete card"
-            message={`Delete "${card.title || "Untitled"}"? This cannot be undone.`}
+            message={`Delete "${current.title || "Untitled"}"? This cannot be undone.`}
             onCancel={() => setConfirmDelete(false)}
             onConfirm={() => {
               setConfirmDelete(false);
