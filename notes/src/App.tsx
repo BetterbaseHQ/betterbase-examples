@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
+import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import { useAuth, SyncedAppGate, InvitationBanner, reportError } from "@betterbase/examples-shared";
 import { db, notebooks, notes } from "@/lib/db";
@@ -30,13 +31,7 @@ function LocalNotesApp() {
             reportError(err, "Couldn't create notebook");
           });
       },
-      deleteNotebook: (id) => {
-        const children = allNotes.filter((n) => n.notebookId === id).map((n) => n.id);
-        return Promise.all([
-          ...children.map((id) => db.delete(notes, id)),
-          db.delete(notebooks, id),
-        ]).then(() => undefined);
-      },
+      deleteNotebook: (id) => deleteTree(db, notebooks, id).then(() => undefined),
       createNote: (notebookId) =>
         db
           .put(notes, {

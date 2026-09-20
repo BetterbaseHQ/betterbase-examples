@@ -11,7 +11,13 @@
 
 import { useRef, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { moveToSpace, bulkMoveToSpace, spaceOf, type SpaceFields } from "betterbase/sync";
+import {
+  deleteTree,
+  moveToSpace,
+  bulkMoveToSpace,
+  spaceOf,
+  type SpaceFields,
+} from "betterbase/sync";
 import { boards, columns, cards, type Board, type Card, type Column } from "@/lib/db";
 
 export function useBoards() {
@@ -72,12 +78,8 @@ export function useBoards() {
 
   const deleteBoard = useCallback(
     async (id: string) => {
-      const boardColumns = allColumnsRef.current.filter((c) => c.boardId === id);
-      const boardCards = allCardsRef.current.filter((c) => c.boardId === id);
-      // allSettled: one failed delete shouldn't abort the rest
-      await Promise.allSettled(boardCards.map((c) => db.delete(cards, c.id)));
-      await Promise.allSettled(boardColumns.map((c) => db.delete(columns, c.id)));
-      await db.delete(boards, id);
+      // Cascade covers columns and cards (declared parent edges).
+      await deleteTree(db, boards, id);
     },
     [db],
   );
@@ -101,9 +103,7 @@ export function useBoards() {
   /** Delete a column and all cards in it. */
   const deleteColumn = useCallback(
     async (columnId: string) => {
-      const columnCards = allCardsRef.current.filter((c) => c.columnId === columnId);
-      await Promise.allSettled(columnCards.map((c) => db.delete(cards, c.id)));
-      await db.delete(columns, columnId);
+      await deleteTree(db, columns, columnId);
     },
     [db],
   );

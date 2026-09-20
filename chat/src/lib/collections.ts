@@ -15,4 +15,6 @@ export const messages = collection("messages")
     text: t.text(),
     sentAt: t.number(),
   })
-  .build();
+  .build({
+    parent: { field: "conversationId", collection: () => conversations },
+  });

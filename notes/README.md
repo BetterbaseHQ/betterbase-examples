@@ -5,7 +5,7 @@ A local-first notes app with rich text editing. Notebooks contain notes, note bo
 ## What it demonstrates
 
 - **Rich text CRDTs** — note bodies use `t.text()`, so concurrent edits to the same note merge character-by-character instead of clobbering each other
-- **Parent/child collections** — `notebooks` and `notes` linked by `notebookId`, with reactive queries and cascade delete
+- **Parent/child collections** — `notes` declares its `notebookId` parent edge, so `deleteTree` cascades notebook deletes through the children
 - **Sharing with FK migration** — sharing a notebook moves it and its notes into a shared space via `shareTree`, rewriting `notebookId` to the moved notebook's new ID
 - **Debounce/delete race handling** — the editor flushes pending edits on note switch and before delete, so a debounced save can never resurrect a deleted note
 

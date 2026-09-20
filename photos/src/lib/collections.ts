@@ -20,4 +20,9 @@ export const photos = collection("photos")
     thumbFileId: t.optional(t.string()),
     caption: t.text(),
   })
-  .build();
+  .build({
+    parent: { field: "albumId", collection: () => albums },
+    // Sync engine evicts cached blobs when records are tombstoned (remotely
+    // for peers; the local deleter evicts explicitly in photo-ops).
+    fileFields: ["fileId", "thumbFileId"],
+  });

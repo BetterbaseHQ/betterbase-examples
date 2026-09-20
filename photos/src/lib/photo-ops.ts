@@ -7,7 +7,7 @@
  */
 
 import { useCallback } from "react";
-import { FileStore } from "betterbase/sync";
+import { deleteTree, FileStore, type DeleteTreeDb } from "betterbase/sync";
 import { albums, photos, type Album, type Photo } from "@/lib/db";
 import { generateThumbnail } from "@/lib/thumbnail";
 import { reportError } from "@betterbase/examples-shared";
@@ -25,7 +25,7 @@ export interface PhotoUploadData {
 }
 
 /** Structural slice of the database the photo ops need (local db or sync adapter). */
-interface PhotoDb {
+interface PhotoDb extends DeleteTreeDb {
   get(collection: typeof photos, id: string): Promise<unknown>;
   patch(collection: typeof photos, patch: { id: string; thumbFileId: string }): Promise<unknown>;
   delete(collection: typeof photos, id: string): Promise<unknown>;
@@ -167,9 +167,12 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
     [db, fileStore, add],
   );
 
-  // NOTE: deleting a photo removes the record and the local file cache, but the
-  // sync service keeps the encrypted blob (the SDK's FileStore has no remote
-  // delete yet). Orphaned blobs are invisible but consume server storage.
+  // NOTE: record deletion IS the remote delete — the tombstone propagates like
+  // any record change, and the sync service drops the file's metadata in the
+  // same transaction, so the blob becomes unfetchable for every member. Two
+  // gaps remain: the encrypted bytes in the service's object store aren't
+  // reclaimed yet, and other members' local caches aren't evicted (they
+  // receive the record tombstone; their cached blobs linger until LRU).
   const deletePhoto = useCallback(
     (photo: Photo) => {
       db.delete(photos, photo.id)
@@ -180,14 +183,14 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
   );
 
   /**
-   * Delete an album and its photo records (`albumPhotos` = photos whose
-   * albumId is the album), evicting cached files. `onDeleted` runs only on
-   * success — used by callers to reset the selected view.
+   * Delete an album and its photo records via the declared parent edge,
+   * evicting cached files on success — `onDeleted` then resets the view.
+   * (Remote peers' caches are evicted automatically from the declared
+   * `fileFields` when the tombstones reach them.)
    */
   const deleteAlbum = useCallback(
     (id: string, albumPhotos: readonly Photo[], onDeleted?: () => void) => {
-      Promise.all(albumPhotos.map((p) => db.delete(photos, p.id)))
-        .then(() => db.delete(albums, id))
+      deleteTree(db, albums, id)
         .then(() => fileStore.evictAll(albumPhotos.flatMap(photoFileIds)))
         .then(() => onDeleted?.())
         .catch((err) => reportError(err, "Couldn't delete album"));

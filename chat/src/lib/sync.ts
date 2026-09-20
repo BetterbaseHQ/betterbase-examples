@@ -13,7 +13,7 @@
 
 import { useRef, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { shareTree, ShareTreeError, spaceOf, type SpaceFields } from "betterbase/sync";
+import { deleteTree, shareTree, ShareTreeError, spaceOf, type SpaceFields } from "betterbase/sync";
 import { conversations, messages, type Conversation, type Message } from "@/lib/db";
 
 export function useConversations() {
@@ -97,11 +97,8 @@ export function useConversations() {
 
   const deleteConversation = useCallback(
     async (id: string) => {
-      const convMessages = allMessagesRef.current.filter((m) => m.conversationId === id);
-      // allSettled: one failed message delete shouldn't block deleting the rest
-      // (Promise.all would abort remaining deletes on first failure)
-      await Promise.allSettled(convMessages.map((m) => db.delete(messages, m.id)));
-      await db.delete(conversations, id);
+      // Cascade covers the conversation's messages (declared parent edge).
+      await deleteTree(db, conversations, id);
     },
     [db],
   );

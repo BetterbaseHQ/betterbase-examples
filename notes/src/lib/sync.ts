@@ -14,7 +14,7 @@
 
 import { useRef, useCallback } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import { shareTree, spaceOf, type SpaceFields } from "betterbase/sync";
+import { deleteTree, shareTree, spaceOf, type SpaceFields } from "betterbase/sync";
 import { notebooks, notes, type Notebook, type Note } from "@/lib/db";
 
 export function useNotebooks() {
@@ -48,9 +48,7 @@ export function useNotebooks() {
 
   const deleteNotebook = useCallback(
     async (id: string) => {
-      const childNotes = allNotesRef.current.filter((n) => n.notebookId === id);
-      await Promise.all(childNotes.map((n) => db.delete(notes, n.id)));
-      await db.delete(notebooks, id);
+      await deleteTree(db, notebooks, id);
     },
     [db],
   );

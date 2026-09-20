@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Kanban } from "lucide-react";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
+import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
@@ -82,13 +83,8 @@ function LocalBoardApp() {
   };
 
   const deleteBoard = (id: string) => {
-    (async () => {
-      const boardCards = allCards.filter((c) => c.boardId === id);
-      const boardColumns = allColumns.filter((c) => c.boardId === id);
-      await Promise.allSettled(boardCards.map((c) => db.delete(cards, c.id)));
-      await Promise.allSettled(boardColumns.map((c) => db.delete(columns, c.id)));
-      await db.delete(boards, id);
-    })().catch((err) => reportError(err, "Couldn't delete board"));
+    // Cascade covers columns and cards (declared parent edges).
+    deleteTree(db, boards, id).catch((err) => reportError(err, "Couldn't delete board"));
     if (selectedBoardId === id) setSelectedBoardId(null);
   };
 

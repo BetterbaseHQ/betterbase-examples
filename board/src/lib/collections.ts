@@ -14,7 +14,7 @@ export const columns = collection("columns")
     name: t.string(),
     sortOrder: t.number(),
   })
-  .build();
+  .build({ parent: { field: "boardId", collection: () => boards } });
 
 export const cards = collection("cards")
   .v(1, {
@@ -25,4 +25,4 @@ export const cards = collection("cards")
     color: t.string(),
     order: t.number(),
   })
-  .build();
+  .build({ parent: { field: "columnId", collection: () => columns } });
