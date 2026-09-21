@@ -10,8 +10,11 @@ import {
   EmptyState,
   InvitationBanner,
   reportError,
+  accountScopeKey,
+  useDbScope,
+  DbScopeGate,
 } from "@betterbase/examples-shared";
-import { db, boards, columns, cards } from "@/lib/db";
+import { db, boards, columns, cards, openDatabaseForScope } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
@@ -336,22 +339,28 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  if (isAuthenticated && session) {
-    return (
-      <BetterbaseProvider
-        adapter={db}
-        collections={[boards, columns, cards]}
-        session={session}
-        clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-        onAuthError={logout}
-      >
-        <SyncedAppGate>
-          <BoardApp personalSpaceId={session.getPersonalSpaceId()} />
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    );
-  }
-
-  return <LocalBoardApp />;
+  const { ready: dbReady, key: dbScopeKey } = useDbScope(
+    openDatabaseForScope,
+    session ? accountScopeKey(session) : null,
+  );
+  return (
+    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+      {isAuthenticated && session ? (
+        <BetterbaseProvider
+          adapter={db}
+          collections={[boards, columns, cards]}
+          session={session}
+          clientId={clientId}
+          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+          onAuthError={logout}
+        >
+          <SyncedAppGate>
+            <BoardApp personalSpaceId={session.getPersonalSpaceId()} />
+          </SyncedAppGate>
+        </BetterbaseProvider>
+      ) : (
+        <LocalBoardApp />
+      )}
+    </DbScopeGate>
+  );
 }

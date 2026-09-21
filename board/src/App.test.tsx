@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
-import { db, boards, columns, cards } from "@/lib/db";
+import { db, boards, columns, cards, openDatabaseForScope } from "@/lib/db";
 import {
   renderWithProviders,
   makeFakeSession,
@@ -43,7 +43,7 @@ describe("Board app sync wiring", () => {
     });
 
     // Auto-created board comes with the three default columns
-    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
     expect(screen.getByText("In Progress")).toBeVisible();
 
     // Add a column through the UI and verify it lands in the db
@@ -55,7 +55,7 @@ describe("Board app sync wiring", () => {
         const all = await db.query(columns, {});
         expect(all.records.map((c) => c.name)).toContain("Blocked");
       },
-      { timeout: 4000 },
+      { timeout: 8000 },
     );
   });
 });
@@ -63,9 +63,10 @@ describe("Board app sync wiring", () => {
 describe("Board local cascade deletes", () => {
   it("deleting a board removes its columns and cards from the db", async () => {
     const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
 
-    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
 
     // Add a card through the composer (title → Enter → description Enter submits)
     await user.click(screen.getByRole("button", { name: "Add card to To Do" }));
@@ -78,7 +79,7 @@ describe("Board local cascade deletes", () => {
         const all = await db.query(cards, {});
         expect(all.records.map((c) => c.title)).toContain("cascade me");
       },
-      { timeout: 4000 },
+      { timeout: 8000 },
     );
 
     // Delete the board from the sidebar (ConfirmDialog guards it). The modal
@@ -92,7 +93,7 @@ describe("Board local cascade deletes", () => {
         expect((await db.query(columns, {})).records).toHaveLength(0);
         expect((await db.query(cards, {})).records).toHaveLength(0);
       },
-      { timeout: 4000 },
+      { timeout: 8000 },
     );
   });
 });

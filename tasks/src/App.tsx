@@ -9,8 +9,11 @@ import {
   EmptyState,
   InvitationBanner,
   reportError,
+  accountScopeKey,
+  useDbScope,
+  DbScopeGate,
 } from "@betterbase/examples-shared";
-import { db, lists } from "@/lib/db";
+import { db, lists, openDatabaseForScope } from "@/lib/db";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
 import { TasksSidebar } from "@/components/TasksSidebar";
@@ -216,22 +219,28 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  if (isAuthenticated && session) {
-    return (
-      <BetterbaseProvider
-        adapter={db}
-        collections={[lists]}
-        session={session}
-        clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-        onAuthError={logout}
-      >
-        <SyncedAppGate>
-          <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    );
-  }
-
-  return <LocalTasksApp />;
+  const { ready: dbReady, key: dbScopeKey } = useDbScope(
+    openDatabaseForScope,
+    session ? accountScopeKey(session) : null,
+  );
+  return (
+    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+      {isAuthenticated && session ? (
+        <BetterbaseProvider
+          adapter={db}
+          collections={[lists]}
+          session={session}
+          clientId={clientId}
+          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+          onAuthError={logout}
+        >
+          <SyncedAppGate>
+            <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
+          </SyncedAppGate>
+        </BetterbaseProvider>
+      ) : (
+        <LocalTasksApp />
+      )}
+    </DbScopeGate>
+  );
 }

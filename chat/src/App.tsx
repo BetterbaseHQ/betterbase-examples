@@ -9,8 +9,11 @@ import {
   EmptyState,
   InvitationBanner,
   reportError,
+  accountScopeKey,
+  useDbScope,
+  DbScopeGate,
 } from "@betterbase/examples-shared";
-import { db, conversations, messages } from "@/lib/db";
+import { db, conversations, messages, openDatabaseForScope } from "@/lib/db";
 import { useConversations } from "@/lib/sync";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { ChatView } from "@/components/ChatView";
@@ -192,21 +195,27 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
+  const { ready: dbReady, key: dbScopeKey } = useDbScope(
+    openDatabaseForScope,
+    session ? accountScopeKey(session) : null,
+  );
   if (!isAuthenticated || !session) return <SignInGate />;
 
   return (
-    <BetterbaseProvider
-      adapter={db}
-      collections={[conversations, messages]}
-      editChainCollections={[messages.name]}
-      session={session}
-      clientId={clientId}
-      domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-      onAuthError={logout}
-    >
-      <SyncedAppGate>
-        <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
-      </SyncedAppGate>
-    </BetterbaseProvider>
+    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+      <BetterbaseProvider
+        adapter={db}
+        collections={[conversations, messages]}
+        editChainCollections={[messages.name]}
+        session={session}
+        clientId={clientId}
+        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+        onAuthError={logout}
+      >
+        <SyncedAppGate>
+          <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
+        </SyncedAppGate>
+      </BetterbaseProvider>
+    </DbScopeGate>
   );
 }

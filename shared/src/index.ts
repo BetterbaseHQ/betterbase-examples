@@ -17,6 +17,7 @@ export type { UploadQueueStatusProps } from "./layout/UploadQueueStatus.js";
 export { ItemsSidebar } from "./layout/ItemsSidebar.js";
 export type { ItemsSidebarItem } from "./layout/ItemsSidebar.js";
 export { SyncedAppGate } from "./layout/SyncedAppGate.js";
+export { DbScopeGate } from "./layout/DbScopeGate.js";
 
 // Components
 export { EmptyState } from "./components/EmptyState.js";
@@ -39,3 +40,8 @@ export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "betterbase/syn
 
 // Hooks
 export { useFlushableDebouncedCallback } from "./useFlushableDebouncedCallback.js";
+
+// Account-scoped databases (AUD-045)
+export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-db.js";
+export type { AccountScopeSource } from "./lib/account-db.js";
+export { useDbScope } from "./lib/use-account-db.js";

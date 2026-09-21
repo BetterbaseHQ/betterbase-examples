@@ -1,8 +1,15 @@
 import { useMemo } from "react";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
-import { useAuth, InvitationBanner, SyncedAppGate } from "@betterbase/examples-shared";
-import { db, entries } from "@/lib/db";
+import {
+  useAuth,
+  InvitationBanner,
+  SyncedAppGate,
+  accountScopeKey,
+  useDbScope,
+  DbScopeGate,
+} from "@betterbase/examples-shared";
+import { db, entries, openDatabaseForScope } from "@/lib/db";
 import { useEntries } from "@/lib/sync";
 import { EntriesScreen, type EntriesApi } from "@/components/EntriesScreen";
 
@@ -105,22 +112,28 @@ function PasswordsApp() {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  if (isAuthenticated && session) {
-    return (
-      <BetterbaseProvider
-        adapter={db}
-        collections={[entries]}
-        session={session}
-        clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-        onAuthError={logout}
-      >
-        <SyncedAppGate>
-          <PasswordsApp />
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    );
-  }
-
-  return <LocalPasswordsApp />;
+  const { ready: dbReady, key: dbScopeKey } = useDbScope(
+    openDatabaseForScope,
+    session ? accountScopeKey(session) : null,
+  );
+  return (
+    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+      {isAuthenticated && session ? (
+        <BetterbaseProvider
+          adapter={db}
+          collections={[entries]}
+          session={session}
+          clientId={clientId}
+          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+          onAuthError={logout}
+        >
+          <SyncedAppGate>
+            <PasswordsApp />
+          </SyncedAppGate>
+        </BetterbaseProvider>
+      ) : (
+        <LocalPasswordsApp />
+      )}
+    </DbScopeGate>
+  );
 }

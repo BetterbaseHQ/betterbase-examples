@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
-import { db, notebooks, notes } from "@/lib/db";
+import { db, notebooks, notes, openDatabaseForScope } from "@/lib/db";
 import {
   renderWithProviders,
   makeFakeSession,
@@ -36,11 +36,12 @@ describe("Notes app sync wiring", () => {
 describe("Notes local flow", () => {
   it("regression: edits flush when switching notes quickly (before the debounce fires)", async () => {
     const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db }); // unauthenticated → local notes
 
     // No auto-create on the local path — set up a notebook and first note
     // (the sidebar's create input is always visible)
-    await user.type(screen.getByRole("textbox", { name: /new notebook/i }), "Notebook");
+    await user.type(await screen.findByRole("textbox", { name: /new notebook/i }), "Notebook");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
     await user.click(screen.getByRole("button", { name: "New note" }));
@@ -66,9 +67,10 @@ describe("Notes local flow", () => {
 
   it("regression: deleting a note with a pending edit doesn't error — delete wins", async () => {
     const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db });
 
-    await user.type(screen.getByRole("textbox", { name: /new notebook/i }), "Notebook");
+    await user.type(await screen.findByRole("textbox", { name: /new notebook/i }), "Notebook");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
     await user.click(screen.getByRole("button", { name: "New note" }));
@@ -94,9 +96,10 @@ describe("Notes local flow", () => {
 describe("Notes concurrency", () => {
   it("regression: a peer title update mid-debounce doesn't discard the pending draft (AUD-046)", async () => {
     const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db });
 
-    await user.type(screen.getByRole("textbox", { name: /new notebook/i }), "Notebook");
+    await user.type(await screen.findByRole("textbox", { name: /new notebook/i }), "Notebook");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
     await user.click(screen.getByRole("button", { name: "New note" }));

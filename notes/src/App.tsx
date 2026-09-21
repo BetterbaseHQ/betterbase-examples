@@ -2,8 +2,16 @@ import { useEffect, useMemo, useRef } from "react";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
-import { useAuth, SyncedAppGate, InvitationBanner, reportError } from "@betterbase/examples-shared";
-import { db, notebooks, notes } from "@/lib/db";
+import {
+  useAuth,
+  SyncedAppGate,
+  InvitationBanner,
+  reportError,
+  accountScopeKey,
+  useDbScope,
+  DbScopeGate,
+} from "@betterbase/examples-shared";
+import { db, notebooks, notes, openDatabaseForScope } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
 import { NotesWorkspace, type NotesApi } from "@/components/NotesWorkspace";
 
@@ -138,22 +146,28 @@ function NotesApp() {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  if (isAuthenticated && session) {
-    return (
-      <BetterbaseProvider
-        adapter={db}
-        collections={[notebooks, notes]}
-        session={session}
-        clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-        onAuthError={logout}
-      >
-        <SyncedAppGate>
-          <NotesApp />
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    );
-  }
-
-  return <LocalNotesApp />;
+  const { ready: dbReady, key: dbScopeKey } = useDbScope(
+    openDatabaseForScope,
+    session ? accountScopeKey(session) : null,
+  );
+  return (
+    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+      {isAuthenticated && session ? (
+        <BetterbaseProvider
+          adapter={db}
+          collections={[notebooks, notes]}
+          session={session}
+          clientId={clientId}
+          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+          onAuthError={logout}
+        >
+          <SyncedAppGate>
+            <NotesApp />
+          </SyncedAppGate>
+        </BetterbaseProvider>
+      ) : (
+        <LocalNotesApp />
+      )}
+    </DbScopeGate>
+  );
 }

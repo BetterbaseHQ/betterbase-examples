@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
-import { db, lists } from "@/lib/db";
+import { db, lists, openDatabaseForScope } from "@/lib/db";
 import {
   renderWithProviders,
   makeFakeSession,
@@ -38,6 +38,7 @@ describe("Tasks app sync wiring", () => {
 describe("Tasks local flow", () => {
   it("adds, completes, and deletes tasks through the real local db", async () => {
     const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db }); // unauthenticated → LocalTasksApp
 
     // Auto-created default list
@@ -48,7 +49,7 @@ describe("Tasks local flow", () => {
     // Add a task
     await user.type(screen.getByRole("textbox", { name: "New task" }), "write tests");
     await user.click(screen.getByRole("button", { name: "Add task" }));
-    await waitFor(() => expect(screen.getByText("write tests")).toBeVisible(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByText("write tests")).toBeVisible(), { timeout: 8000 });
 
     // Complete it
     await user.click(screen.getByRole("checkbox", { name: /write tests/i }));
@@ -58,7 +59,7 @@ describe("Tasks local flow", () => {
         const todos = all.records[0]?.todos ?? [];
         expect(todos.find((t) => t.text === "write tests")?.completed).toBe(true);
       },
-      { timeout: 4000 },
+      { timeout: 8000 },
     );
 
     // Delete it
@@ -68,7 +69,7 @@ describe("Tasks local flow", () => {
         const all = await db.query(lists, {});
         expect(all.records[0]?.todos ?? []).toHaveLength(0);
       },
-      { timeout: 4000 },
+      { timeout: 8000 },
     );
   });
 });

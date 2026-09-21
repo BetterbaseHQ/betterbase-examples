@@ -16,8 +16,11 @@ import {
   SyncedAppGate,
   effectiveSyncStatus,
   reportError,
+  accountScopeKey,
+  useDbScope,
+  DbScopeGate,
 } from "@betterbase/examples-shared";
-import { db, albums, photos } from "@/lib/db";
+import { db, albums, photos, openDatabaseForScope } from "@/lib/db";
 import { useAlbums } from "@/lib/sync";
 import { usePhotoOps, computePhotoCounts } from "@/lib/photo-ops";
 import { AlbumSidebar } from "@/components/AlbumSidebar";
@@ -264,29 +267,33 @@ function PhotosApp({
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
+  const { ready: dbReady, key: dbScopeKey } = useDbScope(
+    openDatabaseForScope,
+    session ? accountScopeKey(session) : null,
+  );
   const [fileStore] = useState(() => new FileStore());
 
-  if (isAuthenticated && session) {
-    return (
-      <BetterbaseProvider
-        adapter={db}
-        collections={[albums, photos]}
-        session={session}
-        clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-        onAuthError={logout}
-        fileStore={fileStore}
-      >
-        <SyncedAppGate>
-          <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    );
-  }
-
   return (
-    <FileStoreProvider fileStore={fileStore}>
-      <LocalPhotosApp fileStore={fileStore} />
-    </FileStoreProvider>
+    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+      {isAuthenticated && session ? (
+        <BetterbaseProvider
+          adapter={db}
+          collections={[albums, photos]}
+          session={session}
+          clientId={clientId}
+          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+          onAuthError={logout}
+          fileStore={fileStore}
+        >
+          <SyncedAppGate>
+            <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
+          </SyncedAppGate>
+        </BetterbaseProvider>
+      ) : (
+        <FileStoreProvider fileStore={fileStore}>
+          <LocalPhotosApp fileStore={fileStore} />
+        </FileStoreProvider>
+      )}
+    </DbScopeGate>
   );
 }
