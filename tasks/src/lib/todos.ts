@@ -4,6 +4,11 @@
  * Every mutation is a read-modify-write on the list's todos array, so they are
  * serialized per list (two rapid Enters otherwise interleave: both reads see
  * the same todos and the second patch drops the first todo).
+ *
+ * Each op reads the record and its CRDT base as one atomic pair and anchors
+ * the patch to that base: a sync update that lands between the read and the
+ * write merges with the array edit instead of being overwritten by the stale
+ * full-array view (AUD-049).
  */
 
 import { lists, type List, type TodoItem } from "@/lib/db";
@@ -11,11 +16,18 @@ import { reportError } from "@betterbase/examples-shared";
 
 /** Structural slice of the database the todo ops need (local db or sync adapter). */
 interface TodoDb {
-  get(
+  getWithBase(
     collection: typeof lists,
     id: string,
-  ): Promise<(List & { _spaceId?: string }) | null | undefined>;
-  patch(collection: typeof lists, patch: { id: string; todos: TodoItem[] }): Promise<unknown>;
+  ): Promise<{
+    record: (List & { _spaceId?: string }) | null | undefined;
+    base: Uint8Array | null;
+  }>;
+  patch(
+    collection: typeof lists,
+    patch: { id: string; todos: TodoItem[] },
+    options?: { base?: Uint8Array },
+  ): Promise<unknown>;
 }
 
 function createWriteMutex() {
@@ -42,34 +54,46 @@ export function createTodoOps(db: TodoDb) {
   return {
     addTodo(listId: string, text: string): Promise<void> {
       return run(listId, async () => {
-        const list = await db.get(lists, listId);
+        const { record: list, base } = await db.getWithBase(lists, listId);
         if (!list) return;
-        await db.patch(lists, {
-          id: listId,
-          todos: [...list.todos, { id: crypto.randomUUID(), text, completed: false }],
-        });
+        await db.patch(
+          lists,
+          {
+            id: listId,
+            todos: [...list.todos, { id: crypto.randomUUID(), text, completed: false }],
+          },
+          base ? { base } : undefined,
+        );
       });
     },
 
     toggleTodo(listId: string, todoId: string): Promise<void> {
       return run(listId, async () => {
-        const list = await db.get(lists, listId);
+        const { record: list, base } = await db.getWithBase(lists, listId);
         if (!list) return;
-        await db.patch(lists, {
-          id: listId,
-          todos: list.todos.map((t) => (t.id === todoId ? { ...t, completed: !t.completed } : t)),
-        });
+        await db.patch(
+          lists,
+          {
+            id: listId,
+            todos: list.todos.map((t) => (t.id === todoId ? { ...t, completed: !t.completed } : t)),
+          },
+          base ? { base } : undefined,
+        );
       });
     },
 
     deleteTodo(listId: string, todoId: string): Promise<void> {
       return run(listId, async () => {
-        const list = await db.get(lists, listId);
+        const { record: list, base } = await db.getWithBase(lists, listId);
         if (!list) return;
-        await db.patch(lists, {
-          id: listId,
-          todos: list.todos.filter((t) => t.id !== todoId),
-        });
+        await db.patch(
+          lists,
+          {
+            id: listId,
+            todos: list.todos.filter((t) => t.id !== todoId),
+          },
+          base ? { base } : undefined,
+        );
       });
     },
   };

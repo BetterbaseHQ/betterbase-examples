@@ -34,3 +34,6 @@ export { EditHistory } from "./sharing/EditHistory.js";
 export { truncateDid } from "./sharing/did.js";
 export { peerGradient, peerHue } from "./sharing/peerColor.js";
 export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "betterbase/sync";
+
+// Hooks
+export { useFlushableDebouncedCallback } from "./useFlushableDebouncedCallback.js";

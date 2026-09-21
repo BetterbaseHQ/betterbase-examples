@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
@@ -85,6 +85,73 @@ describe("Notes local flow", () => {
         const all = await db.query(notes, {});
         // The pending edit must not resurrect the deleted note
         expect(all.records.find((n) => n.title === "doomed edit")).toBeUndefined();
+      },
+      { timeout: 4000 },
+    );
+  });
+});
+
+describe("Notes concurrency", () => {
+  it("regression: a peer title update mid-debounce doesn't discard the pending draft (AUD-046)", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />, { db });
+
+    await user.type(screen.getByRole("textbox", { name: /new notebook/i }), "Notebook");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
+    await user.click(screen.getByRole("button", { name: "New note" }));
+
+    const title = screen.getByLabelText("Note title");
+    await user.type(title, "abc");
+    const noteId = (await db.query(notes, {})).records[0]!.id;
+
+    const patchSpy = vi.spyOn(db, "patch");
+
+    // Peer/sync title update lands while "abc" is still only in the
+    // debounce queue (the 300ms timer has not fired). The peer writes
+    // base-anchored on the version both sides rendered — a synced peer
+    // delivers CRDT ops, never a local view-diff full-value write.
+    const { base: sharedBase } = await db.getWithBase(notes, noteId);
+    await db.patch(
+      notes,
+      { id: noteId, title: "peer edit" },
+      sharedBase ? { base: sharedBase } : undefined,
+    );
+    await waitFor(() => expect(screen.getByLabelText("Note title")).toHaveValue("peer edit"), {
+      timeout: 4000,
+    });
+
+    // Type on the rebased input — this replaces the pending debounced args;
+    // pre-fix, "abc" would never reach the database.
+    await user.type(title, "!");
+
+    await waitFor(
+      () => {
+        const flushed = patchSpy.mock.calls.some(
+          ([, p]) => (p as { title?: string }).title === "abc",
+        );
+        expect(flushed).toBe(true);
+      },
+      { timeout: 4000 },
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      "PATCHES",
+      JSON.stringify(
+        patchSpy.mock.calls.map((c) => [
+          (c[1] as { title?: string }).title ?? null,
+          !!(c[2] as { base?: unknown } | undefined)?.base,
+        ]),
+      ),
+    );
+    // title is t.string() (LWW): the flushed draft ("abc") participates in
+    // the conflict and, being the later write in this session, wins the
+    // race — pre-fix it never reached the database and the final title
+    // would be just "peer edit!".
+    await waitFor(
+      async () => {
+        const final = await db.get(notes, noteId);
+        expect(final!.title).toBe("abc!");
       },
       { timeout: 4000 },
     );

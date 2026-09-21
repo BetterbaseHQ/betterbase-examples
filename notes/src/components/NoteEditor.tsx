@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { Group, ActionIcon, TextInput, Box, Tooltip } from "@mantine/core";
-import { useDebouncedCallback } from "@mantine/hooks";
 import { Pin, Star, Trash2 } from "lucide-react";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { RichTextEditor } from "@mantine/tiptap";
-import { ConfirmDialog, reportError } from "@betterbase/examples-shared";
+import {
+  ConfirmDialog,
+  reportError,
+  useFlushableDebouncedCallback,
+} from "@betterbase/examples-shared";
 import { useEditableRecord } from "betterbase/db/react";
 import { db, notes } from "@/lib/db";
 import type { Note } from "@/lib/db";
@@ -42,7 +45,7 @@ export function NoteEditor({ note, onDelete }: NoteEditorProps) {
   // Saves go through db.patch with the explicit noteId (not update()) —
   // flush-on-switch must target the previous note, while update() always
   // patches the currently subscribed record.
-  const debouncedSaveBody = useDebouncedCallback(
+  const debouncedSaveBody = useFlushableDebouncedCallback(
     (noteId: string, body: string, base: Uint8Array | null) => {
       db.patch(notes, { id: noteId, body }, base ? { base } : undefined).catch((err) =>
         reportError(err, "Couldn't save note"),
@@ -51,7 +54,7 @@ export function NoteEditor({ note, onDelete }: NoteEditorProps) {
     { delay: 500, flushOnUnmount: true },
   );
 
-  const debouncedSaveTitle = useDebouncedCallback(
+  const debouncedSaveTitle = useFlushableDebouncedCallback(
     (noteId: string, title: string, base: Uint8Array | null) => {
       db.patch(notes, { id: noteId, title }, base ? { base } : undefined).catch((err) =>
         reportError(err, "Couldn't save note"),
@@ -69,8 +72,19 @@ export function NoteEditor({ note, onDelete }: NoteEditorProps) {
       prevNoteId.current = note.id;
     }
     noteIdRef.current = note.id;
+  }, [note.id, debouncedSaveTitle, debouncedSaveBody]);
+
+  // External title updates (peer sync) rebase the input. The pending local
+  // draft is flushed FIRST — the debounce replaces its args on every
+  // keystroke, so without the flush a keystroke after the rebase would
+  // discard the un-persisted draft entirely (AUD-046).
+  const prevExternalTitle = useRef(current.title);
+  useEffect(() => {
+    if (current.title === prevExternalTitle.current) return;
+    prevExternalTitle.current = current.title;
+    debouncedSaveTitle.flush();
     setLocalTitle(current.title);
-  }, [note.id, current.title, debouncedSaveTitle, debouncedSaveBody]);
+  }, [current.title, debouncedSaveTitle]);
 
   const editor = useEditor(
     {
@@ -98,10 +112,15 @@ export function NoteEditor({ note, onDelete }: NoteEditorProps) {
     const parsed = parseBody(current.body);
     const parsedJson = JSON.stringify(parsed);
     if (parsedJson !== currentJson) {
+      // AUD-046: write the pending draft through before rebasing the
+      // editor to the peer content — the debounce replaces its args on
+      // every keystroke, so the next keystroke after the rebase would
+      // otherwise discard the un-persisted draft.
+      debouncedSaveBody.flush();
       suppressNextUpdate.current = true;
       editor.commands.setContent(parsed);
     }
-  }, [editor, current.body]);
+  }, [editor, current.body, debouncedSaveBody]);
 
   const handleTitleChange = (title: string) => {
     setLocalTitle(title);
