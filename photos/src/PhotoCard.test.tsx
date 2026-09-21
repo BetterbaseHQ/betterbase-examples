@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
@@ -10,6 +10,7 @@ import {
   setSyncDb,
   wipeCollections,
   setFileUrl,
+  setFileUnavailable,
   lastProviderProps,
 } from "@betterbase/examples-shared/test";
 
@@ -33,6 +34,43 @@ describe("Photos app sync wiring", () => {
       .collections.map((c) => (c as { name: string }).name)
       .sort();
     expect(names).toEqual(["albums", "photos"]);
+  });
+});
+
+describe("PhotoCard unavailable tiles (AUD-048)", () => {
+  it("an unavailable tile still offers deletion", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    setFileUnavailable("f-missing");
+    // Bytes known missing — useFile reports the unavailable state (failed
+    // import, cache eviction, remote never uploaded).
+    renderWithProviders(
+      <PhotoCard
+        photo={
+          {
+            id: "p1",
+            albumId: "a1",
+            filename: "broken.jpg",
+            caption: "",
+            mimeType: "image/jpeg",
+            size: 1,
+            thumbFileId: null,
+            fileId: "f-missing",
+            createdAt: 0,
+            updatedAt: 0,
+          } as never
+        }
+        style={{ width: 100, height: 100 }}
+        onClick={() => {}}
+        onDelete={onDelete}
+      />,
+    );
+
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    // Delete is reachable without hovering (no image to hover over)
+    await user.click(screen.getByRole("button", { name: /delete broken\.jpg/i }));
+    await user.click(screen.getByRole("button", { name: /^Delete$/ }));
+    expect(onDelete).toHaveBeenCalledOnce();
   });
 });
 

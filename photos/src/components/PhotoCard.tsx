@@ -37,6 +37,10 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
   }
 
   if (!url) {
+    // Unavailable bytes (import failed mid-persist, cache eviction, remote
+    // never uploaded): keep the tile destructible — a record the user can
+    // neither view nor delete is a dead end (AUD-048). Delete is always
+    // visible here since there is no image to hover over.
     return (
       <div
         style={{
@@ -49,9 +53,32 @@ export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
           justifyContent: "center",
           color: "var(--mantine-color-dimmed)",
           fontSize: 12,
+          position: "relative",
         }}
       >
         Unavailable
+        <Tooltip label="Delete">
+          <ActionIcon
+            size="sm"
+            variant="filled"
+            color="red"
+            aria-label={`Delete ${photo.filename}`}
+            style={{ position: "absolute", top: 4, right: 4 }}
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 size={12} />
+          </ActionIcon>
+        </Tooltip>
+        <ConfirmDialog
+          opened={confirmDelete}
+          title="Delete photo"
+          message={`Delete ${photo.filename}? This cannot be undone.`}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete(photo);
+          }}
+        />
       </div>
     );
   }

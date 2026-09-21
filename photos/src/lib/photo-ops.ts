@@ -159,8 +159,24 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
           },
           album,
         );
-        const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
-        if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
+        try {
+          const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
+          if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
+        } catch (err) {
+          // Byte persistence failed after the record committed (quota,
+          // unreadable file, interruption). Compensate: without this the
+          // record outlives its bytes as an "Unavailable" tile forever —
+          // re-upload generates a new ID rather than completing this one
+          // (AUD-048). The record is milliseconds old, so a delete
+          // tombstone (synced path) converges ahead of any peer read.
+          try {
+            await db.delete(photos, record.id);
+          } catch (cleanupErr) {
+            console.error("Failed to remove record after upload failure", cleanupErr);
+          }
+          await fileStore.evict(fileId).catch(() => {});
+          throw err;
+        }
       });
       reportFailedUploads(failed, files.length);
     },
@@ -176,7 +192,11 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
   const deletePhoto = useCallback(
     (photo: Photo) => {
       db.delete(photos, photo.id)
-        .then(() => photoFileIds(photo).forEach((fid) => fileStore.evict(fid)))
+        .then(() =>
+          // Awaited inside one promise so a cache-eviction rejection is
+          // caught here rather than escaping as an unhandled rejection.
+          Promise.all(photoFileIds(photo).map((fid) => fileStore.evict(fid))),
+        )
         .catch((err) => reportError(err, "Couldn't delete photo"));
     },
     [db, fileStore],
