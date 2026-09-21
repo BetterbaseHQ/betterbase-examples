@@ -5,7 +5,7 @@ import { lists } from "./collections.js";
 // AUD-045: one fixed database per app meant a prior account's decrypted
 // records stayed visible to the next account (and to the unauthenticated
 // view). The database name is now the isolation boundary: bare name for
-// anonymous/local data (retained, never deleted), `name::<hash>` per
+// anonymous/local data (retained, never deleted), `name_<hash>` per
 // account. Exercises the real module binding swap.
 
 interface Wipeable {

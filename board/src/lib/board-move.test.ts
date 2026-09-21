@@ -42,6 +42,7 @@ function makeMarker(ids: TestIds, overrides: Partial<BoardMoveMarker> = {}): Boa
     columnIdMap: { [ids.colOld1]: ids.colNew1 },
     childIds: { columns: [], cards: [] },
     boardCreatedAt: "2026-09-21T10:00:00.000Z",
+    boardName: null,
     newBoardId: null,
     createdAt: Date.now(),
     ...overrides,
@@ -98,7 +99,9 @@ describe("board share recovery (AUD-047)", () => {
   it("recovers children stranded by a crash after the board move with FK patches incomplete", async () => {
     // The finding's exact state: everything moved, one card's boardId
     // rewrite failed — it references the tombstoned old board and would be
-    // invisible in the new board's view forever without recovery.
+    // invisible in the new board's view forever without recovery. Raw
+    // records carry no _spaceId, so the stray is MOVED (patched-in-place
+    // is covered by the fake-db branch test below).
     const ids = makeIds();
     await putBoard(ids.boardNew);
     await putColumn(ids.colNew1, ids.boardNew);
@@ -109,7 +112,11 @@ describe("board share recovery (AUD-047)", () => {
 
     const result = await reconcileBoardMoves(db as never);
     expect(result).toEqual([ids.boardNew]);
-    expect(await cardBoardId(orphan.id)).toBe(ids.boardNew);
+    // Old record gone; exactly one card per original survives, repointed
+    expect(await cardBoardId(orphan.id)).toBeUndefined();
+    const allCards = (await db.query(cards, {})).records;
+    expect(allCards).toHaveLength(2);
+    expect(allCards.every((c) => c.boardId === ids.boardNew)).toBe(true);
     expect(loadMarkers()).toHaveLength(0);
   });
 
@@ -117,12 +124,59 @@ describe("board share recovery (AUD-047)", () => {
     const ids = makeIds();
     await putBoard(ids.boardNew);
     await putColumn(ids.colNew1, ids.boardNew);
-    const card = await putCard(uid("card"), ids.old, ids.colOld1);
+    await putCard(uid("card"), ids.old, ids.colOld1);
 
     saveMarker(makeMarker(ids, { newBoardId: ids.boardNew }));
     await reconcileBoardMoves(db as never);
 
-    expect((await db.get(cards, card.id))?.columnId).toBe(ids.colNew1);
+    // The stray is moved with its columnId remapped to the new column
+    const allCards = (await db.query(cards, {})).records;
+    expect(allCards).toHaveLength(1);
+    expect(allCards[0]!.columnId).toBe(ids.colNew1);
+  });
+
+  it("branches on space: shared-space strays are patched, personal-space strays are moved", async () => {
+    // Fake structural db — the raw adapter cannot attach _spaceId to
+    // schema-validated records, and the branch is the load-bearing fix:
+    // a patch never leaves the sharer's personal space, so invitees would
+    // never see it (review S5).
+    const ids = makeIds();
+    const ops: string[] = [];
+    const sharedCard = { id: "c-shared", boardId: ids.old, columnId: "col-x", _spaceId: SPACE };
+    const personalCard = { id: "c-personal", boardId: ids.old, columnId: ids.colOld1 };
+    const fakeDb = {
+      get: async (_c: unknown, id: string) =>
+        id === ids.old ? { id, name: "b", createdAt: "2026-09-21T10:00:00.000Z" } : undefined,
+      put: async (_c: unknown, data: Record<string, unknown>) => {
+        ops.push(`put:${JSON.stringify(data)}`);
+        return { id: "generated" };
+      },
+      patch: async (_c: unknown, data: Record<string, unknown>) => {
+        ops.push(`patch:${JSON.stringify(data)}`);
+      },
+      delete: async (_c: unknown, id: string) => {
+        ops.push(`delete:${id}`);
+      },
+      query: async (collection: unknown) => ({
+        records:
+          collection === cards
+            ? [sharedCard, personalCard]
+            : collection === columns
+              ? []
+              : [{ id: "board-maybe", createdAt: "2000-01-01T00:00:00.000Z", name: "other" }],
+      }),
+    };
+
+    const marker = makeMarker(ids, { newBoardId: ids.boardNew });
+    const result = await completeBoardMove(fakeDb as never, marker);
+
+    expect(result).toBe(ids.boardNew);
+    // Shared-space stray: patched in place
+    expect(ops).toContain(`patch:{"id":"c-shared","boardId":"${ids.boardNew}"}`);
+    // Personal-space stray (no _spaceId): moved into the target space with
+    // its columnId remapped
+    expect(ops).toContain("delete:c-personal");
+    expect(ops).toContain(`put:{"boardId":"${ids.boardNew}","columnId":"${ids.colNew1}"}`);
   });
 
   it("recovers a crash before the board move: creates the board, tombstones the old, patches children", async () => {
@@ -143,7 +197,11 @@ describe("board share recovery (AUD-047)", () => {
     expect(new Date((await db.get(boards, newBoardId!))!.createdAt).getTime()).toBe(
       new Date("2026-09-21T10:00:00.000Z").getTime(),
     );
-    expect((await db.get(columns, col.id))?.boardId).toBe(newBoardId);
+    // The stray column (personal space, no _spaceId) is MOVED and repointed
+    expect((await db.get(columns, col.id))?.id).toBeUndefined();
+    const allColumns = (await db.query(columns, {})).records;
+    expect(allColumns).toHaveLength(1);
+    expect(allColumns[0]!.boardId).toBe(newBoardId);
     expect(loadMarkers()).toHaveLength(0);
   });
 
@@ -162,7 +220,11 @@ describe("board share recovery (AUD-047)", () => {
     // Exactly one live board remains, and it is the adopted one
     const live = (await db.query(boards, {})).records;
     expect(live.map((b) => b.id)).toEqual([ids.boardNew]);
-    expect((await db.get(columns, col.id))?.boardId).toBe(ids.boardNew);
+    // The stray column is moved and repointed to the adopted board
+    expect((await db.get(columns, col.id))?.id).toBeUndefined();
+    const allColumns = (await db.query(columns, {})).records;
+    expect(allColumns).toHaveLength(1);
+    expect(allColumns[0]!.boardId).toBe(ids.boardNew);
   });
 
   it("moves children that were listed but never moved (crash mid-children)", async () => {
@@ -196,7 +258,12 @@ describe("board share recovery (AUD-047)", () => {
     saveMarker(makeMarker(ids, { newBoardId: ids.boardNew })); // share never saw this card
 
     await reconcileBoardMoves(db as never);
-    expect(await cardBoardId(late.id)).toBe(ids.boardNew);
+    // The late card (personal space) is moved in and repointed
+    expect(await cardBoardId(late.id)).toBeUndefined();
+    const allCards = (await db.query(cards, {})).records;
+    expect(allCards).toHaveLength(1);
+    expect(allCards[0]!.boardId).toBe(ids.boardNew);
+    expect(allCards[0]!.columnId).toBe(ids.colNew1);
   });
 
   it("recovery is idempotent: a second run finds nothing to do", async () => {
@@ -215,6 +282,30 @@ describe("board share recovery (AUD-047)", () => {
     localStorage.setItem("betterbase.board-move.v1::junk", "{not json");
     expect(loadMarkers()).toHaveLength(0);
     expect(localStorage.getItem("betterbase.board-move.v1::junk")).toBeNull();
+  });
+
+  it("recovers a crash between persist-id and tombstone: the old board is still tombstoned (no ghost)", async () => {
+    const ids = makeIds();
+    await putBoard(ids.old, "2026-09-21T10:00:00.000Z"); // still alive
+    await putBoard(ids.boardNew, "2026-09-21T10:00:00.000Z");
+    await putColumn(uid("col"), ids.boardNew);
+
+    // Marker already knows the new id — recovery must still delete the old
+    saveMarker(makeMarker(ids, { newBoardId: ids.boardNew }));
+    const [newBoardId] = await reconcileBoardMoves(db as never);
+    expect(newBoardId).toBe(ids.boardNew);
+    expect(await boardIdOf(ids.old)).toBeUndefined();
+    const live = (await db.query(boards, {})).records;
+    expect(live.map((b) => b.id)).toEqual([ids.boardNew]);
+    expect(loadMarkers()).toHaveLength(0);
+  });
+
+  it("unresolvable markers are cleared instead of churning on every mount", async () => {
+    const ids = makeIds();
+    saveMarker(makeMarker(ids)); // board gone, nothing adoptable
+    const result = await completeBoardMove(db as never, loadMarkers()[0]!);
+    expect(result).toBeNull();
+    expect(loadMarkers()).toHaveLength(0);
   });
 
   it("completeBoardMove returns null when nothing can be recovered", async () => {

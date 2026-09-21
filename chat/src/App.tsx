@@ -195,14 +195,15 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  const { ready: dbReady, key: dbScopeKey } = useDbScope(
-    openDatabaseForScope,
-    session ? accountScopeKey(session) : null,
-  );
+  const {
+    ready: dbReady,
+    key: dbScopeKey,
+    error: dbError,
+  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   if (!isAuthenticated || !session) return <SignInGate />;
 
   return (
-    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+    <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
       <BetterbaseProvider
         adapter={db}
         collections={[conversations, messages]}

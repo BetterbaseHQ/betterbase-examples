@@ -159,8 +159,9 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
           },
           album,
         );
+        let thumbFileId: string | undefined;
         try {
-          const thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
+          thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
           if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
         } catch (err) {
           // Byte persistence failed after the record committed (quota,
@@ -174,7 +175,13 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
           } catch (cleanupErr) {
             console.error("Failed to remove record after upload failure", cleanupErr);
           }
+          // Evict every cache entry this import created — a surviving
+          // thumbnail (queued against the now-deleted record) would fail
+          // server-side forever and pin a permanent failure badge.
           await fileStore.evict(fileId).catch(() => {});
+          if (thumbFileId !== undefined) {
+            await fileStore.evict(thumbFileId).catch(() => {});
+          }
           throw err;
         }
       });

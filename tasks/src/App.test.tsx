@@ -16,6 +16,13 @@ afterEach(async () => {
   await wipeCollections(db, [lists]);
 });
 
+// Reset the module to the anonymous database after each test — an
+// authenticated test otherwise leaves the account scope open and the
+// next local test pays the swap-back database boot inside its assertions.
+afterEach(async () => {
+  await openDatabaseForScope(null);
+});
+
 describe("Tasks app sync wiring", () => {
   it("registers the lists collection with BetterbaseProvider", async () => {
     setSyncDb(db);

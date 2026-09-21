@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
-import { db, entries } from "@/lib/db";
+import { db, entries, openDatabaseForScope } from "@/lib/db";
 import {
   renderWithProviders,
   makeFakeSession,
@@ -13,6 +13,13 @@ import {
 
 afterEach(async () => {
   await wipeCollections(db, [entries]);
+});
+
+// Reset the module to the anonymous database after each test — an
+// authenticated test otherwise leaves the account scope open and the
+// next local test pays the swap-back database boot inside its assertions.
+afterEach(async () => {
+  await openDatabaseForScope(null);
 });
 
 describe("Passwords app sync wiring", () => {

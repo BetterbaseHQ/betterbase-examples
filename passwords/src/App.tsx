@@ -112,12 +112,13 @@ function PasswordsApp() {
 
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  const { ready: dbReady, key: dbScopeKey } = useDbScope(
-    openDatabaseForScope,
-    session ? accountScopeKey(session) : null,
-  );
+  const {
+    ready: dbReady,
+    key: dbScopeKey,
+    error: dbError,
+  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   return (
-    <DbScopeGate key={dbScopeKey} ready={dbReady}>
+    <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
       {isAuthenticated && session ? (
         <BetterbaseProvider
           adapter={db}

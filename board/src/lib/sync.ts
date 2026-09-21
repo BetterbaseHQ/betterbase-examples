@@ -166,6 +166,7 @@ export function useBoards() {
           cards: boardCards.map((c) => c.id),
         },
         boardCreatedAt: new Date(board.createdAt).toISOString(),
+        boardName: board.name,
         newBoardId: null,
         createdAt: Date.now(),
       };

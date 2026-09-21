@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { Image } from "lucide-react";
 import {
   BetterbaseProvider,
@@ -20,7 +20,7 @@ import {
   useDbScope,
   DbScopeGate,
 } from "@betterbase/examples-shared";
-import { db, albums, photos, openDatabaseForScope } from "@/lib/db";
+import { db, albums, photos, openDatabaseForScope, currentScopeDbName } from "@/lib/db";
 import { useAlbums } from "@/lib/sync";
 import { usePhotoOps, computePhotoCounts } from "@/lib/photo-ops";
 import { AlbumSidebar } from "@/components/AlbumSidebar";
@@ -265,35 +265,77 @@ function PhotosApp({
 // App — wraps PhotosApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
+/**
+ * File-bytes isolation (AUD-045): the FileStore is created INSIDE the
+ * scope-keyed subtree, so each account gets its own cache database
+ * (`photos_<hash>`, derived from the same scope suffix as the record db)
+ * and the anonymous namespace keeps the default shared cache. Created
+ * after `openDatabaseForScope` resolved, `currentScopeDbName()` is
+ * synchronous here. Disposed on unmount (scope switch) — otherwise account
+ * A's cached plaintext blobs, and A's pending queue entries, would be
+ * adopted by account B's store via the cross-space migration on connect.
+ */
+function ScopedPhotoStores({
+  isAuthenticated,
+  session,
+  clientId,
+  logout,
+  children,
+}: {
+  isAuthenticated: boolean;
+  session: ReturnType<typeof useAuth>["session"];
+  clientId: string;
+  logout: () => void;
+  children: (fileStore: FileStore) => ReactNode;
+}) {
+  const [fileStore] = useState(() => {
+    const scoped = currentScopeDbName();
+    return scoped ? new FileStore({ dbName: scoped }) : new FileStore();
+  });
+  useEffect(() => () => fileStore.dispose(), [fileStore]);
+
+  if (isAuthenticated && session) {
+    return (
+      <BetterbaseProvider
+        adapter={db}
+        collections={[albums, photos]}
+        session={session}
+        clientId={clientId}
+        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+        onAuthError={logout}
+        fileStore={fileStore}
+      >
+        <SyncedAppGate>{children(fileStore)}</SyncedAppGate>
+      </BetterbaseProvider>
+    );
+  }
+  return <FileStoreProvider fileStore={fileStore}>{children(fileStore)}</FileStoreProvider>;
+}
+
 export default function App() {
   const { isAuthenticated, session, clientId, logout } = useAuth();
-  const { ready: dbReady, key: dbScopeKey } = useDbScope(
-    openDatabaseForScope,
-    session ? accountScopeKey(session) : null,
-  );
-  const [fileStore] = useState(() => new FileStore());
+  const {
+    ready: dbReady,
+    key: dbScopeKey,
+    error: dbError,
+  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
 
   return (
-    <DbScopeGate key={dbScopeKey} ready={dbReady}>
-      {isAuthenticated && session ? (
-        <BetterbaseProvider
-          adapter={db}
-          collections={[albums, photos]}
-          session={session}
-          clientId={clientId}
-          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-          onAuthError={logout}
-          fileStore={fileStore}
-        >
-          <SyncedAppGate>
+    <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
+      <ScopedPhotoStores
+        isAuthenticated={isAuthenticated}
+        session={session}
+        clientId={clientId}
+        logout={logout}
+      >
+        {(fileStore) =>
+          isAuthenticated && session ? (
             <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
-          </SyncedAppGate>
-        </BetterbaseProvider>
-      ) : (
-        <FileStoreProvider fileStore={fileStore}>
-          <LocalPhotosApp fileStore={fileStore} />
-        </FileStoreProvider>
-      )}
+          ) : (
+            <LocalPhotosApp fileStore={fileStore} />
+          )
+        }
+      </ScopedPhotoStores>
     </DbScopeGate>
   );
 }
