@@ -43,6 +43,8 @@ export function useFlushableDebouncedCallback<A extends unknown[]>(
 
   useEffect(
     () => () => {
+      // Constant options assumed: toggling flushOnUnmount mid-life would
+      // run this cleanup on the options change and flush pending args.
       if (flushOnUnmount) fire();
       else if (timer.current !== null) clearTimeout(timer.current);
     },

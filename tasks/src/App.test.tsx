@@ -10,7 +10,7 @@ import {
   wipeCollections,
   lastProviderProps,
 } from "@betterbase/examples-shared/test";
-import { createTodoOps } from "@/lib/todos";
+import { createTodoOps, type TodoDb } from "@/lib/todos";
 
 afterEach(async () => {
   await wipeCollections(db, [lists]);
@@ -101,7 +101,7 @@ describe("Tasks concurrency", () => {
       ) => db.patch(collection, patch, options),
     };
 
-    const ops = createTodoOps(interleaved as never);
+    const ops = createTodoOps(interleaved as unknown as TodoDb);
     await ops.toggleTodo(seeded.id, "x");
 
     const final = await db.get(lists, seeded.id);

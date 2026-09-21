@@ -121,6 +121,12 @@ describe("Notes concurrency", () => {
       timeout: 4000,
     });
 
+    // Wait for the flushed draft to be merged and the input rebased to the
+    // result before typing — without this the keystroke can land on either
+    // the pre-merge or post-merge input, making the final-value assertion
+    // racy (LWW for t.string()).
+    await waitFor(() => expect(screen.getByLabelText("Note title")).toHaveValue("abc"));
+
     // Type on the rebased input — this replaces the pending debounced args;
     // pre-fix, "abc" would never reach the database.
     await user.type(title, "!");
@@ -134,16 +140,7 @@ describe("Notes concurrency", () => {
       },
       { timeout: 4000 },
     );
-    // eslint-disable-next-line no-console
-    console.log(
-      "PATCHES",
-      JSON.stringify(
-        patchSpy.mock.calls.map((c) => [
-          (c[1] as { title?: string }).title ?? null,
-          !!(c[2] as { base?: unknown } | undefined)?.base,
-        ]),
-      ),
-    );
+    patchSpy.mockRestore();
     // title is t.string() (LWW): the flushed draft ("abc") participates in
     // the conflict and, being the later write in this session, wins the
     // race — pre-fix it never reached the database and the final title

@@ -15,7 +15,7 @@ import { lists, type List, type TodoItem } from "@/lib/db";
 import { reportError } from "@betterbase/examples-shared";
 
 /** Structural slice of the database the todo ops need (local db or sync adapter). */
-interface TodoDb {
+export interface TodoDb {
   getWithBase(
     collection: typeof lists,
     id: string,

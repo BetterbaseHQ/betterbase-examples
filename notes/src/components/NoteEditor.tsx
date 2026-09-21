@@ -63,6 +63,12 @@ export function NoteEditor({ note, onDelete }: NoteEditorProps) {
     { delay: 300, flushOnUnmount: true },
   );
 
+  // External title updates (peer sync) rebase the input. The pending local
+  // draft is flushed FIRST — the debounce replaces its args on every
+  // keystroke, so without the flush a keystroke after the rebase would
+  // discard the un-persisted draft entirely (AUD-046).
+  const prevExternalTitle = useRef(current.title);
+
   const prevNoteId = useRef(note.id);
   useEffect(() => {
     if (prevNoteId.current !== note.id) {
@@ -70,15 +76,16 @@ export function NoteEditor({ note, onDelete }: NoteEditorProps) {
       debouncedSaveTitle.flush();
       debouncedSaveBody.flush();
       prevNoteId.current = note.id;
+      // Rebase the input to the new note explicitly: the title-rebase
+      // effect below keys on the title VALUE, so switching to a note with
+      // an identical title (e.g. the empty default) would otherwise leave
+      // the previous draft displayed and persistable into the new note.
+      prevExternalTitle.current = current.title;
+      setLocalTitle(current.title);
     }
     noteIdRef.current = note.id;
-  }, [note.id, debouncedSaveTitle, debouncedSaveBody]);
+  }, [note.id, current.title, debouncedSaveTitle, debouncedSaveBody]);
 
-  // External title updates (peer sync) rebase the input. The pending local
-  // draft is flushed FIRST — the debounce replaces its args on every
-  // keystroke, so without the flush a keystroke after the rebase would
-  // discard the un-persisted draft entirely (AUD-046).
-  const prevExternalTitle = useRef(current.title);
   useEffect(() => {
     if (current.title === prevExternalTitle.current) return;
     prevExternalTitle.current = current.title;
