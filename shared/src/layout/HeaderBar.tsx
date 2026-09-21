@@ -1,6 +1,7 @@
 import { Group, Burger, Text, UnstyledButton } from "@mantine/core";
 import { EncryptionIndicator } from "./EncryptionIndicator.js";
 import { UserArea } from "./UserArea.js";
+import { UploadQueueStatus } from "./UploadQueueStatus.js";
 import type { SyncStatus } from "./SyncStatusBadge.js";
 import type { ReactNode } from "react";
 
@@ -20,6 +21,12 @@ interface HeaderBarProps {
   onNavbarToggle?: () => void;
   /** URL to navigate when clicking the app icon */
   launchpadUrl?: string;
+  /** File-bytes upload queue status; omit in apps without a FileStore. */
+  uploadQueue?: {
+    pending: number;
+    errored: number;
+    onRetry: () => void;
+  };
 }
 
 /** Default launchpad origin used when no `launchpadUrl` is provided. */
@@ -38,6 +45,7 @@ export function HeaderBar({
   navbarOpened,
   onNavbarToggle,
   launchpadUrl = DEFAULT_LAUNCHPAD_URL,
+  uploadQueue,
 }: HeaderBarProps) {
   return (
     <Group h="100%" px="md" justify="space-between" wrap="nowrap">
@@ -66,6 +74,13 @@ export function HeaderBar({
 
       {/* Right side */}
       <Group gap="md" wrap="nowrap">
+        {uploadQueue && (
+          <UploadQueueStatus
+            pending={uploadQueue.pending}
+            errored={uploadQueue.errored}
+            onRetry={uploadQueue.onRetry}
+          />
+        )}
         <EncryptionIndicator
           isAuthenticated={isAuthenticated}
           hasError={syncStatus === "error"}

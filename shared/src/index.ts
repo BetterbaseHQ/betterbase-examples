@@ -12,6 +12,8 @@ export { EncryptionIndicator } from "./layout/EncryptionIndicator.js";
 export { UserArea } from "./layout/UserArea.js";
 export { ConnectSyncModal } from "./layout/ConnectSyncModal.js";
 export { SyncStatusBadge } from "./layout/SyncStatusBadge.js";
+export { UploadQueueStatus, effectiveSyncStatus } from "./layout/UploadQueueStatus.js";
+export type { UploadQueueStatusProps } from "./layout/UploadQueueStatus.js";
 export { ItemsSidebar } from "./layout/ItemsSidebar.js";
 export type { ItemsSidebarItem } from "./layout/ItemsSidebar.js";
 export { SyncedAppGate } from "./layout/SyncedAppGate.js";

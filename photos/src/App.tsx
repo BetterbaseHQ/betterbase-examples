@@ -4,6 +4,7 @@ import {
   BetterbaseProvider,
   FileStoreProvider,
   useConnectionStatus,
+  useFileUploadQueue,
   useSync,
 } from "betterbase/sync/react";
 import { FileStore } from "betterbase/sync";
@@ -13,6 +14,7 @@ import {
   useAuth,
   InvitationBanner,
   SyncedAppGate,
+  effectiveSyncStatus,
   reportError,
 } from "@betterbase/examples-shared";
 import { db, albums, photos } from "@/lib/db";
@@ -132,7 +134,11 @@ function PhotosApp({
 }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { error: syncError } = useSync();
-  const syncStatus = useConnectionStatus();
+  const connectionStatus = useConnectionStatus();
+  const uploadQueue = useFileUploadQueue();
+  // Record-sync "Synced" must not read as "everything is on the server"
+  // while file bytes are still queued (AUD-052).
+  const syncStatus = effectiveSyncStatus(connectionStatus, uploadQueue.pending);
   const [view, setView] = useState<View>({ kind: "all" });
 
   const {
@@ -219,6 +225,11 @@ function PhotosApp({
       isAuthenticated={isAuthenticated}
       handle={handle}
       syncStatus={syncStatus}
+      uploadQueue={{
+        pending: uploadQueue.pending,
+        errored: uploadQueue.errored,
+        onRetry: () => void uploadQueue.retry(),
+      }}
       syncError={syncError ?? undefined}
       onLogin={login}
       onLogout={logout}

@@ -23,6 +23,12 @@ interface LessAppShellProps {
   isAuthenticated: boolean;
   handle: string | null;
   syncStatus?: SyncStatus;
+  /** File-bytes upload queue status; forwarded to the header. */
+  uploadQueue?: {
+    pending: number;
+    errored: number;
+    onRetry: () => void;
+  };
   syncError?: string;
   onLogin: () => Promise<void>;
   onLogout: () => void;
@@ -43,6 +49,7 @@ export function LessAppShell({
   isAuthenticated,
   handle,
   syncStatus,
+  uploadQueue,
   syncError,
   onLogin,
   onLogout,
@@ -72,6 +79,7 @@ export function LessAppShell({
           isAuthenticated={isAuthenticated}
           handle={handle}
           syncStatus={syncStatus}
+          uploadQueue={uploadQueue}
           syncError={syncError}
           onLogin={onLogin}
           onLogout={onLogout}
