@@ -9,16 +9,17 @@
  * Must be called inside BetterbaseProvider (authenticated path only).
  */
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
-import {
-  deleteTree,
-  moveToSpace,
-  bulkMoveToSpace,
-  spaceOf,
-  type SpaceFields,
-} from "betterbase/sync";
+import { deleteTree, bulkMoveToSpace, spaceOf, type SpaceFields } from "betterbase/sync";
 import { boards, columns, cards, type Board, type Card, type Column } from "@/lib/db";
+import {
+  saveMarker,
+  clearMarker,
+  completeBoardMove,
+  reconcileBoardMoves,
+  type BoardMoveMarker,
+} from "@/lib/board-move";
 
 export function useBoards() {
   const db = useSyncDb();
@@ -107,17 +108,23 @@ export function useBoards() {
     [db],
   );
 
+  // Recover any share interrupted by a crash/reload before doing anything
+  // else — otherwise its children can reference a tombstoned board forever
+  // (AUD-047). Runs once per mount; safe when nothing is pending.
+  useEffect(() => {
+    reconcileBoardMoves(db as unknown as Parameters<typeof reconcileBoardMoves>[0]).catch((err) => {
+      console.error("Board share reconciliation failed", err);
+    });
+  }, [db]);
+
   /**
    * Share a personal board with another user.
-   * Creates a new shared space, moves columns and cards first (remapping
-   * columnId FKs), moves the board last, then patches boardId FKs and invites.
    *
-   * Children-first ordering keeps every intermediate failure retryable: the
-   * children keep the old boardId until the final patch, so the board keeps
-   * rendering locally and a retry re-finds them by that id. (Moving the board
-   * first would tombstone its record, orphaning children on any later failure.)
-   * The sequence is still not transactional — a failure mid-share can leave
-   * children temporarily in the shared space; a retry converges.
+   * Children move first (remapping columnId FKs), then the board, then the
+   * boardId FKs — under a durable marker so an interruption at ANY point is
+   * recovered on next mount by completeBoardMove (see board-move.ts for the
+   * crash-state map). The invite happens after the data has fully moved; a
+   * failure there leaves the data correct and is retryable via the UI.
    */
   const shareBoard = useCallback(
     async (board: Board & { _spaceId?: string }, handle: string): Promise<Board & SpaceFields> => {
@@ -139,7 +146,7 @@ export function useBoards() {
       );
       const columnIdMap = new Map(boardColumns.map((c, i) => [c.id, newColumns[i]!.id]));
 
-      const newCards = await bulkMoveToSpace(
+      await bulkMoveToSpace(
         db,
         cards,
         boardCards.map((c) => c.id),
@@ -149,17 +156,32 @@ export function useBoards() {
         }),
       );
 
-      const newBoard = await moveToSpace(db, boards, board.id, spaceId);
+      // Durable marker from here on: any crash is recoverable
+      const marker: BoardMoveMarker = {
+        oldBoardId: board.id,
+        spaceId,
+        columnIdMap: Object.fromEntries(columnIdMap),
+        childIds: {
+          columns: boardColumns.map((c) => c.id),
+          cards: boardCards.map((c) => c.id),
+        },
+        boardCreatedAt: new Date(board.createdAt).toISOString(),
+        newBoardId: null,
+        createdAt: Date.now(),
+      };
+      saveMarker(marker);
 
-      // Point the moved children at the new board record (patches don't need
-      // space routing)
-      await Promise.all([
-        ...newColumns.map((c) => db.patch(columns, { id: c.id, boardId: newBoard.id })),
-        ...newCards.map((c) => db.patch(cards, { id: c.id, boardId: newBoard.id })),
-      ]);
+      const newBoardId = await completeBoardMove(
+        db as unknown as Parameters<typeof completeBoardMove>[0],
+        marker,
+      );
+      if (newBoardId === null) {
+        clearMarker(board.id);
+        throw new Error("Board share could not be completed");
+      }
 
       await invite(spaceId, handle, { spaceName: board.name });
-      return newBoard;
+      return (await db.get(boards, newBoardId)) as Board & SpaceFields;
     },
     [db, userExists, createSpace, invite],
   );
