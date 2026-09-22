@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/betterbase
-          ref: eecda45cfd0e98865537239d79503b32ca4c9e3e
+          ref: eecda45811811935fe0a6f7c337d87e23d81e2e2
           path: betterbase
       - uses: actions/checkout@v7
         with:
