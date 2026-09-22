@@ -46,14 +46,16 @@ describe("Notes local flow", () => {
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
     await user.click(screen.getByRole("button", { name: "New note" }));
 
-    const title = screen.getByLabelText("Note title");
+    // The create handler is fire-and-forget (db put, then select) — the
+    // editor mounts asynchronously, so this must retry (CI loses the race)
+    const title = await screen.findByLabelText("Note title", {}, { timeout: 4000 });
     await user.type(title, "first note title");
 
     // Switch to another note IMMEDIATELY and type in it — the new note's
     // debounce replaces the pending timer, so without a flush-on-switch the
     // first note's captured args would be dropped (the bug this pins)
     await user.click(screen.getByRole("button", { name: "New note" }));
-    await user.type(screen.getByLabelText("Note title"), "2");
+    await user.type(await screen.findByLabelText("Note title", {}, { timeout: 4000 }), "2");
 
     // The first note's title must still be persisted despite the replaced timer
     await waitFor(
@@ -75,7 +77,7 @@ describe("Notes local flow", () => {
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
     await user.click(screen.getByRole("button", { name: "New note" }));
 
-    const title = screen.getByLabelText("Note title");
+    const title = await screen.findByLabelText("Note title", {}, { timeout: 4000 });
     await user.type(title, "doomed edit");
 
     // Delete while the edit is still debounced
@@ -104,7 +106,7 @@ describe("Notes concurrency", () => {
     await waitFor(() => expect(screen.getByText("Notebook")).toBeVisible(), { timeout: 4000 });
     await user.click(screen.getByRole("button", { name: "New note" }));
 
-    const title = screen.getByLabelText("Note title");
+    const title = await screen.findByLabelText("Note title", {}, { timeout: 4000 });
     await user.type(title, "abc");
     const noteId = (await db.query(notes, {})).records[0]!.id;
 
