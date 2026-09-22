@@ -12,6 +12,7 @@ import {
   accountScopeKey,
   useDbScope,
   DbScopeGate,
+  runtimeDomain,
 } from "@betterbase/examples-shared";
 import { db, conversations, messages, openDatabaseForScope } from "@/lib/db";
 import { useConversations } from "@/lib/sync";
@@ -210,7 +211,7 @@ export default function App() {
         editChainCollections={[messages.name]}
         session={session}
         clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+        domain={runtimeDomain()}
         onAuthError={logout}
       >
         <SyncedAppGate>

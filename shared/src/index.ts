@@ -45,3 +45,13 @@ export { useFlushableDebouncedCallback } from "./useFlushableDebouncedCallback.j
 export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-db.js";
 export type { AccountScopeSource } from "./lib/account-db.js";
 export { useDbScope } from "./lib/use-account-db.js";
+
+// Runtime configuration (deployed samples container / dev fallbacks)
+export {
+  appAuthConfig,
+  runtimeConfig,
+  runtimeDomain,
+  runtimeClientId,
+  runtimeRedirectUri,
+} from "./lib/runtime-config.js";
+export type { BetterbaseRuntimeConfig } from "./lib/runtime-config.js";

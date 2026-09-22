@@ -1,0 +1,10 @@
+# Applies to builds using betterbase-examples/Dockerfile regardless of where
+# the context root is (betterbase-dev root or a CI workspace). Paths are
+# relative to the context root.
+
+**/node_modules
+**/target
+**/dist
+**/.playwright-mcp
+.pnpm-store
+**/.git

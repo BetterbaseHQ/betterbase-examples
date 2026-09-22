@@ -7,6 +7,8 @@ const accountsUrl = process.env.ACCOUNTS_URL || "http://localhost:5377";
 const syncUrl = process.env.SYNC_URL || "http://localhost:5379";
 
 export default defineConfig({
+  // Path-based hosting in the samples container (e.g. /tasks/); "/" in dev.
+  base: process.env.VITE_BASE_PATH || "/",
   plugins: [wasm(), react()],
   worker: {
     format: "es",

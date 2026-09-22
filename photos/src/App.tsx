@@ -19,6 +19,7 @@ import {
   accountScopeKey,
   useDbScope,
   DbScopeGate,
+  runtimeDomain,
 } from "@betterbase/examples-shared";
 import { db, albums, photos, openDatabaseForScope, currentScopeDbName } from "@/lib/db";
 import { useAlbums } from "@/lib/sync";
@@ -301,7 +302,7 @@ function ScopedPhotoStores({
         collections={[albums, photos]}
         session={session}
         clientId={clientId}
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+        domain={runtimeDomain()}
         onAuthError={logout}
         fileStore={fileStore}
       >

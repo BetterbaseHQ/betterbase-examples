@@ -4,7 +4,7 @@ import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { DatabaseProvider } from "betterbase/db/react";
 import { AuthProvider } from "betterbase/auth/react";
-import { lessTheme } from "@betterbase/examples-shared";
+import { appAuthConfig, lessTheme } from "@betterbase/examples-shared";
 import { db } from "@/lib/db";
 import App from "./App.tsx";
 
@@ -12,14 +12,13 @@ import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "@mantine/tiptap/styles.css";
 
+const auth = appAuthConfig("notes");
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MantineProvider theme={lessTheme}>
       <Notifications />
-      <AuthProvider
-        domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
-        clientId={import.meta.env.VITE_OAUTH_CLIENT_ID || ""}
-      >
+      <AuthProvider domain={auth.domain} clientId={auth.clientId} redirectUri={auth.redirectUri}>
         <DatabaseProvider value={db}>
           <App />
         </DatabaseProvider>

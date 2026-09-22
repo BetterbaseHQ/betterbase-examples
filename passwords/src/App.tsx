@@ -8,6 +8,7 @@ import {
   accountScopeKey,
   useDbScope,
   DbScopeGate,
+  runtimeDomain,
 } from "@betterbase/examples-shared";
 import { db, entries, openDatabaseForScope } from "@/lib/db";
 import { useEntries } from "@/lib/sync";
@@ -125,7 +126,7 @@ export default function App() {
           collections={[entries]}
           session={session}
           clientId={clientId}
-          domain={import.meta.env.VITE_DOMAIN || "localhost:5377"}
+          domain={runtimeDomain()}
           onAuthError={logout}
         >
           <SyncedAppGate>
