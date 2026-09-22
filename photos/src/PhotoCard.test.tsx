@@ -69,7 +69,9 @@ describe("PhotoCard unavailable tiles (AUD-048)", () => {
     expect(screen.getByText("Unavailable")).toBeInTheDocument();
     // Delete is reachable without hovering (no image to hover over)
     await user.click(screen.getByRole("button", { name: /delete broken\.jpg/i }));
-    await user.click(screen.getByRole("button", { name: /^Delete$/ }));
+    // The confirm dialog mounts asynchronously (Mantine modal) — wait
+    // for it instead of racing the sync query.
+    await user.click(await screen.findByRole("button", { name: /^Delete$/ }));
     expect(onDelete).toHaveBeenCalledOnce();
   });
 });
