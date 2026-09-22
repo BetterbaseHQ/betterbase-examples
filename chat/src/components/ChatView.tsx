@@ -7,20 +7,21 @@ import {
   PresenceAvatars,
   TypingIndicator,
 } from "@betterbase/examples-shared";
-import { usePresence, useTyping } from "betterbase/sync/react";
+import { useMembers, usePresence, useTyping, type EditHistoryEntry } from "betterbase/sync/react";
 import type { Conversation, Message } from "@/lib/db";
 import { MessageBubble } from "./MessageBubble";
 import { shortHandle } from "@/lib/handle";
 import type { SpaceFields } from "betterbase/sync";
 
-type MessageWithChain = Message & { _editChainValid?: boolean };
+type MessageWithChain = Message & Pick<SpaceFields, "_editChain" | "_editChainValid">;
 
 interface ChatViewProps {
   conversation: (Conversation & SpaceFields) | null;
   messages: readonly Message[];
   currentHandle: string | null;
   isAdmin: boolean;
-  onSendMessage: (text: string) => Promise<void>;
+  /** `id` (when provided) makes the commit idempotent across retries. */
+  onSendMessage: (text: string, id?: string) => Promise<void>;
   onInvite: (handle: string) => Promise<void>;
   onRemoveMember: (did: string) => Promise<void>;
 }
@@ -35,11 +36,22 @@ export function ChatView({
   onRemoveMember,
 }: ChatViewProps) {
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  // AUD-051: a failed send keeps its submission id so a retry of the same
+  // text overwrites the same record instead of duplicating it — the first
+  // attempt may already have committed the message before its preview
+  // patch failed.
+  const failedAttemptRef = useRef<{ text: string; id: string } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Presence & typing
   usePresence(conversation?._spaceId, currentHandle ? { handle: currentHandle } : undefined);
   const { typingPeers, sendTyping } = useTyping(conversation?._spaceId, currentHandle);
+
+  // AUD-050: membership is the authenticated did→handle mapping that
+  // sender attribution is verified against (the message's `senderHandle`
+  // is writable content; the edit chain's author did is cryptographic).
+  const { members } = useMembers(conversation?._spaceId);
 
   // Jump to the bottom once per conversation — on switch or when the first
   // batch of history arrives (queries start empty and fill in async, so the
@@ -72,6 +84,14 @@ export function ChatView({
     return undefined;
   }, [messages, conversation?.id]);
 
+  const handleByDid = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const member of members) {
+      if (member.handle) map.set(member.did, member.handle);
+    }
+    return map;
+  }, [members]);
+
   const senderHandles = useMemo(
     () => [...new Set(messages.map((m) => m.senderHandle))],
     [messages],
@@ -99,13 +119,25 @@ export function ChatView({
 
   const handleSend = () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    // Clear only on success — a failed local write shouldn't eat the message
-    onSendMessage(trimmed)
-      .then(() => setText(""))
+    if (!trimmed || sending) return;
+    const id =
+      failedAttemptRef.current?.text === trimmed
+        ? failedAttemptRef.current.id
+        : crypto.randomUUID();
+    setSending(true);
+    onSendMessage(trimmed, id)
+      .then(() => {
+        failedAttemptRef.current = null;
+        // AUD-051: clear only the submitted draft — the user may have
+        // started typing a replacement while the send was pending, and
+        // that newer text must survive.
+        setText((current) => (current.trim() === trimmed ? "" : current));
+      })
       .catch(() => {
+        failedAttemptRef.current = { text: trimmed, id };
         /* failure already reported by the caller */
-      });
+      })
+      .finally(() => setSending(false));
   };
 
   return (
@@ -148,15 +180,40 @@ export function ChatView({
           )}
           {messages.map((msg) => {
             const m = msg as MessageWithChain;
+            // AUD-050: `senderHandle` is writable content — attribution is
+            // verified against the edit chain's author did (the record's
+            // cryptographic writer) via the space's member registry. The
+            // first chain entry is the record's creator; later entries are
+            // edits, which don't change who sent it.
+            const chain: readonly EditHistoryEntry[] | undefined = m._editChain;
+            const authorDid =
+              chain !== undefined && chain.length > 0 ? chain[0]!.author : undefined;
+            const attributedHandle =
+              authorDid !== undefined ? handleByDid.get(authorDid) : undefined;
+            const mismatched =
+              attributedHandle !== undefined && attributedHandle !== m.senderHandle;
+            // A peer writing under the local user's handle renders as
+            // theirs, not ours.
+            const isOwn = m.senderHandle === currentHandle && !mismatched;
+            const verified = Boolean(
+              !isOwn && m._editChainValid === true && attributedHandle === m.senderHandle,
+            );
+            const displayHandle = attributedHandle ?? m.senderHandle;
             return (
               <MessageBubble
                 key={m.id}
                 message={m}
-                isOwn={m.senderHandle === currentHandle}
-                senderDisplay={shortHandle(m.senderHandle, senderHandles)}
-                verified={
-                  // Own messages omitted: edit chain lags until next sync round-trip
-                  m.senderHandle !== currentHandle && m._editChainValid === true
+                isOwn={isOwn}
+                senderDisplay={shortHandle(displayHandle, senderHandles)}
+                verified={verified}
+                // Chain integrity passed but the signature's owner doesn't
+                // match the claimed handle — show the warning explicitly
+                // rather than a silent green shield.
+                spoofed={
+                  !isOwn &&
+                  m._editChainValid === true &&
+                  attributedHandle !== undefined &&
+                  mismatched
                 }
               />
             );
@@ -199,7 +256,7 @@ export function ChatView({
           size="lg"
           variant="filled"
           aria-label="Send message"
-          disabled={!text.trim()}
+          disabled={!text.trim() || sending}
           onClick={handleSend}
         >
           <Send size={16} />

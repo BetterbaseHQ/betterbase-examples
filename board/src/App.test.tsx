@@ -96,4 +96,40 @@ describe("Board local cascade deletes", () => {
       { timeout: 8000 },
     );
   });
+
+  it("AUD-054: deleting a column cascades its cards through the gated tree", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope(null);
+    renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
+
+    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
+
+    // Add a card to the first column.
+    await user.click(screen.getByRole("button", { name: "Add card to To Do" }));
+    const title = screen.getByRole("textbox", { name: /card title/i });
+    await user.type(title, "cascade with column");
+    await user.keyboard("{Enter}"); // move to description
+    await user.keyboard("{Enter}"); // submit from description
+    await waitFor(
+      async () => {
+        const all = await db.query(cards, {});
+        expect(all.records.map((c) => c.title)).toContain("cascade with column");
+      },
+      { timeout: 8000 },
+    );
+
+    // Delete the column (confirm-guarded like board deletion). The card
+    // must go with it — the column delete is gated on its cards
+    // (deleteTree), so no orphaned survivor can hide.
+    await user.click(screen.getByRole("button", { name: "Delete column To Do" }));
+    await user.click(await screen.findByRole("button", { name: /^delete$/i }));
+
+    await waitFor(
+      async () => {
+        expect((await db.query(columns, {})).records).toHaveLength(2);
+        expect((await db.query(cards, {})).records).toHaveLength(0);
+      },
+      { timeout: 8000 },
+    );
+  });
 });

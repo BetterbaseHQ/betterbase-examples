@@ -9,6 +9,8 @@ import {
   setSyncDb,
   wipeCollections,
   lastProviderProps,
+  resetSyncMocks,
+  setSpaceMembers,
 } from "@betterbase/examples-shared/test";
 
 afterEach(async () => {
@@ -36,7 +38,12 @@ describe("Chat app sync wiring", () => {
 });
 
 describe("ChatView", () => {
-  async function renderChatView(onSendMessage: (text: string) => Promise<void>) {
+  afterEach(() => resetSyncMocks());
+
+  async function renderChatView(
+    onSendMessage: (text: string, id?: string) => Promise<void>,
+    messages: readonly unknown[] = [],
+  ) {
     const { ChatView } = await import("./components/ChatView");
     const user = userEvent.setup();
     const utils = renderWithProviders(
@@ -52,7 +59,7 @@ describe("ChatView", () => {
             _spaceId: "personal-space-1",
           } as never
         }
-        messages={[]}
+        messages={messages as never}
         currentHandle="alice"
         isAdmin
         onSendMessage={onSendMessage}
@@ -62,6 +69,107 @@ describe("ChatView", () => {
     );
     return { user, ...utils };
   }
+
+  it("AUD-050: shield requires the chain author's member handle to match the claimed sender", async () => {
+    setSpaceMembers("personal-space-1", [
+      { did: "did:key:bob", role: "write", status: "joined", handle: "bob@example.com" },
+      { did: "did:key:eve", role: "write", status: "joined", handle: "eve@example.com" },
+    ]);
+    await renderChatView(
+      () => Promise.resolve(),
+      [
+        // Legit: bob's chain author maps to bob's handle -> verified shield.
+        {
+          id: "m-bob",
+          conversationId: "conv-1",
+          senderHandle: "bob@example.com",
+          text: "genuinely from bob",
+          sentAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          _editChain: [{ author: "did:key:bob", timestamp: 1, diffs: [] }],
+          _editChainValid: true,
+        },
+        // Spoofed: eve signed, claims bob's handle -> warning, not a shield.
+        {
+          id: "m-spoof",
+          conversationId: "conv-1",
+          senderHandle: "bob@example.com",
+          text: "forged attribution",
+          sentAt: 2,
+          createdAt: 2,
+          updatedAt: 2,
+          _editChain: [{ author: "did:key:eve", timestamp: 2, diffs: [] }],
+          _editChainValid: true,
+        },
+        // Unsigned claim (chain absent): no shield, handle displayed as-is.
+        {
+          id: "m-plain",
+          conversationId: "conv-1",
+          senderHandle: "bob@example.com",
+          text: "no chain yet",
+          sentAt: 3,
+          createdAt: 3,
+          updatedAt: 3,
+        },
+      ],
+    );
+
+    // Exactly one verified shield (bob's real message) and one warning.
+    expect(screen.getAllByLabelText("Verified sender")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Sender identity doesn't match signature")).toHaveLength(1);
+  });
+
+  it("AUD-051: a replacement draft typed during a pending send survives completion", async () => {
+    let releaseSend: (() => void) | undefined;
+    const sent = new Promise<void>((resolve) => {
+      releaseSend = resolve;
+    });
+    const { user } = await renderChatView(() => sent);
+
+    const input = screen.getByPlaceholderText(/type a message/i) as HTMLTextAreaElement;
+    await user.type(input, "original");
+    await user.keyboard("{Enter}");
+    // The send is still pending — start a new draft.
+    await user.type(input, " and more");
+
+    releaseSend!();
+    // After resolution the newer text must still be there.
+    await waitFor(() => {
+      expect((screen.getByPlaceholderText(/type a message/i) as HTMLTextAreaElement).value).toBe(
+        "original and more",
+      );
+    });
+  });
+
+  it("AUD-051: retrying a failed send reuses the submission id (no duplicate commit)", async () => {
+    const ids: (string | undefined)[] = [];
+    let fail = true;
+    const { user } = await renderChatView((_text, id) => {
+      ids.push(id);
+      return fail ? Promise.reject(new Error("preview patch failed")) : Promise.resolve();
+    });
+
+    const input = screen.getByPlaceholderText(/type a message/i);
+    await user.type(input, "please persist");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(ids).toHaveLength(1));
+    expect(ids[0]).toEqual(expect.any(String));
+
+    // Same draft, second attempt (user presses send again after the error).
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(ids).toHaveLength(2));
+    // The retry must target the same record: same id, so db.put overwrites
+    // instead of appending a duplicate message.
+    expect(ids[1]).toBe(ids[0]);
+    // And the draft clears on success.
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText(/type a message/i) as HTMLTextAreaElement).value).toBe(
+        "",
+      ),
+    );
+  });
 
   it("regression: a failed send keeps the draft in the input", async () => {
     const { user } = await renderChatView(() => Promise.reject(new Error("write failed")));

@@ -75,7 +75,11 @@ function LocalBoardApp() {
   useEffect(() => {
     if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      createBoardWithColumns("My Board").catch((err) => reportError(err, "Couldn't create board"));
+      // AUD-053: release the guard on failure so retry isn't blocked.
+      createBoardWithColumns("My Board").catch((err) => {
+        reportError(err, "Couldn't create board");
+        autoCreated.current = false;
+      });
     }
   }, [boardResult]);
 
@@ -107,12 +111,13 @@ function LocalBoardApp() {
   };
 
   const deleteColumn = (columnId: string) => {
-    allCards
-      .filter((c) => c.columnId === columnId)
-      .forEach((c) =>
-        db.delete(cards, c.id).catch((err) => reportError(err, "Couldn't delete card")),
-      );
-    db.delete(columns, columnId).catch((err) => reportError(err, "Couldn't delete column"));
+    // AUD-054: delete through the gated cascade — cards are discovered
+    // from the db (not render state, which can omit a just-committed
+    // card) and removed deepest-first, and the column is only deleted
+    // once they are all gone. Firing child deletes individually and the
+    // column unconditionally left a failed card orphaned under a deleted
+    // column, unreachable in the UI.
+    deleteTree(db, columns, columnId).catch((err) => reportError(err, "Couldn't delete column"));
   };
 
   const cardCounts = useMemo(
@@ -208,7 +213,13 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   useEffect(() => {
     if (phase === "ready" && allBoards.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      createBoard("My Board");
+      // AUD-053: a failed auto-create must surface through the shared
+      // error UI (it was an unhandled rejection) and release the one-shot
+      // guard so a later mount/effect can retry.
+      createBoard("My Board").catch((err) => {
+        reportError(err, "Couldn't create default board");
+        autoCreated.current = false;
+      });
     }
   }, [phase, allBoards.length, createBoard]);
 

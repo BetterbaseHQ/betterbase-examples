@@ -117,9 +117,9 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
       });
   };
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = (text: string, id?: string) => {
     if (!selectedConv || !handle) return Promise.resolve();
-    return sendMessage(selectedConv, text, handle).catch((err) => {
+    return sendMessage(selectedConv, text, handle, id).catch((err) => {
       reportError(err, "Couldn't send message");
       // Let ChatView keep the draft so the user doesn't lose the message
       throw err;

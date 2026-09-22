@@ -91,7 +91,13 @@ function NotesApp() {
   useEffect(() => {
     if (phase === "ready" && allNotebooks.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      createNotebook("My Notebook");
+      // AUD-053: a failed auto-create must surface through the shared
+      // error UI (it was an unhandled rejection) and release the one-shot
+      // guard so a later mount/effect can retry.
+      createNotebook("My Notebook").catch((err) => {
+        reportError(err, "Couldn't create default notebook");
+        autoCreated.current = false;
+      });
     }
   }, [phase, allNotebooks.length, createNotebook]);
 

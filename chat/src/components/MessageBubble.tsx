@@ -1,12 +1,15 @@
 import { Stack, Paper, Text, Group } from "@mantine/core";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, ShieldAlert } from "lucide-react";
 import type { Message } from "@/lib/db";
 
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
   senderDisplay: string;
+  /** Sender attribution verified against the edit chain via membership. */
   verified?: boolean;
+  /** Chain is intact but its author doesn't match the claimed handle. */
+  spoofed?: boolean;
 }
 
 function formatTime(epochMs: number): string {
@@ -30,7 +33,13 @@ function formatTime(epochMs: number): string {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-export function MessageBubble({ message, isOwn, senderDisplay, verified }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isOwn,
+  senderDisplay,
+  verified,
+  spoofed,
+}: MessageBubbleProps) {
   return (
     <Stack gap={2} align={isOwn ? "flex-end" : "flex-start"} px="md" py={2}>
       {!isOwn && (
@@ -39,7 +48,19 @@ export function MessageBubble({ message, isOwn, senderDisplay, verified }: Messa
             {senderDisplay}
           </Text>
           {verified && (
-            <ShieldCheck size={12} color="var(--mantine-color-green-5)" style={{ opacity: 0.7 }} />
+            <ShieldCheck
+              size={12}
+              color="var(--mantine-color-green-5)"
+              style={{ opacity: 0.7 }}
+              aria-label="Verified sender"
+            />
+          )}
+          {spoofed && (
+            <ShieldAlert
+              size={12}
+              color="var(--mantine-color-yellow-5)"
+              aria-label="Sender identity doesn't match signature"
+            />
           )}
         </Group>
       )}

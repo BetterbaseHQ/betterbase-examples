@@ -100,11 +100,20 @@ export function useConversations() {
   );
 
   const sendMessage = useCallback(
-    async (conv: Conversation & SpaceFields, text: string, senderHandle: string) => {
+    async (conv: Conversation & SpaceFields, text: string, senderHandle: string, id?: string) => {
       const sentAt = Date.now();
+      // An explicit id makes the commit idempotent: when the message put
+      // succeeds but the preview patch fails, a retry of the same draft
+      // re-puts the same record instead of duplicating it (AUD-051).
       await db.put(
         messages,
-        { conversationId: conv.id, senderHandle, text, sentAt },
+        {
+          ...(id !== undefined ? { id } : {}),
+          conversationId: conv.id,
+          senderHandle,
+          text,
+          sentAt,
+        },
         spaceOf(conv),
       );
       await db.patch(conversations, {
