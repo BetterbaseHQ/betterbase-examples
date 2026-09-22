@@ -1,4 +1,4 @@
-# Unified samples image: all example apps as static builds under one origin,
+# Unified examples image: all example apps as static builds under one origin,
 # served path-based (launchpad at /, other apps at /<app>/).
 #
 # Build context is the REPOSITORY ROOT that contains this repo as a sibling

@@ -4,7 +4,7 @@ import wasm from "vite-plugin-wasm";
 import path from "path";
 
 export default defineConfig({
-  // Path-based hosting in the samples container (e.g. /tasks/); "/" in dev.
+  // Path-based hosting in the examples container (e.g. /tasks/); "/" in dev.
   base: process.env.VITE_BASE_PATH || "/",
   plugins: [wasm(), react()],
   worker: {

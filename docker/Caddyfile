@@ -1,4 +1,4 @@
-# Static serving for the unified samples image.
+# Static serving for the unified examples image.
 # TLS, rate limiting, and public exposure are handled by the deployment's
 # edge proxy (see betterbase-deploy) — this only serves inside the network.
 

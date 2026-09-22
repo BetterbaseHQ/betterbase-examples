@@ -46,7 +46,7 @@ export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-
 export type { AccountScopeSource } from "./lib/account-db.js";
 export { useDbScope } from "./lib/use-account-db.js";
 
-// Runtime configuration (deployed samples container / dev fallbacks)
+// Runtime configuration (deployed examples container / dev fallbacks)
 export {
   appAuthConfig,
   runtimeConfig,

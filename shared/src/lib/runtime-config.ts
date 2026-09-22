@@ -3,18 +3,18 @@
  *
  * Two configuration sources, in precedence order:
  *
- * 1. **Container runtime config** — the samples image entrypoint writes a
+ * 1. **Container runtime config** — the examples image entrypoint writes a
  *    `config.js` next to each app's `index.html` that sets
  *    `window.__BETTERBASE__` (deployment-specific accounts domain + OAuth
- *    client IDs). Used when the apps are served from the unified samples
- *    container (path-based hosting, e.g. `https://samples.example.com/tasks/`).
+ *    client IDs). Used when the apps are served from the unified examples
+ *    container (path-based hosting, e.g. `https://examples.yourdomain.com/tasks/`).
  *
  * 2. **Vite env vars** — `VITE_DOMAIN` / `VITE_OAUTH_CLIENT_ID` from each
  *    app's `.env` file, provisioned by `just setup-example` in the dev
  *    environment (each app on its own port at `/`).
  *
  * `redirectUri` follows Vite's `BASE_URL` so OAuth callbacks land on the
- * app's mounted path (`https://samples.example.com/tasks/` in the container,
+ * app's mounted path (`https://examples.yourdomain.com/tasks/` in the container,
  * `http://localhost:5381/` in dev).
  *
  * Build note: this module ships as tsup-built ESM inside the shared

@@ -117,7 +117,7 @@ function AppCard({ name, description, icon, href }: AppCardProps) {
 /**
  * Enabled apps with links.
  *
- * Deployed (samples container): the entrypoint-generated config.js lists the
+ * Deployed (examples container): the entrypoint-generated config.js lists the
  * enabled apps; each is served same-origin at `/<app>/`.
  *
  * Dev: all apps on their fixed localhost ports.

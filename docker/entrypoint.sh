@@ -1,17 +1,17 @@
 #!/bin/sh
-# Entrypoint for the unified samples image.
+# Entrypoint for the unified examples image.
 #
 # Renders deployment-specific runtime config (accounts domain + OAuth client
 # IDs) into a config.js consumed by each app (see
 # shared/src/lib/runtime-config.ts), enables the subset of apps requested via
-# ENABLED_APPS, and removes the rest from the served tree. Launchpad is the
+# EXAMPLES_ENABLED_APPS, and removes the rest from the served tree. Launchpad is the
 # index page at / and is always served.
 set -eu
 
 ALL_APPS="tasks notes photos board chat passwords"
 # Accept space- or comma-separated lists.
-ENABLED_APPS="$(printf '%s' "${ENABLED_APPS:-$ALL_APPS}" | tr ',' ' ')"
-DOMAIN="${SAMPLES_ACCOUNTS_DOMAIN:-localhost:5377}"
+EXAMPLES_ENABLED_APPS="$(printf '%s' "${EXAMPLES_ENABLED_APPS:-$ALL_APPS}" | tr ',' ' ')"
+DOMAIN="${EXAMPLES_ACCOUNTS_DOMAIN:-localhost:5377}"
 
 # Values are embedded into a <script> body — only allow conservative
 # hostname/client-ID characters through.
@@ -23,7 +23,7 @@ valid_value() {
 }
 
 if ! valid_value "$DOMAIN"; then
-  echo "entrypoint: invalid SAMPLES_ACCOUNTS_DOMAIN: $DOMAIN" >&2
+  echo "entrypoint: invalid EXAMPLES_ACCOUNTS_DOMAIN: $DOMAIN" >&2
   exit 1
 fi
 
@@ -49,7 +49,7 @@ app_dir() {
 }
 
 enabled() {
-  case " launchpad $ENABLED_APPS " in
+  case " launchpad $EXAMPLES_ENABLED_APPS " in
     *" $1 "*) return 0 ;;
     *) return 1 ;;
   esac
@@ -57,10 +57,10 @@ enabled() {
 
 # Fail fast on unknown app names — a typo would otherwise silently drop
 # the app from the portal.
-for app in $ENABLED_APPS; do
+for app in $EXAMPLES_ENABLED_APPS; do
   case " launchpad $ALL_APPS " in
     *" $app "*) ;;
-    *) echo "entrypoint: unknown app in ENABLED_APPS: $app" >&2; exit 1 ;;
+    *) echo "entrypoint: unknown app in EXAMPLES_ENABLED_APPS: $app" >&2; exit 1 ;;
   esac
 done
 

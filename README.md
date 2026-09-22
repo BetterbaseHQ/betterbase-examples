@@ -18,7 +18,7 @@ Everything here works offline, syncs in real time, and encrypts data before it l
 
 All apps share common UI components via the [`shared`](./shared) package (`@betterbase/examples-shared`).
 
-## Hosting all apps (samples image)
+## Hosting all apps (examples image)
 
 `Dockerfile` (repo root; build context is the parent workspace) builds every
 app for path-based hosting into a single static-serving container: the
@@ -28,7 +28,7 @@ container start — see [`docker/entrypoint.sh`](./docker/entrypoint.sh) and
 `shared/src/lib/runtime-config.ts`. The image is published to GHCR as
 `ghcr.io/betterbasehq/betterbase-examples` and deployed by the
 [betterbase-deploy](https://github.com/BetterbaseHQ/betterbase-deploy) repo
-at `samples.<domain>`. Locally each app still runs standalone on its own
+at `examples.<domain>`. Locally each app still runs standalone on its own
 port via `just dev`.
 
 ## Quick Start
