@@ -7,7 +7,7 @@ import {
   PresenceAvatars,
   TypingIndicator,
 } from "@betterbase/examples-shared";
-import { useMembers, usePresence, useTyping, type EditHistoryEntry } from "betterbase/sync/react";
+import { useMembers, usePresence, useTyping } from "betterbase/sync/react";
 import type { Conversation, Message } from "@/lib/db";
 import { MessageBubble } from "./MessageBubble";
 import { shortHandle } from "@/lib/handle";
@@ -92,10 +92,28 @@ export function ChatView({
     return map;
   }, [members]);
 
-  const senderHandles = useMemo(
-    () => [...new Set(messages.map((m) => m.senderHandle))],
-    [messages],
-  );
+  // AUD-050: resolve a message's cryptographic author to a member handle.
+  // Only a chain that passed integrity verification is trusted — a
+  // tampered chain must not drive display attribution.
+  const resolveAttribution = (m: MessageWithChain): string | undefined => {
+    if (m._editChainValid !== true) return undefined;
+    const chain = m._editChain;
+    // The first chain entry is the record's creator; later entries are
+    // edits, which don't change who sent it.
+    const authorDid = chain !== undefined && chain.length > 0 ? chain[0]!.author : undefined;
+    return authorDid !== undefined ? handleByDid.get(authorDid) : undefined;
+  };
+
+  const senderHandles = useMemo(() => {
+    const names = new Set<string>();
+    for (const msg of messages) {
+      const m = msg as MessageWithChain;
+      names.add(resolveAttribution(m) ?? m.senderHandle);
+    }
+    return [...names];
+    // resolveAttribution closes over handleByDid only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, handleByDid]);
 
   if (!conversation) {
     return (
@@ -182,14 +200,8 @@ export function ChatView({
             const m = msg as MessageWithChain;
             // AUD-050: `senderHandle` is writable content — attribution is
             // verified against the edit chain's author did (the record's
-            // cryptographic writer) via the space's member registry. The
-            // first chain entry is the record's creator; later entries are
-            // edits, which don't change who sent it.
-            const chain: readonly EditHistoryEntry[] | undefined = m._editChain;
-            const authorDid =
-              chain !== undefined && chain.length > 0 ? chain[0]!.author : undefined;
-            const attributedHandle =
-              authorDid !== undefined ? handleByDid.get(authorDid) : undefined;
+            // cryptographic writer) via the space's member registry.
+            const attributedHandle = resolveAttribution(m);
             const mismatched =
               attributedHandle !== undefined && attributedHandle !== m.senderHandle;
             // A peer writing under the local user's handle renders as
@@ -209,12 +221,7 @@ export function ChatView({
                 // Chain integrity passed but the signature's owner doesn't
                 // match the claimed handle — show the warning explicitly
                 // rather than a silent green shield.
-                spoofed={
-                  !isOwn &&
-                  m._editChainValid === true &&
-                  attributedHandle !== undefined &&
-                  mismatched
-                }
+                spoofed={!isOwn && mismatched}
               />
             );
           })}

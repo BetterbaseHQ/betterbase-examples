@@ -122,14 +122,23 @@ describe("ChatView", () => {
 
   it("AUD-051: a replacement draft typed during a pending send survives completion", async () => {
     let releaseSend: (() => void) | undefined;
+    let calls = 0;
     const sent = new Promise<void>((resolve) => {
       releaseSend = resolve;
     });
-    const { user } = await renderChatView(() => sent);
+    const { user } = await renderChatView(() => {
+      calls += 1;
+      return sent;
+    });
 
     const input = screen.getByPlaceholderText(/type a message/i) as HTMLTextAreaElement;
     await user.type(input, "original");
     await user.keyboard("{Enter}");
+    // The send is still pending — a second Enter and a Send click must not
+    // double-fire the submission.
+    await user.keyboard("{Enter}");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+    expect(calls).toBe(1);
     // The send is still pending — start a new draft.
     await user.type(input, " and more");
 
