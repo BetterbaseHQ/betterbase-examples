@@ -38,12 +38,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/betterbase
-          ref: eecda45811811935fe0a6f7c337d87e23d81e2e2
+          ref: 607b3a68214d191c6c0c5feb95d79a11999474d9
           path: betterbase
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/json-joy-rs
-          ref: 11e07a31d58bf5a98ac702c499ceaf67abe38d64
+          ref: 410e199748be7a9b18de3026e090bd9a7e737290
           path: json-joy-rs
       - uses: dtolnay/rust-toolchain@1.98.1
         with:
