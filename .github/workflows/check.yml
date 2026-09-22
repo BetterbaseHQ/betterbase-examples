@@ -26,16 +26,24 @@ jobs:
       # Apps link the SDK TS source via link:../../betterbase/js, and the
       # SDK's betterbase-db crate path-depends on json-joy-rs — both must be
       # checked out as siblings of this repo.
+      #
+      # Siblings are pinned to exact revisions so a green run identifies a
+      # reproducible platform release (AUD-058). The pins come from
+      # release.toml in the betterbase-dev orchestration repo — bump them
+      # together via `just release-pin` there. CI fails until the pinned
+      # sibling commits are pushed.
       - uses: actions/checkout@v7
         with:
           path: betterbase-examples
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/betterbase
+          ref: eecda45cfd0e98865537239d79503b32ca4c9e3e
           path: betterbase
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/json-joy-rs
+          ref: 11e07a31d58bf5a98ac702c499ceaf67abe38d64
           path: json-joy-rs
       - uses: dtolnay/rust-toolchain@1.98.1
         with:
