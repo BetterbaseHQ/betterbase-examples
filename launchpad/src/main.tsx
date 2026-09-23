@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { AuthProvider } from "betterbase/auth/react";
-import { appAuthConfig, lessTheme } from "@betterbase/examples-shared";
+import { appAuthConfig, appStoragePrefix, lessTheme } from "@betterbase/examples-shared";
 import App from "./App.tsx";
 
 import "@mantine/core/styles.css";
@@ -19,7 +19,8 @@ createRoot(document.getElementById("root")!).render(
         domain={auth.domain}
         clientId={auth.clientId}
         redirectUri={auth.redirectUri}
-        scope="openid email"
+        storagePrefix={appStoragePrefix("launchpad")}
+        scope="openid"
       >
         <App />
       </AuthProvider>

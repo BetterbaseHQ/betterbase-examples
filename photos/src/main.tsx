@@ -4,7 +4,7 @@ import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { DatabaseProvider } from "betterbase/db/react";
 import { AuthProvider } from "betterbase/auth/react";
-import { appAuthConfig, lessTheme } from "@betterbase/examples-shared";
+import { appAuthConfig, appStoragePrefix, lessTheme } from "@betterbase/examples-shared";
 import { db } from "@/lib/db";
 import App from "./App.tsx";
 
@@ -22,7 +22,8 @@ createRoot(document.getElementById("root")!).render(
         domain={auth.domain}
         clientId={auth.clientId}
         redirectUri={auth.redirectUri}
-        scope="openid email sync files"
+        storagePrefix={appStoragePrefix("photos")}
+        scope="openid sync files"
       >
         <DatabaseProvider value={db}>
           <App />
