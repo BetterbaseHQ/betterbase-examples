@@ -2,6 +2,7 @@ import { Group, Burger, Text, UnstyledButton } from "@mantine/core";
 import { EncryptionIndicator } from "./EncryptionIndicator.js";
 import { UserArea } from "./UserArea.js";
 import { UploadQueueStatus } from "./UploadQueueStatus.js";
+import { runtimeConfig } from "../lib/runtime-config.js";
 import type { SyncStatus } from "./SyncStatusBadge.js";
 import type { ReactNode } from "react";
 
@@ -29,8 +30,16 @@ interface HeaderBarProps {
   };
 }
 
-/** Default launchpad origin used when no `launchpadUrl` is provided. */
+/** Launchpad link target in the dev environment (each app on its own port). */
 export const DEFAULT_LAUNCHPAD_URL = "http://localhost:5380";
+
+/**
+ * Launchpad link target: the same origin's root when served from the unified
+ * examples container (runtime config present), the dev origin otherwise.
+ */
+export function resolveLaunchpadUrl(): string {
+  return runtimeConfig() ? `${window.location.origin}/` : DEFAULT_LAUNCHPAD_URL;
+}
 
 export function HeaderBar({
   appName,
@@ -44,7 +53,7 @@ export function HeaderBar({
   authMode,
   navbarOpened,
   onNavbarToggle,
-  launchpadUrl = DEFAULT_LAUNCHPAD_URL,
+  launchpadUrl = resolveLaunchpadUrl(),
   uploadQueue,
 }: HeaderBarProps) {
   return (

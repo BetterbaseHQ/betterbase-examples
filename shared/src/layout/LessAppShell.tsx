@@ -34,7 +34,7 @@ interface LessAppShellProps {
   onLogout: () => void;
   /** "sync" (default) shows sync copy in the header/modal; "auth" shows sign-in-only copy. */
   authMode?: "sync" | "auth";
-  /** URL for launchpad icon link (default http://localhost:5380) */
+  /** URL for launchpad icon link (default: same origin in the container, localhost:5380 in dev) */
   launchpadUrl?: string;
 }
 
