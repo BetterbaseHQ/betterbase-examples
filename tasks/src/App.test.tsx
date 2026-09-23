@@ -40,6 +40,33 @@ describe("Tasks app sync wiring", () => {
       .sort();
     expect(names).toEqual(["lists"]);
   });
+
+  it("regression: remounting with an existing default list does not create a second one", async () => {
+    // A page reload remounts the whole tree: the auto-create one-shot guard
+    // resets while the record already exists, and the reactive query starts
+    // empty and repopulates asynchronously although phase is "ready"
+    // immediately. Deciding emptiness from a direct db read (not the query)
+    // is what keeps reloads from duplicating the default list.
+    const auth = { isAuthenticated: true, session: makeFakeSession(), handle: "alice" };
+    setSyncDb(db);
+
+    const first = renderWithProviders(<App />, { db, auth });
+    await waitFor(() => expect(screen.getAllByText("My Tasks").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    first.unmount();
+
+    renderWithProviders(<App />, { db, auth });
+    await waitFor(() => expect(screen.getAllByText("My Tasks").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    // Let any erroneous duplicate put land before asserting
+    await new Promise((r) => setTimeout(r, 150));
+
+    const all = await db.query(lists, {});
+    const defaults = all.records.filter((r) => r.name === "My Tasks");
+    expect(defaults).toHaveLength(1);
+  });
 });
 
 describe("Tasks local flow", () => {

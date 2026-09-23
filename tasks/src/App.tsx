@@ -13,6 +13,7 @@ import {
   useDbScope,
   DbScopeGate,
   runtimeDomain,
+  useDefaultRecord,
 } from "@betterbase/examples-shared";
 import { db, lists, openDatabaseForScope } from "@/lib/db";
 import { useLists } from "@/lib/sync";
@@ -111,7 +112,6 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { phase, error: syncError } = useSync();
   const syncStatus = useConnectionStatus();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
-  const autoCreated = useRef(false);
 
   const {
     lists: allLists,
@@ -127,18 +127,16 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     todoOps,
   } = useLists();
 
-  // Auto-create a default list only after the full bootstrap sync completes.
-  // phase === "ready" is true only after connect → pull → subscribe → pull, so
-  // by then allLists already reflects server data. syncReady (LessContext
-  // populated) is not sufficient — the IDB query starts empty and fills in async.
-  useEffect(() => {
-    if (phase === "ready" && allLists.length === 0 && !autoCreated.current) {
-      autoCreated.current = true;
-      createList("My Tasks", "indigo").catch((err) =>
-        reportError(err, "Couldn't create default list"),
-      );
-    }
-  }, [phase, allLists.length, createList]);
+  // Auto-create a default list only after the full bootstrap sync completes,
+  // and only when the collection verifiably reads empty from the sync db —
+  // a reactive-query length check at ready-time races the post-pull query
+  // propagation and duplicated the list on every reload.
+  useDefaultRecord(
+    phase === "ready",
+    lists,
+    () => createList("My Tasks", "indigo"),
+    "Couldn't create default list",
+  );
 
   const [firstList] = allLists;
   useEffect(() => {

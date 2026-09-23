@@ -40,6 +40,7 @@ export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "betterbase/syn
 
 // Hooks
 export { useFlushableDebouncedCallback } from "./useFlushableDebouncedCallback.js";
+export { useDefaultRecord } from "./lib/use-default-record.js";
 
 // Account-scoped databases (AUD-045)
 export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-db.js";

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
@@ -11,6 +11,7 @@ import {
   useDbScope,
   DbScopeGate,
   runtimeDomain,
+  useDefaultRecord,
 } from "@betterbase/examples-shared";
 import { db, notebooks, notes, openDatabaseForScope } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
@@ -68,7 +69,6 @@ function NotesApp() {
   const { session } = useAuth();
   const { phase, error: syncError } = useSync();
   const syncStatus = useConnectionStatus();
-  const autoCreated = useRef(false);
 
   const {
     notebooks: allNotebooks,
@@ -86,21 +86,16 @@ function NotesApp() {
     deleteNote,
   } = useNotebooks();
 
-  // Auto-create a default notebook only after the full bootstrap sync completes.
-  // phase === "ready" is true only after connect → pull → subscribe → pull, so
-  // by then allNotebooks already reflects server data.
-  useEffect(() => {
-    if (phase === "ready" && allNotebooks.length === 0 && !autoCreated.current) {
-      autoCreated.current = true;
-      // AUD-053: a failed auto-create must surface through the shared
-      // error UI (it was an unhandled rejection) and release the one-shot
-      // guard so a later mount/effect can retry.
-      createNotebook("My Notebook").catch((err) => {
-        reportError(err, "Couldn't create default notebook");
-        autoCreated.current = false;
-      });
-    }
-  }, [phase, allNotebooks.length, createNotebook]);
+  // Auto-create a default notebook only after the full bootstrap sync
+  // completes, and only when the collection verifiably reads empty from the
+  // sync db — a reactive-query length check at ready-time races the post-pull
+  // query propagation and duplicated the notebook on every reload.
+  useDefaultRecord(
+    phase === "ready",
+    notebooks,
+    () => createNotebook("My Notebook"),
+    "Couldn't create default notebook",
+  );
 
   const personalSpaceId = session?.getPersonalSpaceId() ?? null;
 

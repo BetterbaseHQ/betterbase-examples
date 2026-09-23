@@ -31,6 +31,29 @@ describe("Notes app sync wiring", () => {
       .sort();
     expect(names).toEqual(["notebooks", "notes"]);
   });
+
+  it("regression: remounting with an existing default notebook does not create a second one", async () => {
+    // A page reload remounts the whole tree: the auto-create one-shot guard
+    // resets while the record already exists, and the reactive query starts
+    // empty and repopulates asynchronously although phase is "ready"
+    // immediately. Deciding emptiness from a direct db read (not the query)
+    // is what keeps reloads from duplicating the default notebook.
+    const auth = { isAuthenticated: true, session: makeFakeSession(), handle: "alice" };
+    setSyncDb(db);
+
+    const first = renderWithProviders(<App />, { db, auth });
+    await waitFor(() => expect(screen.getByText("My Notebook")).toBeVisible(), { timeout: 4000 });
+    first.unmount();
+
+    renderWithProviders(<App />, { db, auth });
+    await waitFor(() => expect(screen.getByText("My Notebook")).toBeVisible(), { timeout: 4000 });
+    // Let any erroneous duplicate put land before asserting
+    await new Promise((r) => setTimeout(r, 150));
+
+    const all = await db.query(notebooks, {});
+    const defaults = all.records.filter((r) => r.name === "My Notebook");
+    expect(defaults).toHaveLength(1);
+  });
 });
 
 describe("Notes local flow", () => {

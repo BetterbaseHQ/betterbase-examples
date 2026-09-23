@@ -14,6 +14,7 @@ import {
   useDbScope,
   DbScopeGate,
   runtimeDomain,
+  useDefaultRecord,
 } from "@betterbase/examples-shared";
 import { db, boards, columns, cards, openDatabaseForScope } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
@@ -188,7 +189,6 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { phase, error: syncError } = useSync();
   const syncStatus = useConnectionStatus();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
-  const autoCreated = useRef(false);
 
   const {
     boards: allBoards,
@@ -210,19 +210,16 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     moveCard,
   } = useBoards();
 
-  // Auto-create a default board only after the full bootstrap sync completes.
-  useEffect(() => {
-    if (phase === "ready" && allBoards.length === 0 && !autoCreated.current) {
-      autoCreated.current = true;
-      // AUD-053: a failed auto-create must surface through the shared
-      // error UI (it was an unhandled rejection) and release the one-shot
-      // guard so a later mount/effect can retry.
-      createBoard("My Board").catch((err) => {
-        reportError(err, "Couldn't create default board");
-        autoCreated.current = false;
-      });
-    }
-  }, [phase, allBoards.length, createBoard]);
+  // Auto-create a default board only after the full bootstrap sync completes,
+  // and only when the collection verifiably reads empty from the sync db —
+  // a reactive-query length check at ready-time races the post-pull query
+  // propagation and duplicated the board on every reload.
+  useDefaultRecord(
+    phase === "ready",
+    boards,
+    () => createBoard("My Board"),
+    "Couldn't create default board",
+  );
 
   useEffect(() => {
     if (allBoards.length > 0 && !allBoards.find((b) => b.id === selectedBoardId)) {
