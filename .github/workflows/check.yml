@@ -34,6 +34,7 @@ jobs:
       # sibling commits are pushed.
       - name: Read sibling pins from release.toml
         id: pins
+        working-directory: ${{ github.workspace }}
         run: |
           curl -fsSL --header "Authorization: Bearer ${{ github.token }}" \
             "https://raw.githubusercontent.com/BetterbaseHQ/betterbase-dev/main/release.toml" -o release.toml
