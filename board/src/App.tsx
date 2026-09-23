@@ -15,14 +15,23 @@ import {
   DbScopeGate,
   runtimeDomain,
   useDefaultRecord,
+  defaultRecordId,
 } from "@betterbase/examples-shared";
-import { db, boards, columns, cards, openDatabaseForScope } from "@/lib/db";
+import {
+  db,
+  boards,
+  columns,
+  cards,
+  openDatabaseForScope,
+  deleteAnonymousDatabase,
+  DB_NAME,
+} from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
-async function createBoardWithColumns(name: string) {
-  const board = await db.put(boards, { name });
+async function createBoardWithColumns(name: string, id?: string) {
+  const board = await db.put(boards, { name }, id ? { id } : undefined);
   const defaults = ["To Do", "In Progress", "Done"];
   for (let i = 0; i < defaults.length; i++) {
     await db.put(columns, { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 });
@@ -77,11 +86,19 @@ function LocalBoardApp() {
   useEffect(() => {
     if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      // AUD-053: release the guard on failure so retry isn't blocked.
-      createBoardWithColumns("My Board").catch((err) => {
-        reportError(err, "Couldn't create board");
-        autoCreated.current = false;
-      });
+      // A tombstone under the default id means the user deleted the
+      // default board — don't recreate it. AUD-053: release the guard on
+      // failure so retry isn't blocked.
+      db.get(boards, defaultRecordId(boards), { includeDeleted: true })
+        .then((deleted) =>
+          deleted === null
+            ? createBoardWithColumns("My Board", defaultRecordId(boards))
+            : undefined,
+        )
+        .catch((err) => {
+          reportError(err, "Couldn't create board");
+          autoCreated.current = false;
+        });
     }
   }, [boardResult]);
 
@@ -217,7 +234,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   useDefaultRecord(
     phase === "ready",
     boards,
-    () => createBoard("My Board"),
+    (id) => createBoard("My Board", id),
     "Couldn't create default board",
   );
 
@@ -364,7 +381,17 @@ export default function App() {
           domain={runtimeDomain()}
           onAuthError={logout}
         >
-          <SyncedAppGate>
+          <SyncedAppGate
+            retireAnonymous={
+              session
+                ? {
+                    appName: DB_NAME,
+                    scopeKey: accountScopeKey(session),
+                    deleteAnonymousDb: deleteAnonymousDatabase,
+                  }
+                : undefined
+            }
+          >
             <BoardApp personalSpaceId={session.getPersonalSpaceId()} />
           </SyncedAppGate>
         </BetterbaseProvider>

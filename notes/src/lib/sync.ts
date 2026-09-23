@@ -39,9 +39,9 @@ export function useNotebooks() {
   allNotesRef.current = allNotes;
 
   const createNotebook = useCallback(
-    async (name: string) => {
+    async (name: string, id?: string) => {
       const maxOrder = allNotebooks.reduce((max, nb) => Math.max(max, nb.sortOrder), 0);
-      await db.put(notebooks, { name, sortOrder: maxOrder + 1 });
+      await db.put(notebooks, { name, sortOrder: maxOrder + 1 }, id ? { id } : undefined);
     },
     [db, allNotebooks],
   );

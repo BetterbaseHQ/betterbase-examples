@@ -14,7 +14,14 @@ import {
   DbScopeGate,
   runtimeDomain,
 } from "@betterbase/examples-shared";
-import { db, conversations, messages, openDatabaseForScope } from "@/lib/db";
+import {
+  db,
+  conversations,
+  messages,
+  openDatabaseForScope,
+  deleteAnonymousDatabase,
+  DB_NAME,
+} from "@/lib/db";
 import { useConversations } from "@/lib/sync";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { ChatView } from "@/components/ChatView";
@@ -214,7 +221,17 @@ export default function App() {
         domain={runtimeDomain()}
         onAuthError={logout}
       >
-        <SyncedAppGate>
+        <SyncedAppGate
+          retireAnonymous={
+            session
+              ? {
+                  appName: DB_NAME,
+                  scopeKey: accountScopeKey(session),
+                  deleteAnonymousDb: deleteAnonymousDatabase,
+                }
+              : undefined
+          }
+        >
           <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
         </SyncedAppGate>
       </BetterbaseProvider>

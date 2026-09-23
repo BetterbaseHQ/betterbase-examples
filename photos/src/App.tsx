@@ -21,7 +21,15 @@ import {
   DbScopeGate,
   runtimeDomain,
 } from "@betterbase/examples-shared";
-import { db, albums, photos, openDatabaseForScope, currentScopeDbName } from "@/lib/db";
+import {
+  db,
+  albums,
+  photos,
+  openDatabaseForScope,
+  currentScopeDbName,
+  deleteAnonymousDatabase,
+  DB_NAME,
+} from "@/lib/db";
 import { useAlbums } from "@/lib/sync";
 import { usePhotoOps, computePhotoCounts } from "@/lib/photo-ops";
 import { AlbumSidebar } from "@/components/AlbumSidebar";
@@ -306,7 +314,19 @@ function ScopedPhotoStores({
         onAuthError={logout}
         fileStore={fileStore}
       >
-        <SyncedAppGate>{children(fileStore)}</SyncedAppGate>
+        <SyncedAppGate
+          retireAnonymous={
+            session
+              ? {
+                  appName: DB_NAME,
+                  scopeKey: accountScopeKey(session),
+                  deleteAnonymousDb: deleteAnonymousDatabase,
+                }
+              : undefined
+          }
+        >
+          {children(fileStore)}
+        </SyncedAppGate>
       </BetterbaseProvider>
     );
   }

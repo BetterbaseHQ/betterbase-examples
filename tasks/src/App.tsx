@@ -14,8 +14,9 @@ import {
   DbScopeGate,
   runtimeDomain,
   useDefaultRecord,
+  defaultRecordId,
 } from "@betterbase/examples-shared";
-import { db, lists, openDatabaseForScope } from "@/lib/db";
+import { db, lists, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
 import { TasksSidebar } from "@/components/TasksSidebar";
@@ -39,9 +40,20 @@ function LocalTasksApp() {
   useEffect(() => {
     if (result && result.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      db.put(lists, { name: "My Tasks", color: "indigo", todos: [] }).catch((err) =>
-        reportError(err, "Couldn't create default list"),
-      );
+      const id = defaultRecordId(lists);
+      // A tombstone under the default id means the user deleted the
+      // default list — don't recreate it (put onto a tombstone is
+      // rejected anyway).
+      db.get(lists, id, { includeDeleted: true })
+        .then((deleted) =>
+          deleted === null
+            ? db.put(lists, { name: "My Tasks", color: "indigo", todos: [] }, { id })
+            : undefined,
+        )
+        .catch((err) => {
+          reportError(err, "Couldn't create default list");
+          autoCreated.current = false;
+        });
     }
   }, [result]);
 
@@ -134,7 +146,7 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   useDefaultRecord(
     phase === "ready",
     lists,
-    () => createList("My Tasks", "indigo"),
+    (id) => createList("My Tasks", "indigo", id),
     "Couldn't create default list",
   );
 
@@ -234,7 +246,17 @@ export default function App() {
           domain={runtimeDomain()}
           onAuthError={logout}
         >
-          <SyncedAppGate>
+          <SyncedAppGate
+            retireAnonymous={
+              session
+                ? {
+                    appName: DB_NAME,
+                    scopeKey: accountScopeKey(session),
+                    deleteAnonymousDb: deleteAnonymousDatabase,
+                  }
+                : undefined
+            }
+          >
             <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
           </SyncedAppGate>
         </BetterbaseProvider>

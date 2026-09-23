@@ -17,7 +17,12 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MantineProvider theme={lessTheme}>
       <Notifications />
-      <AuthProvider domain={auth.domain} clientId={auth.clientId} redirectUri={auth.redirectUri} storagePrefix={appStoragePrefix("tasks")}>
+      <AuthProvider
+        domain={auth.domain}
+        clientId={auth.clientId}
+        redirectUri={auth.redirectUri}
+        storagePrefix={appStoragePrefix("tasks")}
+      >
         <DatabaseProvider value={db}>
           <App />
         </DatabaseProvider>

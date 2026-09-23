@@ -65,8 +65,8 @@ export function useBoards() {
   allColumnsRef.current = allColumns;
 
   const createBoard = useCallback(
-    async (name: string) => {
-      const board = await db.put(boards, { name });
+    async (name: string, id?: string) => {
+      const board = await db.put(boards, { name }, id ? { id } : undefined);
       const defaults = ["To Do", "In Progress", "Done"];
       for (let i = 0; i < defaults.length; i++) {
         await db.put(columns, { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 });

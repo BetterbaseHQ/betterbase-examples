@@ -29,8 +29,8 @@ export function useLists() {
   const todoOps = useMemo(() => createTodoOps(db), [db]);
 
   const createList = useCallback(
-    async (name: string, color: string) => {
-      await db.put(lists, { name, color, todos: [] });
+    async (name: string, color: string, id?: string) => {
+      await db.put(lists, { name, color, todos: [] }, id ? { id } : undefined);
     },
     [db],
   );

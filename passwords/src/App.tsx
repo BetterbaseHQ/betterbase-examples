@@ -10,7 +10,7 @@ import {
   DbScopeGate,
   runtimeDomain,
 } from "@betterbase/examples-shared";
-import { db, entries, openDatabaseForScope } from "@/lib/db";
+import { db, entries, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
 import { useEntries } from "@/lib/sync";
 import { EntriesScreen, type EntriesApi } from "@/components/EntriesScreen";
 
@@ -129,7 +129,17 @@ export default function App() {
           domain={runtimeDomain()}
           onAuthError={logout}
         >
-          <SyncedAppGate>
+          <SyncedAppGate
+            retireAnonymous={
+              session
+                ? {
+                    appName: DB_NAME,
+                    scopeKey: accountScopeKey(session),
+                    deleteAnonymousDb: deleteAnonymousDatabase,
+                  }
+                : undefined
+            }
+          >
             <PasswordsApp />
           </SyncedAppGate>
         </BetterbaseProvider>

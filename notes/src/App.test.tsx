@@ -38,7 +38,11 @@ describe("Notes app sync wiring", () => {
     // empty and repopulates asynchronously although phase is "ready"
     // immediately. Deciding emptiness from a direct db read (not the query)
     // is what keeps reloads from duplicating the default notebook.
-    const auth = { isAuthenticated: true, session: makeFakeSession(), handle: "alice" };
+    // Isolated scope: shared-scope runs tombstone the deterministic default
+    // id in afterEach wipes, and a tombstoned default must not resurrect.
+    await openDatabaseForScope("default-remount-test");
+    const session = makeFakeSession({ getPersonalSpaceId: () => "default-remount-test" });
+    const auth = { isAuthenticated: true, session, handle: "alice" };
     setSyncDb(db);
 
     const first = renderWithProviders(<App />, { db, auth });

@@ -10,12 +10,19 @@ import {
   wipeCollections,
   lastProviderProps,
 } from "@betterbase/examples-shared/test";
+import { createBoardWithColumns } from "./App";
 
 // One db per file — tests share it, so wipe records between tests to keep
 // them independent (the auto-created board belongs to whichever test ran first)
 afterEach(async () => {
   await wipeCollections(db, [cards, columns, boards]);
 });
+
+/** Unique-per-run board id — deterministic default ids must not be reused
+ * after a wipe tombstoned them (a deleted default stays deleted). */
+function uniqueBoardId(label: string): string {
+  return `board-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 describe("Board app sync wiring", () => {
   it("regression: registers every collection with BetterbaseProvider (columns were once missing — shared boards rendered empty for peers)", async () => {
@@ -36,10 +43,17 @@ describe("Board app sync wiring", () => {
 
   it("synced path renders default columns and adds one through the real local db", async () => {
     const user = userEvent.setup();
+    // Isolated scope: the file-level afterEach wipe tombstones the
+    // deterministic default id, and a tombstoned default must not resurrect.
+    await openDatabaseForScope("board-columns-test");
     setSyncDb(db);
     renderWithProviders(<App />, {
       db,
-      auth: { isAuthenticated: true, session: makeFakeSession(), handle: "alice" },
+      auth: {
+        isAuthenticated: true,
+        session: makeFakeSession({ getPersonalSpaceId: () => "board-columns-test" }),
+        handle: "alice",
+      },
     });
 
     // Auto-created board comes with the three default columns
@@ -65,7 +79,9 @@ describe("Board app sync wiring", () => {
     // empty and repopulates asynchronously although phase is "ready"
     // immediately. Deciding emptiness from a direct db read (not the query)
     // is what keeps reloads from duplicating the default board.
-    const auth = { isAuthenticated: true, session: makeFakeSession(), handle: "alice" };
+    await openDatabaseForScope("board-remount-test");
+    const session = makeFakeSession({ getPersonalSpaceId: () => "board-remount-test" });
+    const auth = { isAuthenticated: true, session, handle: "alice" };
     setSyncDb(db);
 
     const first = renderWithProviders(<App />, { db, auth });
@@ -93,6 +109,9 @@ describe("Board local cascade deletes", () => {
     await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
 
+    // Explicit unique-id board: the previous test's wipe tombstoned the
+    // deterministic default id, and a deleted default must stay deleted.
+    await createBoardWithColumns("Cascade Board", uniqueBoardId("del"));
     await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
 
     // Add a card through the composer (title → Enter → description Enter submits)
@@ -129,6 +148,7 @@ describe("Board local cascade deletes", () => {
     await openDatabaseForScope(null);
     renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
 
+    await createBoardWithColumns("Column Cascade Board", uniqueBoardId("col"));
     await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
 
     // Add a card to the first column.

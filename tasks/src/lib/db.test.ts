@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { db, openDatabaseForScope } from "./db";
 import { lists } from "./collections.js";
+import { defaultRecordId } from "@betterbase/examples-shared";
 
 // AUD-045: one fixed database per app meant a prior account's decrypted
 // records stayed visible to the next account (and to the unauthenticated
@@ -66,6 +67,32 @@ describe("account-scoped databases (AUD-045)", () => {
     // The anonymous namespace survives every switch (never modified)
     await openDatabaseForScope(null);
     expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual(["anon-1"]);
+  });
+
+  it("collapses the deterministic default across adoption — no duplicate My Tasks", async () => {
+    // Local mode seeded its default with the stable id, then the user
+    // added a todo offline
+    const defaultId = defaultRecordId(lists);
+    const seeded = await db.put(
+      lists,
+      { name: "My Tasks", color: "indigo", todos: [] },
+      { id: defaultId },
+    );
+    await db.patch(lists, {
+      id: seeded.id,
+      todos: [{ id: "todo-1", text: "buy milk", completed: false }],
+    } as never);
+
+    // First login adopts the anonymous workspace into the account db
+    await openDatabaseForScope("account-D");
+
+    // The bootstrap pull then delivers the server's copy of the same
+    // default (same deterministic id, seeded on another device)
+    await db.put(lists, { name: "My Tasks", color: "indigo", todos: [] }, { id: defaultId });
+
+    const records = await db.query(lists, {});
+    expect(records.records.length).toBe(1);
+    expect(records.records[0]!.id).toBe(defaultId);
   });
 
   it("reopening the same scope is a no-op (no spurious swap)", async () => {

@@ -1,4 +1,4 @@
-import { createDatabase, type CollectionRead } from "betterbase/db";
+import { createDatabase, deleteDatabase, type CollectionRead } from "betterbase/db";
 import { accountDbName, adoptLocalData } from "@betterbase/examples-shared";
 import { lists } from "./collections.js";
 
@@ -96,4 +96,17 @@ function deferredClose(displaced: AppDb): void {
   setTimeout(() => {
     displaced.close().catch(() => undefined);
   }, 10_000);
+}
+
+/**
+ * Delete the anonymous (logged-out) database files. Used to retire the
+ * namespace after its records were adopted into an account and synced —
+ * the records' only home is the account database from then on.
+ */
+export function deleteAnonymousDatabase(): Promise<void> {
+  return deleteDatabase(DB_NAME, {
+    worker: new Worker(new URL("./db-worker.ts", import.meta.url), {
+      type: "module",
+    }),
+  });
 }

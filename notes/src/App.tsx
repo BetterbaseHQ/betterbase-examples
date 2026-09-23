@@ -12,8 +12,16 @@ import {
   DbScopeGate,
   runtimeDomain,
   useDefaultRecord,
+  defaultRecordId,
 } from "@betterbase/examples-shared";
-import { db, notebooks, notes, openDatabaseForScope } from "@/lib/db";
+import {
+  db,
+  notebooks,
+  notes,
+  openDatabaseForScope,
+  deleteAnonymousDatabase,
+  DB_NAME,
+} from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
 import { NotesWorkspace, type NotesApi } from "@/components/NotesWorkspace";
 
@@ -93,7 +101,7 @@ function NotesApp() {
   useDefaultRecord(
     phase === "ready",
     notebooks,
-    () => createNotebook("My Notebook"),
+    (id) => createNotebook("My Notebook", id),
     "Couldn't create default notebook",
   );
 
@@ -164,7 +172,17 @@ export default function App() {
           domain={runtimeDomain()}
           onAuthError={logout}
         >
-          <SyncedAppGate>
+          <SyncedAppGate
+            retireAnonymous={
+              session
+                ? {
+                    appName: DB_NAME,
+                    scopeKey: accountScopeKey(session),
+                    deleteAnonymousDb: deleteAnonymousDatabase,
+                  }
+                : undefined
+            }
+          >
             <NotesApp />
           </SyncedAppGate>
         </BetterbaseProvider>
