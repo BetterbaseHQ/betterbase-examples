@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { db, openDatabaseForScope } from "./db";
 import { lists } from "./collections.js";
 
@@ -7,6 +7,12 @@ import { lists } from "./collections.js";
 // view). The database name is now the isolation boundary: bare name for
 // anonymous/local data (retained, never deleted), `name_<hash>` per
 // account. Exercises the real module binding swap.
+//
+// On first login the anonymous workspace is ADOPTED: its records merge
+// into the account database (idempotent, one-time per scope) so local
+// data survives connecting — offline-first. Only the first account
+// opened from the anonymous namespace adopts; later accounts stay
+// isolated from each other.
 
 interface Wipeable {
   query(c: never, o: unknown): Promise<{ records: Array<{ id: string }> }>;
@@ -21,6 +27,15 @@ async function wipeCurrent() {
   await Promise.all(all.records.map((r) => current.delete(lists as never, r.id)));
 }
 
+beforeEach(() => {
+  // Adoption is one-time per (app, scope) via a localStorage marker —
+  // clear markers so every run exercises the adoption path deterministically.
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i)!;
+    if (key.startsWith("bb_local_adopted_")) localStorage.removeItem(key);
+  }
+});
+
 afterEach(async () => {
   // Leave the module in the anonymous state, cleaned, for other test files
   await openDatabaseForScope(null);
@@ -28,25 +43,27 @@ afterEach(async () => {
 });
 
 describe("account-scoped databases (AUD-045)", () => {
-  it("isolates records per account and retains the anonymous namespace", async () => {
+  it("adopts the anonymous workspace into the first account, isolates later accounts, retains anonymous", async () => {
     // Anonymous (module default)
     await db.put(lists, { id: "anon-1", name: "Local groceries", color: "", todos: [] } as never);
 
-    // Account A: separate database, empty
+    // Account A: the anonymous records were adopted — local data
+    // survives connecting (offline-first contract)
     await openDatabaseForScope("account-A");
-    expect((await db.query(lists, {})).records).toHaveLength(0);
+    expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual(["anon-1"]);
     await db.put(lists, { id: "a-1", name: "A's list", color: "", todos: [] } as never);
 
-    // Account B: another separate database, empty — B never sees A's records
+    // Account B: opened from A's scope, not the anonymous namespace —
+    // empty. Adoption never crosses account boundaries.
     await openDatabaseForScope("account-B");
     expect((await db.query(lists, {})).records).toHaveLength(0);
     await db.put(lists, { id: "b-1", name: "B's list", color: "", todos: [] } as never);
 
-    // Switching back to A restores A's records exactly
+    // Switching back to A restores A's records exactly (adopted + own)
     await openDatabaseForScope("account-A");
-    expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual(["a-1"]);
+    expect((await db.query(lists, {})).records.map((r) => r.id).sort()).toEqual(["a-1", "anon-1"]);
 
-    // The anonymous namespace survives every switch
+    // The anonymous namespace survives every switch (never modified)
     await openDatabaseForScope(null);
     expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual(["anon-1"]);
   });
