@@ -46,10 +46,13 @@ export { useDefaultRecord } from "./lib/use-default-record.js";
 export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-db.js";
 export type { AccountScopeSource } from "./lib/account-db.js";
 export { useDbScope } from "./lib/use-account-db.js";
+export { adoptLocalData } from "./lib/adopt-local-data.js";
+export type { AdoptLocalDataOptions } from "./lib/adopt-local-data.js";
 
 // Runtime configuration (deployed examples container / dev fallbacks)
 export {
   appAuthConfig,
+  appStoragePrefix,
   runtimeConfig,
   runtimeDomain,
   runtimeClientId,

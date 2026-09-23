@@ -75,3 +75,14 @@ export function appAuthConfig(appId: string): {
     redirectUri: runtimeRedirectUri(),
   };
 }
+
+/**
+ * Per-app session/keys storage prefix for `AuthProvider`. Apps hosted on
+ * one origin must not share a prefix: a shared prefix means a shared
+ * localStorage session slot, so each app would silently reuse whichever
+ * app's OAuth grant was stored last (wrong client, wrong personal space,
+ * refresh rejected with a client_id mismatch).
+ */
+export function appStoragePrefix(appId: string): string {
+  return `betterbase_session_${appId}_`;
+}

@@ -1,5 +1,5 @@
 import { createDatabase, type CollectionRead } from "betterbase/db";
-import { accountDbName } from "@betterbase/examples-shared";
+import { accountDbName, adoptLocalData } from "@betterbase/examples-shared";
 import { boards, columns, cards } from "./collections.js";
 
 export { boards, columns, cards } from "./collections.js";
@@ -68,9 +68,21 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
     deferredClose(next);
     return;
   }
+  const wasAnonymous = openName === DB_NAME;
   const prev = db;
   db = next;
   openName = name;
+  if (scopeKey !== null && wasAnonymous) {
+    // Offline-first: the logged-out workspace merges into the first
+    // account opened on this profile (idempotent, one-time per scope).
+    await adoptLocalData({
+      appName: DB_NAME,
+      scopeKey,
+      anonymous: prev,
+      target: next,
+      collections: [boards, columns, cards],
+    });
+  }
   deferredClose(prev);
 }
 
