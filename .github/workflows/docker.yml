@@ -24,20 +24,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Build context is the workspace root: this repo plus the sibling
-      # checkouts the apps link against (same pins as check.yml — bump
+      # checkouts the apps link against (same pins as check.yml — bump them
       # together via `just release-pin` in betterbase-dev).
+      - name: Read sibling pins from release.toml
+        id: pins
+        run: |
+          curl -fsSL --header "Authorization: Bearer ${{ github.token }}" \
+            "https://raw.githubusercontent.com/BetterbaseHQ/betterbase-dev/main/release.toml" -o release.toml
+          {
+            echo "betterbase=$(grep -E '^betterbase = ' release.toml | sed 's/.*"\(.*\)".*/\1/')"
+            echo "json-joy-rs=$(grep -E '^json-joy-rs = ' release.toml | sed 's/.*"\(.*\)".*/\1/')"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           path: betterbase-examples
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/betterbase
-          ref: e192b77591cffe982cf02dd195d6bad8913a6cd2
+          ref: ${{ steps.pins.outputs.betterbase }}
           path: betterbase
       - uses: actions/checkout@v7
         with:
           repository: BetterbaseHQ/json-joy-rs
-          ref: 410e199748be7a9b18de3026e090bd9a7e737290
+          ref: ${{ steps.pins.outputs.json-joy-rs }}
           path: json-joy-rs
 
       # The image copies the SDK's wasm-pack output (gitignored), so it is
