@@ -11,9 +11,7 @@ import {
   useDbScope,
   DbScopeGate,
   runtimeDomain,
-  useDefaultRecord,
-  defaultRecordId,
-} from "@betterbase/examples-shared";
+  useDefaultRecord,} from "@betterbase/examples-shared";
 import {
   db,
   notebooks,

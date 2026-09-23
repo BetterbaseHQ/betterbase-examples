@@ -30,7 +30,7 @@ import { useBoards } from "@/lib/sync";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
-async function createBoardWithColumns(name: string, id?: string) {
+export async function createBoardWithColumns(name: string, id?: string) {
   const board = await db.put(boards, { name }, id ? { id } : undefined);
   const defaults = ["To Do", "In Progress", "Done"];
   for (let i = 0; i < defaults.length; i++) {
