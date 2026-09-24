@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { adoptLocalData, retireLocalData } from "./adopt-local-data.js";
 import { accountScopeHash } from "./account-db.js";
-import type { CollectionDefHandle } from "betterbase/db";
+import type { CollectionDefHandle, Database } from "betterbase/db";
 
 /** Minimal Database double: records in a Map. */
 function fakeDb(records: Array<Record<string, unknown>> = []) {
@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe("adoptLocalData", () => {
   it("merges anonymous records and writes the adopted marker", async () => {
-    const anon = fakeDb([{ id: "a1", name: "Groceries" }]);
+    const anon = fakeDb([{ id: "11111111-2222-4333-8444-555555555555", name: "Groceries" }]);
     const target = fakeDb();
     const adopted = await adoptLocalData({
       appName: "tasks",
@@ -68,7 +68,7 @@ describe("adoptLocalData", () => {
   });
 
   it("a pending (adopted) marker blocks a re-run", async () => {
-    const anon = fakeDb([{ id: "a1", name: "Groceries" }]);
+    const anon = fakeDb([{ id: "11111111-2222-4333-8444-555555555555", name: "Groceries" }]);
     const target = fakeDb();
     await adoptLocalData({
       appName: "tasks",
@@ -90,7 +90,7 @@ describe("adoptLocalData", () => {
   });
 
   it("a retired marker re-arms adoption for the next cycle", async () => {
-    const anon = fakeDb([{ id: "a1", name: "Second cycle" }]);
+    const anon = fakeDb([{ id: "11111111-2222-4333-8444-555555555555", name: "Second cycle" }]);
     const target = fakeDb();
     const key = await markerKey();
     localStorage.setItem(key, "retired");
@@ -204,5 +204,26 @@ describe("retireLocalData", () => {
     ).rejects.toThrow("quota exceeded");
     expect(del).not.toHaveBeenCalled();
     expect(localStorage.getItem(key)).toBe("adopted");
+  });
+});
+
+describe("adoptLocalData — non-UUID id guard", () => {
+  it("skips records whose ids the server could never store", async () => {
+    localStorage.clear();
+    const anon = fakeDb([
+      { id: "default_lists", name: "My Tasks" },
+      { id: "22222222-3333-4444-8555-666666666666", name: "Real list" },
+    ]);
+    const target = fakeDb();
+    const result = await adoptLocalData({
+      appName: "tasks",
+      scopeKey: "scope-guard",
+      anonymous: anon as unknown as Database,
+      target: target as unknown as Database,
+      collections: [def],
+    });
+    expect(result.merged).toBe(1);
+    const putArg = target.bulkPut.mock.calls[0]?.[1] as Array<Record<string, unknown>>;
+    expect(putArg.map((r) => r.id)).toEqual(["22222222-3333-4444-8555-666666666666"]);
   });
 });

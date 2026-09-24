@@ -53,6 +53,9 @@ import { accountScopeHash } from "./account-db.js";
 /** Marker value once the anonymous database files have been deleted. */
 const MARKER_RETIRED = "retired";
 
+/** Hyphenated UUID form — what the sync server accepts as a record id. */
+const HYPHENATED_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * localStorage key for this app+scope's adoption state machine. Exported
  * for tests that need to pre-seed a state (e.g. disarm retirement) —
@@ -122,7 +125,14 @@ export async function adoptLocalData(
     source: anonymous,
     target,
     collections,
-    skipRecord,
+    // Records with non-UUID ids can never be stored server-side (the sync
+    // storage layer validates ids as hyphenated UUIDs): adopting one would
+    // wedge the collection's whole push stream — every batch containing
+    // it is rejected atomically. They stay in the anonymous database and
+    // are deleted at retirement. The pre-v5 `default_<name>` id scheme is
+    // the known producer of such records.
+    skipRecord: (_def, record) =>
+      !HYPHENATED_UUID_RE.test(String(record.id)) || (skipRecord?.(_def, record) ?? false),
   });
 
   if (result.merged > 0) {

@@ -126,6 +126,12 @@ export async function registerUser(page: Page, creds: UserCredentials): Promise<
 export async function connectFromApp(page: Page, creds: UserCredentials): Promise<void> {
   const appOrigin = new URL(page.url()).origin;
 
+  // Surface engine errors in test output — SyncErrorReporter logs what no
+  // app UI displays, and "Sync error" badges are opaque otherwise
+  page.on("console", (m) => {
+    if (m.type() === "error") console.log("[browser]", m.text().slice(0, 240));
+  });
+
   // Entry points differ: most apps open a "Connect Sync" modal first; chat's
   // sign-in gate starts the OAuth redirect directly
   const signIn = page.getByRole("button", { name: "Sign in", exact: true });

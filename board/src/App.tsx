@@ -23,24 +23,19 @@ import {
   DB_NAME,
 } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
+import { createBoardIn } from "@/lib/create-board";
 import { defaultData } from "@/lib/defaults";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
+/**
+ * Create a board with its three default columns. Deterministic ids when
+ * `id` is given (concurrent seeds collapse); column ids are v5-derived
+ * UUIDs — the sync server rejects non-UUID ids, which is exactly how the
+ * pre-v5 `${id}-col-N` scheme silently broke column syncing.
+ */
 export async function createBoardWithColumns(name: string, id?: string) {
-  const board = await db.put(boards, { name }, id ? { id } : undefined);
-  const defaults = ["To Do", "In Progress", "Done"];
-  for (let i = 0; i < defaults.length; i++) {
-    // Deterministic column ids for deterministic boards — concurrent
-    // default seeds collapse instead of duplicating columns.
-    const columnId = id ? `${id}-col-${i + 1}` : undefined;
-    await db.put(
-      columns,
-      { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 },
-      columnId ? { id: columnId } : undefined,
-    );
-  }
-  return board;
+  return createBoardIn(db, name, id);
 }
 
 // ---------------------------------------------------------------------------

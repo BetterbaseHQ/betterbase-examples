@@ -265,6 +265,12 @@ function PhotosApp({
 // ---------------------------------------------------------------------------
 
 export default function App() {
+  const createFileStore = useCallback(
+    (scopeDbName: string | null) =>
+      scopeDbName ? new FileStore({ dbName: scopeDbName }) : new FileStore(),
+    [],
+  );
+
   return (
     <ScopedAppTree
       appName={DB_NAME}
@@ -272,9 +278,9 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
-      createFileStore={(scopeDbName) =>
-        scopeDbName ? new FileStore({ dbName: scopeDbName }) : new FileStore()
-      }
+      // Stable identity: ScopedAppTree keys effects off this prop, and an
+      // inline arrow would re-fire the retirement effect every render
+      createFileStore={createFileStore}
       getCurrentScopeDbName={currentScopeDbName}
       local={(fileStore) => <LocalPhotosApp fileStore={fileStore} />}
     >

@@ -68,6 +68,24 @@ export function useDefaultRecord(
     const id = defaultRecordId(collection);
     db.getAll(collection)
       .then(async (existing) => {
+        // Respect a deliberate deletion BEFORE the sweep: a tombstone
+        // under the deterministic id (or a pre-migration tombstone under
+        // the legacy id) means the user removed this default on some
+        // device — recreating it would resurrect it (and put onto a
+        // tombstone is rejected anyway). The sweep below tombstones live
+        // legacy-id records, so sampling its state first is what
+        // distinguishes "user deleted" from "migration garbage".
+        // Tombstone = present with includeDeleted, absent from the alive
+        // read (the db layer's convention — records carry no flag).
+        const aliveIds = new Set(existing.map((r) => r.id));
+        const tombstonedIds = new Set(
+          (await db.getAll(collection, { includeDeleted: true }))
+            .filter((r) => !aliveIds.has(r.id))
+            .map((r) => r.id),
+        );
+        if (tombstonedIds.has(id)) return;
+        if (tombstonedIds.has(legacyDefaultRecordId(collection))) return;
+
         // One-time migration off the pre-v5 id scheme: the sync server
         // rejects non-UUID record ids (`InvalidRecordId`), so such records
         // can never sync and their pushes get quarantined. Tombstone them
@@ -82,15 +100,6 @@ export function useDefaultRecord(
         }
         // Re-read: the sweep may have emptied the collection
         if ((await db.getAll(collection)).length > 0) return;
-        // Respect a deliberate deletion: a tombstone under the
-        // deterministic id means the user removed this default on some
-        // device — recreating it would resurrect it (and put onto a
-        // tombstone is rejected anyway).
-        // Nullish check: the raw OpfsDb returns null for absence, the
-        // sync TypedAdapter returns undefined — either means "not
-        // tombstoned, create the default".
-        const deleted = await db.get(collection, id, { includeDeleted: true });
-        if (deleted != null) return;
         return create(id);
       })
       .catch((err) => {

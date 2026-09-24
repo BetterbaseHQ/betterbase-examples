@@ -13,6 +13,7 @@ import { useRef, useCallback, useEffect } from "react";
 import { useSyncDb, useSpaces, usePendingInvitations, useQuery } from "betterbase/sync/react";
 import { deleteTree, bulkMoveToSpace, spaceOf, type SpaceFields } from "betterbase/sync";
 import { boards, columns, cards, type Board, type Card, type Column } from "@/lib/db";
+import { createBoardIn } from "./create-board.js";
 import {
   saveMarker,
   clearMarker,
@@ -65,22 +66,7 @@ export function useBoards() {
   allColumnsRef.current = allColumns;
 
   const createBoard = useCallback(
-    async (name: string, id?: string) => {
-      const board = await db.put(boards, { name }, id ? { id } : undefined);
-      const defaults = ["To Do", "In Progress", "Done"];
-      for (let i = 0; i < defaults.length; i++) {
-        // Derive column ids from a deterministic board id so concurrent
-        // seeds of the default board collapse (one board, three columns —
-        // not six) instead of duplicating.
-        const columnId = id ? `${id}-col-${i + 1}` : undefined;
-        await db.put(
-          columns,
-          { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 },
-          columnId ? { id: columnId } : undefined,
-        );
-      }
-      return board;
-    },
+    async (name: string, id?: string) => createBoardIn(db, name, id),
     [db],
   );
 

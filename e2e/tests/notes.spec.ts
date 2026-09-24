@@ -1,10 +1,16 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
 
 /**
  * Notes lifecycle: anonymous note (no default notebook by design — notes
  * seeds "My Notebook" only after the full bootstrap sync completes), adoption
  * of the anonymous note, account-side notebook seeding, returning device.
+ *
+ * RACE-OPEN (2026-09-24): the post-connect `waitForSynced` intermittently
+ * times out with the engine holding `push rejected by server: internal`
+ * (phase already "ready", all local assertions pass, ~1 record reaches the
+ * server). Same signature as the tasks returning-device flake — under
+ * investigation; see tasks.spec.ts.
  */
 
 const creds = uniqueCreds();
@@ -27,6 +33,11 @@ test.describe.serial("notes lifecycle", () => {
     // The anonymous note was adopted; the default notebook seeded exactly once
     await expect(page.getByText("lifecycle note")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("nav").getByText("My Notebook", { exact: true })).toHaveCount(1, { timeout: 30_000 });
+
+    // Push settled before this context closes — else the returning
+    // device races the bootstrap flush
+    await waitForSynced(page);
+    await page.waitForTimeout(2_000);
   });
 
   test("returning device downloads the note and seeds exactly one notebook", async ({

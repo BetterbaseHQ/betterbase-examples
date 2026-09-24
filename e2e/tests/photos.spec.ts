@@ -9,13 +9,6 @@ import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, wa
  * Photos lifecycle: upload, connect, returning device. Exercises the file
  * scope (blob sync) on top of record sync — the only app with file uploads.
  *
- * OPEN FINDING (2026-09-24): FileStore.transferUnuploadedFrom reads both
- * anonymous blobs with correct byte lengths, but only one entry lands in
- * the scoped store's queue — with emptied bytes (uploads 34-byte empty
- * payloads). The adopted photo renders "Unavailable" post-connect and the
- * returning device gets nothing. Reproduces deterministically; needs focused
- * SDK debugging of the put/putFile path during retirement. Re-enable both
- * tests when fixed.
  */
 
 // 40x30 solid-red PNG — a real decodable image (a 1x1 fixture never
@@ -26,8 +19,6 @@ const PNG_BASE64 =
 const creds = uniqueCreds();
 
 test.describe.serial("photos lifecycle", () => {
-  test.skip(true, "pending FileStore.transferUnuploadedFrom fix — see header");
-
   test("uploaded photo survives connect", async ({ page }) => {
     await page.goto(appUrl("photos"));
 

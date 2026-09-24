@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
 
 /**
  * Board lifecycle: multi-collection defaults (board → columns) + created card,
@@ -7,6 +7,12 @@ import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted } f
  * Board is where the parent/child default complexity lives — if default
  * declarations, seedChildren, or the pristine-skip short-circuit regress,
  * these assertions fail.
+ *
+ * RACE-OPEN (2026-09-24): the post-connect `waitForSynced` intermittently
+ * times out with the engine holding `push rejected by server: internal`
+ * (phase already "ready", all local assertions pass, ~1 record reaches the
+ * server). Same signature as the tasks returning-device flake — under
+ * investigation; see tasks.spec.ts.
  */
 
 const creds = uniqueCreds();
@@ -44,6 +50,11 @@ test.describe.serial("board lifecycle", () => {
     await expect(page.locator("nav").getByText("My Board", { exact: true })).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Rename column To Do" })).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Rename column Done" })).toHaveCount(1, { timeout: 30_000 });
+
+    // Push settled before this context closes — else the returning
+    // device races the bootstrap flush
+    await waitForSynced(page);
+    await page.waitForTimeout(2_000);
   });
 
   test("returning device downloads data without duplicating defaults", async ({ browser }) => {
