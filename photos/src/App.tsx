@@ -8,7 +8,7 @@ import {
   useSync,
 } from "betterbase/sync/react";
 import { FileStore } from "betterbase/sync";
-import { useQuery } from "betterbase/db/react";
+import { useQuery, DatabaseProvider } from "betterbase/db/react";
 import {
   LessAppShell,
   useAuth,
@@ -342,21 +342,23 @@ export default function App() {
   } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
 
   return (
-    <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-      <ScopedPhotoStores
-        isAuthenticated={isAuthenticated}
-        session={session}
-        clientId={clientId}
-        logout={logout}
-      >
-        {(fileStore) =>
-          isAuthenticated && session ? (
-            <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
-          ) : (
-            <LocalPhotosApp fileStore={fileStore} />
-          )
-        }
-      </ScopedPhotoStores>
-    </DbScopeGate>
+    <DatabaseProvider value={db}>
+      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
+        <ScopedPhotoStores
+          isAuthenticated={isAuthenticated}
+          session={session}
+          clientId={clientId}
+          logout={logout}
+        >
+          {(fileStore) =>
+            isAuthenticated && session ? (
+              <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
+            ) : (
+              <LocalPhotosApp fileStore={fileStore} />
+            )
+          }
+        </ScopedPhotoStores>
+      </DbScopeGate>
+    </DatabaseProvider>
   );
 }

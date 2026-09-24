@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
-import { useQuery } from "betterbase/db/react";
+import { useQuery, DatabaseProvider } from "betterbase/db/react";
 import {
   LessAppShell,
   SyncedAppGate,
@@ -236,33 +236,35 @@ export default function App() {
     error: dbError,
   } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   return (
-    <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-      {isAuthenticated && session ? (
-        <BetterbaseProvider
-          adapter={db}
-          collections={[lists]}
-          session={session}
-          clientId={clientId}
-          domain={runtimeDomain()}
-          onAuthError={logout}
-        >
-          <SyncedAppGate
-            retireAnonymous={
-              session
-                ? {
-                    appName: DB_NAME,
-                    scopeKey: accountScopeKey(session),
-                    deleteAnonymousDb: deleteAnonymousDatabase,
-                  }
-                : undefined
-            }
+    <DatabaseProvider value={db}>
+      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
+        {isAuthenticated && session ? (
+          <BetterbaseProvider
+            adapter={db}
+            collections={[lists]}
+            session={session}
+            clientId={clientId}
+            domain={runtimeDomain()}
+            onAuthError={logout}
           >
-            <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
-          </SyncedAppGate>
-        </BetterbaseProvider>
-      ) : (
-        <LocalTasksApp />
-      )}
-    </DbScopeGate>
+            <SyncedAppGate
+              retireAnonymous={
+                session
+                  ? {
+                      appName: DB_NAME,
+                      scopeKey: accountScopeKey(session),
+                      deleteAnonymousDb: deleteAnonymousDatabase,
+                    }
+                  : undefined
+              }
+            >
+              <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
+            </SyncedAppGate>
+          </BetterbaseProvider>
+        ) : (
+          <LocalTasksApp />
+        )}
+      </DbScopeGate>
+    </DatabaseProvider>
   );
 }

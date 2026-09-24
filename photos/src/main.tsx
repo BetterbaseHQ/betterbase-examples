@@ -2,10 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
-import { DatabaseProvider } from "betterbase/db/react";
 import { AuthProvider } from "betterbase/auth/react";
 import { appAuthConfig, appStoragePrefix, lessTheme } from "@betterbase/examples-shared";
-import { db } from "@/lib/db";
 import App from "./App.tsx";
 
 import "@mantine/core/styles.css";
@@ -25,9 +23,7 @@ createRoot(document.getElementById("root")!).render(
         storagePrefix={appStoragePrefix("photos")}
         scope="openid sync files"
       >
-        <DatabaseProvider value={db}>
-          <App />
-        </DatabaseProvider>
+        <App />
       </AuthProvider>
     </MantineProvider>
   </StrictMode>,

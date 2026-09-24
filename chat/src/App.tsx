@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { MessageCircle } from "lucide-react";
 import { Box, Button } from "@mantine/core";
 import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
+import { DatabaseProvider } from "betterbase/db/react";
 import {
   LessAppShell,
   SyncedAppGate,
@@ -211,30 +212,32 @@ export default function App() {
   if (!isAuthenticated || !session) return <SignInGate />;
 
   return (
-    <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-      <BetterbaseProvider
-        adapter={db}
-        collections={[conversations, messages]}
-        editChainCollections={[messages.name]}
-        session={session}
-        clientId={clientId}
-        domain={runtimeDomain()}
-        onAuthError={logout}
-      >
-        <SyncedAppGate
-          retireAnonymous={
-            session
-              ? {
-                  appName: DB_NAME,
-                  scopeKey: accountScopeKey(session),
-                  deleteAnonymousDb: deleteAnonymousDatabase,
-                }
-              : undefined
-          }
+    <DatabaseProvider value={db}>
+      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
+        <BetterbaseProvider
+          adapter={db}
+          collections={[conversations, messages]}
+          editChainCollections={[messages.name]}
+          session={session}
+          clientId={clientId}
+          domain={runtimeDomain()}
+          onAuthError={logout}
         >
-          <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    </DbScopeGate>
+          <SyncedAppGate
+            retireAnonymous={
+              session
+                ? {
+                    appName: DB_NAME,
+                    scopeKey: accountScopeKey(session),
+                    deleteAnonymousDb: deleteAnonymousDatabase,
+                  }
+                : undefined
+            }
+          >
+            <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
+          </SyncedAppGate>
+        </BetterbaseProvider>
+      </DbScopeGate>
+    </DatabaseProvider>
   );
 }

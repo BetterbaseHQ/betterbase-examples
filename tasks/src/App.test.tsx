@@ -11,6 +11,7 @@ import {
   lastProviderProps,
 } from "@betterbase/examples-shared/test";
 import { createTodoOps, type TodoDb } from "@/lib/todos";
+import { accountScopeKey, accountScopeHash } from "@betterbase/examples-shared";
 
 afterEach(async () => {
   await wipeCollections(db, [lists]);
@@ -145,5 +146,61 @@ describe("Tasks concurrency", () => {
     expect(ids).toContain("x");
     expect(ids).toContain("y");
     expect(final!.todos.find((t) => t.id === "x")!.completed).toBe(true);
+  });
+});
+
+describe("Tasks scope-swap wiring", () => {
+  it("regression (issue #4): queries follow the swapped db, not the bootstrap-pinned provider", async () => {
+    // main.tsx used to pin <DatabaseProvider value={db}> once at page
+    // load. After a login→logout cycle the pinned database was the
+    // long-gone page-load anonymous db — post-retirement its worker is
+    // terminated, so every logged-out query silently timed out (the
+    // "wedge until reload" bug). The provider must track the live `db`
+    // binding so a re-render serves the current scope's database.
+    await openDatabaseForScope(null); // fresh anonymous A
+    // main.tsx reads `db` exactly once at bootstrap — model that here
+    // instead of the harness's per-call re-read, or the test can't see
+    // the pin. `bootstrap` is the page-load database the provider pins.
+    const bootstrap = db;
+    const pinned = db;
+    const session = makeFakeSession();
+    const auth = { isAuthenticated: true, session, handle: "alice" };
+    setSyncDb(db);
+    // Skip adoption/retirement side effects: this test exercises the
+    // provider wiring, not the retirement lifecycle (covered separately).
+    localStorage.setItem(
+      `bb_local_adopted_tasks_${await accountScopeHash(accountScopeKey(session as unknown as Parameters<typeof accountScopeKey>[0]))}`,
+      "retired",
+    );
+
+    // Page load, logged out: pins A in the outer provider (as main.tsx did).
+    // (Shell marker, not "My Tasks": earlier suites' wipes tombstone the
+    // deterministic default id, which legitimately suppresses re-seeding.)
+    const first = renderWithProviders(<App />, { db: pinned });
+    await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    first.unmount();
+
+    // Login cycle: anonymous → account → back to a fresh anonymous A2
+    const second = renderWithProviders(<App />, { db: pinned, auth });
+    await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    second.unmount();
+
+    // Retire the page-load database the way the real logout cycle does
+    // (its worker terminates; a pinned handle can no longer serve reads).
+    await bootstrap.close();
+
+    await openDatabaseForScope(null); // A2 (fresh — records live in the account db)
+    // A record only visible through the CURRENT scope's database
+    await db.put(lists, { name: "Probe List", color: "#00ff00", todos: [] });
+
+    const third = renderWithProviders(<App />, { db: pinned });
+    await waitFor(() => expect(screen.getAllByText("Probe List").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    third.unmount();
   });
 });
