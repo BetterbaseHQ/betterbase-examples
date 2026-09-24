@@ -28,7 +28,9 @@ import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { ChatView } from "@/components/ChatView";
 
 // ---------------------------------------------------------------------------
-// SignInGate — shown when the user is not authenticated
+// SignInGate — shown when the user is not authenticated. Renders ABOVE the
+// App-level DatabaseProvider: must not consume Database context (none is
+// provided on this path).
 // ---------------------------------------------------------------------------
 
 function SignInGate() {
@@ -209,6 +211,9 @@ export default function App() {
     key: dbScopeKey,
     error: dbError,
   } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
+  // Signed-out early return: sits above the DatabaseProvider on purpose
+  // (chat has no logged-out mode). SignInGate must not consume Database
+  // context — there is no provider on this path.
   if (!isAuthenticated || !session) return <SignInGate />;
 
   return (

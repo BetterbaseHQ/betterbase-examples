@@ -51,7 +51,12 @@ import { accountScopeHash } from "./account-db.js";
 /** Marker value once the anonymous database files have been deleted. */
 const MARKER_RETIRED = "retired";
 
-async function adoptionMarkerKey(appName: string, scopeKey: string): Promise<string> {
+/**
+ * localStorage key for this app+scope's adoption state machine. Exported
+ * for tests that need to pre-seed a state (e.g. disarm retirement) —
+ * the format is private to this module otherwise.
+ */
+export async function adoptionMarkerKey(appName: string, scopeKey: string): Promise<string> {
   return `bb_local_adopted_${appName}_${await accountScopeHash(scopeKey)}`;
 }
 

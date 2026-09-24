@@ -11,7 +11,7 @@ import {
   lastProviderProps,
 } from "@betterbase/examples-shared/test";
 import { createTodoOps, type TodoDb } from "@/lib/todos";
-import { accountScopeKey, accountScopeHash } from "@betterbase/examples-shared";
+import { accountScopeKey, adoptionMarkerKey } from "@betterbase/examples-shared";
 
 afterEach(async () => {
   await wipeCollections(db, [lists]);
@@ -166,10 +166,16 @@ describe("Tasks scope-swap wiring", () => {
     const session = makeFakeSession();
     const auth = { isAuthenticated: true, session, handle: "alice" };
     setSyncDb(db);
-    // Skip adoption/retirement side effects: this test exercises the
-    // provider wiring, not the retirement lifecycle (covered separately).
+    // Disarm retirement only: a "retired" marker stops RetireAnonymousEffect
+    // from deleting the anonymous db mid-test, but adoption re-arms on it
+    // and runs during the second render's scope swap — harmlessly here,
+    // since earlier suites' wipes leave the anonymous db with no live
+    // records to merge.
     localStorage.setItem(
-      `bb_local_adopted_tasks_${await accountScopeHash(accountScopeKey(session as unknown as Parameters<typeof accountScopeKey>[0]))}`,
+      await adoptionMarkerKey(
+        "tasks",
+        accountScopeKey(session as unknown as Parameters<typeof accountScopeKey>[0]),
+      ),
       "retired",
     );
 

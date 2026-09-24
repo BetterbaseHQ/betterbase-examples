@@ -17,8 +17,11 @@ import "@mantine/notifications/styles.css";
 export interface RenderWithProvidersOptions extends RenderOptions {
   auth?: MockAuthOverrides;
   /**
-   * The app's local db — mounted as DatabaseProvider, mirroring how every
-   * app's main.tsx wires it up.
+   * The app's local db — mounted as a DatabaseProvider for tests of
+   * components outside their App root. Apps mount their own
+   * DatabaseProvider (inside App, around the scope gate) which overrides
+   * this one; the issue-#4 regression test relies on that outer pin to
+   * model the old main.tsx bootstrap behavior.
    */
   db?: unknown;
   /** Extra providers between Mantine and auth (e.g. a mocked sync context). */
