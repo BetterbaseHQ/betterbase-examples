@@ -8,11 +8,6 @@ import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, wa
  * declarations, seedChildren, or the pristine-skip short-circuit regress,
  * these assertions fail.
  *
- * RACE-OPEN (2026-09-24): the post-connect `waitForSynced` intermittently
- * times out with the engine holding `push rejected by server: internal`
- * (phase already "ready", all local assertions pass, ~1 record reaches the
- * server). Same signature as the tasks returning-device flake — under
- * investigation; see tasks.spec.ts.
  */
 
 const creds = uniqueCreds();

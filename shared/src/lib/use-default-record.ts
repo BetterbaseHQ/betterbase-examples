@@ -61,6 +61,14 @@ export function useDefaultRecord(
 ): void {
   const db = useSyncDb();
   const attempted = useRef(false);
+  // Callers pass inline closures (fresh identity every render). Keeping them
+  // out of the effect deps is what makes the one-shot guard real: with them
+  // inlined, a failed seed re-fires the whole chain on every render. The
+  // refs route the latest callback to whichever effect instance runs.
+  const createRef = useRef(create);
+  createRef.current = create;
+  const alsoSweepRef = useRef(alsoSweep);
+  alsoSweepRef.current = alsoSweep;
 
   useEffect(() => {
     if (!ready || attempted.current) return;
@@ -90,7 +98,7 @@ export function useDefaultRecord(
         // rejects non-UUID record ids (`InvalidRecordId`), so such records
         // can never sync and their pushes get quarantined. Tombstone them
         // and let the seed below recreate the default under a valid id.
-        for (const c of [collection, ...(alsoSweep ?? [])]) {
+        for (const c of [collection, ...(alsoSweepRef.current ?? [])]) {
           const rows = c === collection ? existing : await db.getAll(c);
           for (const row of rows) {
             if (!HYPHENATED_UUID_RE.test(row.id)) {
@@ -100,11 +108,11 @@ export function useDefaultRecord(
         }
         // Re-read: the sweep may have emptied the collection
         if ((await db.getAll(collection)).length > 0) return;
-        return create(id);
+        return createRef.current(id);
       })
       .catch((err) => {
         reportError(err, errorMessage);
         attempted.current = false;
       });
-  }, [ready, db, collection, create, errorMessage, alsoSweep]);
+  }, [ready, db, collection, errorMessage]);
 }

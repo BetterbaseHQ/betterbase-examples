@@ -6,14 +6,6 @@ import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, wa
  * account-side seeding, returning device. Single-collection default — the
  * simplest declaration shape.
  *
- * FLAKY-OPEN (2026-09-24): the returning-device test fails intermittently —
- * the account's personal space on the sync server ends up with ZERO records
- * even though device 1 reached `phase === "ready"` (Synced badge) with the
- * adopted list visible locally. The adoption put apparently races the
- * engine's bootstrap dirty-collection/subscription: when it loses, the
- * record never pushes and the engine idles "synced" forever. Needs focused
- * SDK investigation (openDatabaseForScope adoption vs engine bootstrap
- * ordering). Likely shares a root cause with the photos transfer finding.
  */
 
 const creds = uniqueCreds();

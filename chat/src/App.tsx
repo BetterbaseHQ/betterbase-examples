@@ -30,9 +30,11 @@ import { ChatView } from "@/components/ChatView";
 
 function SignInGate() {
   const { handle, login, logout } = useAuth();
+  // This button bypasses the header's connect modal, so login failures have
+  // no other UI surface — report them here rather than swallowing.
   const handleLogin = () => {
-    login().catch(() => {
-      /* failure rendered in the header's sync modal / console */
+    login().catch((err) => {
+      reportError(err, "Couldn't start sign-in");
     });
   };
   return (

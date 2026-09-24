@@ -218,7 +218,9 @@ function PhotosApp({
           personalSpaceId={personalSpaceId}
           view={view}
           onViewChange={setView}
-          onCreate={createAlbum}
+          onCreate={(name) => {
+            createAlbum(name).catch((err) => reportError(err, "Couldn't create album"));
+          }}
           onDelete={deleteAlbum}
           counts={photoCounts}
         />
