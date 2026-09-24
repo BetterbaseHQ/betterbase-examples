@@ -43,9 +43,12 @@ function mockDb(existing: { alive?: Row[]; tombstoned?: Row[] } = {}) {
       async (def: { name: string }, opts?: { includeDeleted?: boolean }) =>
         pool(def.name, opts) as never,
     ),
+    // Absence returns undefined — the sync TypedAdapter's contract (the
+    // raw OpfsDb returns null). The nullish handling in default-data must
+    // hold for BOTH, so the mock models the stricter one.
     get: vi.fn(
       async (def: { name: string }, id: string, opts?: { includeDeleted?: boolean }) =>
-        (pool(def.name, opts).find((r) => r.id === id) as never) ?? null,
+        (pool(def.name, opts).find((r) => r.id === id) as never) ?? undefined,
     ),
     put: vi.fn(
       async (def: { name: string }, record: Record<string, unknown>, opts: { id: string }) => {

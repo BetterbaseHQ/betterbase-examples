@@ -94,7 +94,7 @@ function LocalBoardApp() {
     if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
       db.get(boards, defaultRecordId(boards), { includeDeleted: true })
-        .then((deleted) => (deleted === null ? defaultData.seed(db, [boards, columns]) : undefined))
+        .then((deleted) => (deleted == null ? defaultData.seed(db, [boards, columns]) : undefined))
         .catch((err) => {
           reportError(err, "Couldn't create board");
           autoCreated.current = false;

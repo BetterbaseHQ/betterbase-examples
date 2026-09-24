@@ -55,8 +55,11 @@ export function useDefaultRecord(
         // deterministic id means the user removed this default on some
         // device — recreating it would resurrect it (and put onto a
         // tombstone is rejected anyway).
+        // Nullish check: the raw OpfsDb returns null for absence, the
+        // sync TypedAdapter returns undefined — either means "not
+        // tombstoned, create the default".
         const deleted = await db.get(collection, id, { includeDeleted: true });
-        if (deleted !== null) return;
+        if (deleted != null) return;
         return create(id);
       })
       .catch((err) => {

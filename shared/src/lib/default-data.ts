@@ -162,8 +162,9 @@ export function defineDefaultData(declaration: DefaultDataDeclaration): DefaultD
       if (!declaredRecord) {
         throw new Error(`defineDefaultData: no declared default ${def.name}/${id}`);
       }
+      // Nullish: adapter get() returns undefined, OpfsDb null.
       const existing = await db.get(def, id, { includeDeleted: true });
-      if (existing !== null) return;
+      if (existing != null) return;
       const { id: _drop, ...payload } = declaredRecord;
       await db.put(def, structuredClone(payload), { id });
     },
@@ -190,9 +191,9 @@ export function defineDefaultData(declaration: DefaultDataDeclaration): DefaultD
           if (!parentDef) continue;
           // Parent must be alive (default alive-only read): a deleted
           // default parent stays deleted, children with it.
-          if ((await db.get(parentDef, parentId)) === null) continue;
+          if ((await db.get(parentDef, parentId)) == null) continue;
           // Child must be absent, tombstones included.
-          if ((await db.get(def, record.id as string, { includeDeleted: true })) !== null) {
+          if ((await db.get(def, record.id as string, { includeDeleted: true })) != null) {
             continue;
           }
           const { id, ...payload } = record;
