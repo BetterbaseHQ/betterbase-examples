@@ -79,7 +79,12 @@ export async function adoptLocalData(options: AdoptLocalDataOptions): Promise<nu
   if (!anonymous) return 0;
 
   const marker = await adoptionMarkerKey(appName, scopeKey);
-  if (localStorage.getItem(marker) !== null) return 0;
+  const state = localStorage.getItem(marker);
+  // "adopted" (pending retirement) blocks a re-run; a retired marker
+  // re-arms adoption — the anonymous database was deleted, so anything in
+  // a re-born one was created after retirement and must merge on the
+  // next login (offline-first holds for every logout/login cycle).
+  if (state !== null && state !== MARKER_RETIRED) return 0;
 
   const adopted = await mergeDatabaseRecords({
     source: anonymous,
