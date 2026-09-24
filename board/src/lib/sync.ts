@@ -69,7 +69,15 @@ export function useBoards() {
       const board = await db.put(boards, { name }, id ? { id } : undefined);
       const defaults = ["To Do", "In Progress", "Done"];
       for (let i = 0; i < defaults.length; i++) {
-        await db.put(columns, { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 });
+        // Derive column ids from a deterministic board id so concurrent
+        // seeds of the default board collapse (one board, three columns —
+        // not six) instead of duplicating.
+        const columnId = id ? `${id}-col-${i + 1}` : undefined;
+        await db.put(
+          columns,
+          { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 },
+          columnId ? { id: columnId } : undefined,
+        );
       }
       return board;
     },

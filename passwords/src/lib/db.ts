@@ -68,19 +68,26 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
   }
   const wasAnonymous = openName === DB_NAME;
   const prev = db;
+  try {
+    if (scopeKey !== null && wasAnonymous) {
+      // Offline-first: the logged-out workspace merges into the first
+      // account opened on this profile (idempotent, one-time per scope).
+      // Runs before the swap commits so a failure keeps the previous
+      // database current (openName unchanged) and a retry re-runs the merge.
+      await adoptLocalData({
+        appName: DB_NAME,
+        scopeKey,
+        anonymous: prev,
+        target: next,
+        collections: [entries],
+      });
+    }
+  } catch (err) {
+    deferredClose(next);
+    throw err;
+  }
   db = next;
   openName = name;
-  if (scopeKey !== null && wasAnonymous) {
-    // Offline-first: the logged-out workspace merges into the first
-    // account opened on this profile (idempotent, one-time per scope).
-    await adoptLocalData({
-      appName: DB_NAME,
-      scopeKey,
-      anonymous: prev,
-      target: next,
-      collections: [entries],
-    });
-  }
   deferredClose(prev);
 }
 

@@ -30,7 +30,7 @@ export async function accountScopeHash(scopeKey: string): Promise<string> {
   const bytes = new TextEncoder().encode(scopeKey);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const view = new Uint8Array(digest);
-  // base36 of the first 8 bytes — 41 bits of entropy, plenty for a local name
+  // base36 of the first 8 bytes — 64 bits of entropy, plenty for a local name
   let value = 0n;
   for (let i = 0; i < 8; i++) value = (value << 8n) | BigInt(view[i]!);
   return value.toString(36);

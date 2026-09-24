@@ -18,7 +18,10 @@
  * the user believes they live in their account. So the flow is two-phase:
  *
  * 1. adoptLocalData — merge records into the account database (at
- *    scope-open time), marker → "adopted".
+ *    scope-open time), marker → "adopted". The marker is written ONLY
+ *    when at least one record merged: an empty anonymous database must
+ *    not mark the scope, or local data created after that login would
+ *    never adopt (the no-marker path is what re-runs the merge).
  * 2. retireLocalData — once sync reaches phase "ready" (the bootstrap
  *    flushAll pushed the adopted records), delete the anonymous database
  *    files entirely, marker → "retired". Between the phases the duplicate

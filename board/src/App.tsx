@@ -34,7 +34,14 @@ export async function createBoardWithColumns(name: string, id?: string) {
   const board = await db.put(boards, { name }, id ? { id } : undefined);
   const defaults = ["To Do", "In Progress", "Done"];
   for (let i = 0; i < defaults.length; i++) {
-    await db.put(columns, { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 });
+    // Deterministic column ids for deterministic boards — concurrent
+    // default seeds collapse instead of duplicating columns.
+    const columnId = id ? `${id}-col-${i + 1}` : undefined;
+    await db.put(
+      columns,
+      { boardId: board.id, name: defaults[i]!, sortOrder: i + 1 },
+      columnId ? { id: columnId } : undefined,
+    );
   }
   return board;
 }

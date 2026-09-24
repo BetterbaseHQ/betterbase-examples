@@ -15,17 +15,34 @@ export interface RetireAnonymousConfig {
 /**
  * Fires retirement once the engine reports ready (the bootstrap flushAll
  * pushed the adopted records — deleting the source is then lossless).
- * No-ops when nothing is pending; failures log and retry on the next
- * login's ready transition.
+ * No-ops when nothing is pending. A failed attempt (e.g. the leader lock
+ * is still held by the displaced database's deferred close) retries once
+ * in-session after a delay, then falls back to the next login's ready
+ * transition. The state machine is idempotent, so overlapping or
+ * repeated attempts are harmless.
  */
-function RetireAnonymousEffect({ config }: { config: RetireAnonymousConfig }) {
+function RetireAnonymousEffect({ appName, scopeKey, deleteAnonymousDb }: RetireAnonymousConfig) {
   const { phase } = useSync();
+
   useEffect(() => {
     if (phase !== "ready") return;
-    retireLocalData(config).catch((err) => {
-      console.error("Failed to retire adopted anonymous database:", err);
-    });
-  }, [phase, config]);
+    const attempt = (isRetry: boolean) => {
+      retireLocalData({ appName, scopeKey, deleteAnonymousDb }).catch((err) => {
+        console.error("Failed to retire adopted anonymous database:", err);
+        if (!isRetry) {
+          // One deliberate in-session retry — e.g. the leader lock
+          // freed right after the failed attempt. Beyond that, the
+          // next login's ready transition retries.
+          setTimeout(() => attempt(true), 30_000);
+        }
+      });
+    };
+    attempt(false);
+    // Primitives only — a config object identity would re-fire this on
+    // every App render while phase === "ready".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, appName, scopeKey, deleteAnonymousDb]);
+
   return null;
 }
 
@@ -56,7 +73,7 @@ export function SyncedAppGate({
   }
   return (
     <>
-      {retireAnonymous && <RetireAnonymousEffect config={retireAnonymous} />}
+      {retireAnonymous && <RetireAnonymousEffect {...retireAnonymous} />}
       {children}
     </>
   );

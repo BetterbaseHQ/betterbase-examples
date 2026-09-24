@@ -1,4 +1,5 @@
 import { createDatabase, deleteDatabase, type CollectionRead } from "betterbase/db";
+import { deleteFileCacheDatabase } from "betterbase/sync";
 import { accountDbName, adoptLocalData } from "@betterbase/examples-shared";
 import { albums, photos } from "./collections.js";
 
@@ -69,19 +70,26 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
   }
   const wasAnonymous = openName === DB_NAME;
   const prev = db;
+  try {
+    if (scopeKey !== null && wasAnonymous) {
+      // Offline-first: the logged-out workspace merges into the first
+      // account opened on this profile (idempotent, one-time per scope).
+      // Runs before the swap commits so a failure keeps the previous
+      // database current (openName unchanged) and a retry re-runs the merge.
+      await adoptLocalData({
+        appName: DB_NAME,
+        scopeKey,
+        anonymous: prev,
+        target: next,
+        collections: [albums, photos],
+      });
+    }
+  } catch (err) {
+    deferredClose(next);
+    throw err;
+  }
   db = next;
   openName = name;
-  if (scopeKey !== null && wasAnonymous) {
-    // Offline-first: the logged-out workspace merges into the first
-    // account opened on this profile (idempotent, one-time per scope).
-    await adoptLocalData({
-      appName: DB_NAME,
-      scopeKey,
-      anonymous: prev,
-      target: next,
-      collections: [albums, photos],
-    });
-  }
   deferredClose(prev);
 }
 
@@ -99,14 +107,17 @@ function deferredClose(displaced: AppDb): void {
 }
 
 /**
- * Delete the anonymous (logged-out) database files. Used to retire the
- * namespace after its records were adopted into an account and synced —
- * the records' only home is the account database from then on.
+ * Delete the anonymous (logged-out) workspace: record database files AND
+ * the default-name blob cache (photos created while logged out are
+ * cached plaintext — they must not linger on disk after adoption moved
+ * the records into the account). Scoped (per-account) blob caches are
+ * named databases and are untouched.
  */
-export function deleteAnonymousDatabase(): Promise<void> {
-  return deleteDatabase(DB_NAME, {
+export async function deleteAnonymousDatabase(): Promise<void> {
+  await deleteDatabase(DB_NAME, {
     worker: new Worker(new URL("./db-worker.ts", import.meta.url), {
       type: "module",
     }),
   });
+  await deleteFileCacheDatabase();
 }

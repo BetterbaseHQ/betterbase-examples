@@ -17,6 +17,7 @@ export type { UploadQueueStatusProps } from "./layout/UploadQueueStatus.js";
 export { ItemsSidebar } from "./layout/ItemsSidebar.js";
 export type { ItemsSidebarItem } from "./layout/ItemsSidebar.js";
 export { SyncedAppGate } from "./layout/SyncedAppGate.js";
+export type { RetireAnonymousConfig } from "./layout/SyncedAppGate.js";
 export { DbScopeGate } from "./layout/DbScopeGate.js";
 
 // Components
@@ -46,8 +47,8 @@ export { useDefaultRecord, defaultRecordId } from "./lib/use-default-record.js";
 export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-db.js";
 export type { AccountScopeSource } from "./lib/account-db.js";
 export { useDbScope } from "./lib/use-account-db.js";
-export { adoptLocalData } from "./lib/adopt-local-data.js";
-export type { AdoptLocalDataOptions } from "./lib/adopt-local-data.js";
+export { adoptLocalData, retireLocalData } from "./lib/adopt-local-data.js";
+export type { AdoptLocalDataOptions, RetireLocalDataOptions } from "./lib/adopt-local-data.js";
 
 // Runtime configuration (deployed examples container / dev fallbacks)
 export {

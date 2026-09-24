@@ -82,6 +82,11 @@ export function appAuthConfig(appId: string): {
  * localStorage session slot, so each app would silently reuse whichever
  * app's OAuth grant was stored last (wrong client, wrong personal space,
  * refresh rejected with a client_id mismatch).
+ *
+ * Note for deployments predating per-app prefixes: sessions persisted
+ * under the old default `betterbase_session_` slot are not migrated —
+ * users re-consent once per app. The stale slot is left in place
+ * (example-stage trade-off).
  */
 export function appStoragePrefix(appId: string): string {
   return `betterbase_session_${appId}_`;
