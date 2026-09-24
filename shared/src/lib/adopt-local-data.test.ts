@@ -46,7 +46,7 @@ describe("adoptLocalData", () => {
       target: target as never,
       collections: [def],
     });
-    expect(adopted).toBe(1);
+    expect(adopted.merged).toBe(1);
     expect(target.bulkPut).toHaveBeenCalled();
     expect(localStorage.getItem(await markerKey())).not.toBeNull();
   });
@@ -61,7 +61,7 @@ describe("adoptLocalData", () => {
       target: target as never,
       collections: [def],
     });
-    expect(adopted).toBe(0);
+    expect(adopted.merged).toBe(0);
     // The critical property: no marker means a later login (after the
     // user creates local data) still runs the merge.
     expect(Object.keys(localStorage).filter((k) => k.startsWith("bb_local_adopted"))).toEqual([]);
@@ -85,7 +85,7 @@ describe("adoptLocalData", () => {
       target: target as never,
       collections: [def],
     });
-    expect(again).toBe(0);
+    expect(again.merged).toBe(0);
     expect(anon.getAll).not.toHaveBeenCalled();
   });
 
@@ -102,8 +102,30 @@ describe("adoptLocalData", () => {
       target: target as never,
       collections: [def],
     });
-    expect(adopted).toBe(1);
+    expect(adopted.merged).toBe(1);
     expect(localStorage.getItem(key)).toBe("adopted");
+  });
+
+  it("a pristine-only anonymous workspace adopts nothing and writes no marker", async () => {
+    const anon = fakeDb([{ id: "default_lists", name: "My Tasks", color: "indigo", todos: [] }]);
+    const target = fakeDb();
+    const adopted = await adoptLocalData({
+      appName: "tasks",
+      scopeKey: "scope-1",
+      anonymous: anon as never,
+      target: target as never,
+      collections: [def],
+      skipRecord: (_def, record) => record.id === "default_lists",
+    });
+    expect(adopted).toEqual({
+      merged: 0,
+      skippedPristine: 1,
+      skippedTombstoned: 0,
+    });
+    expect(target.bulkPut).not.toHaveBeenCalled();
+    // No marker: the anonymous db is the logged-out workspace and the
+    // next login must still adopt anything real created later.
+    expect(Object.keys(localStorage).filter((k) => k.startsWith("bb_local_adopted"))).toEqual([]);
   });
 });
 

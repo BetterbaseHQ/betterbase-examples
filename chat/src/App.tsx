@@ -1,19 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { MessageCircle } from "lucide-react";
 import { Box, Button } from "@mantine/core";
-import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
-import { DatabaseProvider } from "betterbase/db/react";
+import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import {
-  LessAppShell,
-  SyncedAppGate,
-  useAuth,
   EmptyState,
   InvitationBanner,
+  LessAppShell,
+  ScopedAppTree,
   reportError,
-  accountScopeKey,
-  useDbScope,
-  DbScopeGate,
-  runtimeDomain,
+  useAuth,
 } from "@betterbase/examples-shared";
 import {
   db,
@@ -205,44 +200,19 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const { isAuthenticated, session, clientId, logout } = useAuth();
-  const {
-    ready: dbReady,
-    key: dbScopeKey,
-    error: dbError,
-  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
-  // Signed-out early return: sits above the DatabaseProvider on purpose
-  // (chat has no logged-out mode). SignInGate must not consume Database
-  // context — there is no provider on this path.
-  if (!isAuthenticated || !session) return <SignInGate />;
-
+  // Signed-out renders the sign-in gate (no Database context consumed —
+  // see SignInGate).
   return (
-    <DatabaseProvider value={db}>
-      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-        <BetterbaseProvider
-          adapter={db}
-          collections={[conversations, messages]}
-          editChainCollections={[messages.name]}
-          session={session}
-          clientId={clientId}
-          domain={runtimeDomain()}
-          onAuthError={logout}
-        >
-          <SyncedAppGate
-            retireAnonymous={
-              session
-                ? {
-                    appName: DB_NAME,
-                    scopeKey: accountScopeKey(session),
-                    deleteAnonymousDb: deleteAnonymousDatabase,
-                  }
-                : undefined
-            }
-          >
-            <ChatApp personalSpaceId={session.getPersonalSpaceId()} />
-          </SyncedAppGate>
-        </BetterbaseProvider>
-      </DbScopeGate>
-    </DatabaseProvider>
+    <ScopedAppTree
+      appName={DB_NAME}
+      collections={[conversations, messages]}
+      editChainCollections={[messages.name]}
+      openDatabaseForScope={openDatabaseForScope}
+      deleteAnonymousDatabase={deleteAnonymousDatabase}
+      getDb={() => db}
+      local={<SignInGate />}
+    >
+      {(session) => <ChatApp personalSpaceId={session.getPersonalSpaceId()} />}
+    </ScopedAppTree>
   );
 }

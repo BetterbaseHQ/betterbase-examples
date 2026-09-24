@@ -19,6 +19,8 @@ export type { ItemsSidebarItem } from "./layout/ItemsSidebar.js";
 export { SyncedAppGate } from "./layout/SyncedAppGate.js";
 export type { RetireAnonymousConfig } from "./layout/SyncedAppGate.js";
 export { DbScopeGate } from "./layout/DbScopeGate.js";
+export { ScopedAppTree } from "./layout/ScopedAppTree.js";
+export type { ScopedAppTreeProps } from "./layout/ScopedAppTree.js";
 
 // Components
 export { EmptyState } from "./components/EmptyState.js";
@@ -49,6 +51,8 @@ export type { AccountScopeSource } from "./lib/account-db.js";
 export { useDbScope } from "./lib/use-account-db.js";
 export { adoptLocalData, retireLocalData, adoptionMarkerKey } from "./lib/adopt-local-data.js";
 export type { AdoptLocalDataOptions, RetireLocalDataOptions } from "./lib/adopt-local-data.js";
+export { defineDefaultData } from "./lib/default-data.js";
+export type { DefaultData, DefaultDataDeclaration } from "./lib/default-data.js";
 
 // Runtime configuration (deployed examples container / dev fallbacks)
 export {

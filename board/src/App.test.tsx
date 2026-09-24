@@ -148,7 +148,7 @@ describe("Board local cascade deletes", () => {
     await openDatabaseForScope(null);
     renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
 
-    await createBoardWithColumns("Column Cascade Board", uniqueBoardId("col"));
+    const cascadeBoard = await createBoardWithColumns("Column Cascade Board", uniqueBoardId("col"));
     await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
 
     // Add a card to the first column.
@@ -173,7 +173,13 @@ describe("Board local cascade deletes", () => {
 
     await waitFor(
       async () => {
-        expect((await db.query(columns, {})).records).toHaveLength(2);
+        // Scoped to this board: a default-seed write racing an earlier
+        // suite's wipe can leave orphan default columns behind — the
+        // cascade property is that THIS board's columns go with the delete.
+        const remaining = (await db.query(columns, {})).records.filter(
+          (c) => c.boardId === cascadeBoard.id,
+        );
+        expect(remaining).toHaveLength(2);
         expect((await db.query(cards, {})).records).toHaveLength(0);
       },
       { timeout: 8000 },

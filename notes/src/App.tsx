@@ -1,16 +1,12 @@
 import { useMemo } from "react";
-import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
-import { useQuery, DatabaseProvider } from "betterbase/db/react";
+import { useQuery } from "betterbase/db/react";
 import {
-  useAuth,
-  SyncedAppGate,
   InvitationBanner,
+  ScopedAppTree,
   reportError,
-  accountScopeKey,
-  useDbScope,
-  DbScopeGate,
-  runtimeDomain,
+  useAuth,
   useDefaultRecord,
 } from "@betterbase/examples-shared";
 import {
@@ -22,6 +18,7 @@ import {
   DB_NAME,
 } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
+import { defaultData } from "@/lib/defaults";
 import { NotesWorkspace, type NotesApi } from "@/components/NotesWorkspace";
 
 // ---------------------------------------------------------------------------
@@ -100,7 +97,7 @@ function NotesApp() {
   useDefaultRecord(
     phase === "ready",
     notebooks,
-    (id) => createNotebook("My Notebook", id),
+    (id) => defaultData.seedRecord(db, notebooks, id),
     "Couldn't create default notebook",
   );
 
@@ -154,42 +151,16 @@ function NotesApp() {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const { isAuthenticated, session, clientId, logout } = useAuth();
-  const {
-    ready: dbReady,
-    key: dbScopeKey,
-    error: dbError,
-  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   return (
-    <DatabaseProvider value={db}>
-      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-        {isAuthenticated && session ? (
-          <BetterbaseProvider
-            adapter={db}
-            collections={[notebooks, notes]}
-            session={session}
-            clientId={clientId}
-            domain={runtimeDomain()}
-            onAuthError={logout}
-          >
-            <SyncedAppGate
-              retireAnonymous={
-                session
-                  ? {
-                      appName: DB_NAME,
-                      scopeKey: accountScopeKey(session),
-                      deleteAnonymousDb: deleteAnonymousDatabase,
-                    }
-                  : undefined
-              }
-            >
-              <NotesApp />
-            </SyncedAppGate>
-          </BetterbaseProvider>
-        ) : (
-          <LocalNotesApp />
-        )}
-      </DbScopeGate>
-    </DatabaseProvider>
+    <ScopedAppTree
+      appName={DB_NAME}
+      collections={[notebooks, notes]}
+      openDatabaseForScope={openDatabaseForScope}
+      deleteAnonymousDatabase={deleteAnonymousDatabase}
+      getDb={() => db}
+      local={<LocalNotesApp />}
+    >
+      {() => <NotesApp />}
+    </ScopedAppTree>
   );
 }

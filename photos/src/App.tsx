@@ -1,25 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Image } from "lucide-react";
-import {
-  BetterbaseProvider,
-  FileStoreProvider,
-  useConnectionStatus,
-  useFileUploadQueue,
-  useSync,
-} from "betterbase/sync/react";
+import { useConnectionStatus, useFileUploadQueue, useSync } from "betterbase/sync/react";
 import { FileStore } from "betterbase/sync";
-import { useQuery, DatabaseProvider } from "betterbase/db/react";
+import { useQuery } from "betterbase/db/react";
 import {
-  LessAppShell,
-  useAuth,
   InvitationBanner,
-  SyncedAppGate,
+  LessAppShell,
+  ScopedAppTree,
   effectiveSyncStatus,
   reportError,
-  accountScopeKey,
-  useDbScope,
-  DbScopeGate,
-  runtimeDomain,
+  useAuth,
 } from "@betterbase/examples-shared";
 import {
   db,
@@ -274,91 +264,24 @@ function PhotosApp({
 // App — wraps PhotosApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
-/**
- * File-bytes isolation (AUD-045): the FileStore is created INSIDE the
- * scope-keyed subtree, so each account gets its own cache database
- * (`photos_<hash>`, derived from the same scope suffix as the record db)
- * and the anonymous namespace keeps the default shared cache. Created
- * after `openDatabaseForScope` resolved, `currentScopeDbName()` is
- * synchronous here. Disposed on unmount (scope switch) — otherwise account
- * A's cached plaintext blobs, and A's pending queue entries, would be
- * adopted by account B's store via the cross-space migration on connect.
- */
-function ScopedPhotoStores({
-  isAuthenticated,
-  session,
-  clientId,
-  logout,
-  children,
-}: {
-  isAuthenticated: boolean;
-  session: ReturnType<typeof useAuth>["session"];
-  clientId: string;
-  logout: () => void;
-  children: (fileStore: FileStore) => ReactNode;
-}) {
-  const [fileStore] = useState(() => {
-    const scoped = currentScopeDbName();
-    return scoped ? new FileStore({ dbName: scoped }) : new FileStore();
-  });
-  useEffect(() => () => fileStore.dispose(), [fileStore]);
-
-  if (isAuthenticated && session) {
-    return (
-      <BetterbaseProvider
-        adapter={db}
-        collections={[albums, photos]}
-        session={session}
-        clientId={clientId}
-        domain={runtimeDomain()}
-        onAuthError={logout}
-        fileStore={fileStore}
-      >
-        <SyncedAppGate
-          retireAnonymous={
-            session
-              ? {
-                  appName: DB_NAME,
-                  scopeKey: accountScopeKey(session),
-                  deleteAnonymousDb: deleteAnonymousDatabase,
-                }
-              : undefined
-          }
-        >
-          {children(fileStore)}
-        </SyncedAppGate>
-      </BetterbaseProvider>
-    );
-  }
-  return <FileStoreProvider fileStore={fileStore}>{children(fileStore)}</FileStoreProvider>;
-}
-
 export default function App() {
-  const { isAuthenticated, session, clientId, logout } = useAuth();
-  const {
-    ready: dbReady,
-    key: dbScopeKey,
-    error: dbError,
-  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
-
   return (
-    <DatabaseProvider value={db}>
-      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-        <ScopedPhotoStores
-          isAuthenticated={isAuthenticated}
-          session={session}
-          clientId={clientId}
-          logout={logout}
-        >
-          {(fileStore) =>
-            isAuthenticated && session ? (
-              <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
-            ) : (
-              <LocalPhotosApp fileStore={fileStore} />
-            )
-          }
-        </ScopedPhotoStores>
-      </DbScopeGate>
-    </DatabaseProvider>
+    <ScopedAppTree
+      appName={DB_NAME}
+      collections={[albums, photos]}
+      openDatabaseForScope={openDatabaseForScope}
+      deleteAnonymousDatabase={deleteAnonymousDatabase}
+      getDb={() => db}
+      createFileStore={(scopeDbName) =>
+        scopeDbName ? new FileStore({ dbName: scopeDbName }) : new FileStore()
+      }
+      getCurrentScopeDbName={currentScopeDbName}
+      local={(fileStore) => <LocalPhotosApp fileStore={fileStore} />}
+    >
+      {(session, fileStore) => (
+        // createFileStore is configured, so the scoped store exists.
+        <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore!} />
+      )}
+    </ScopedAppTree>
   );
 }

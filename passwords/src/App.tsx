@@ -1,15 +1,7 @@
 import { useMemo } from "react";
-import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
-import { useQuery, DatabaseProvider } from "betterbase/db/react";
-import {
-  useAuth,
-  InvitationBanner,
-  SyncedAppGate,
-  accountScopeKey,
-  useDbScope,
-  DbScopeGate,
-  runtimeDomain,
-} from "@betterbase/examples-shared";
+import { useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useQuery } from "betterbase/db/react";
+import { InvitationBanner, ScopedAppTree, useAuth } from "@betterbase/examples-shared";
 import { db, entries, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
 import { useEntries } from "@/lib/sync";
 import { EntriesScreen, type EntriesApi } from "@/components/EntriesScreen";
@@ -112,42 +104,16 @@ function PasswordsApp() {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const { isAuthenticated, session, clientId, logout } = useAuth();
-  const {
-    ready: dbReady,
-    key: dbScopeKey,
-    error: dbError,
-  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   return (
-    <DatabaseProvider value={db}>
-      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-        {isAuthenticated && session ? (
-          <BetterbaseProvider
-            adapter={db}
-            collections={[entries]}
-            session={session}
-            clientId={clientId}
-            domain={runtimeDomain()}
-            onAuthError={logout}
-          >
-            <SyncedAppGate
-              retireAnonymous={
-                session
-                  ? {
-                      appName: DB_NAME,
-                      scopeKey: accountScopeKey(session),
-                      deleteAnonymousDb: deleteAnonymousDatabase,
-                    }
-                  : undefined
-              }
-            >
-              <PasswordsApp />
-            </SyncedAppGate>
-          </BetterbaseProvider>
-        ) : (
-          <LocalPasswordsApp />
-        )}
-      </DbScopeGate>
-    </DatabaseProvider>
+    <ScopedAppTree
+      appName={DB_NAME}
+      collections={[entries]}
+      openDatabaseForScope={openDatabaseForScope}
+      deleteAnonymousDatabase={deleteAnonymousDatabase}
+      getDb={() => db}
+      local={<LocalPasswordsApp />}
+    >
+      {() => <PasswordsApp />}
+    </ScopedAppTree>
   );
 }

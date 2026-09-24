@@ -1,29 +1,22 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
-import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
-import { useQuery, DatabaseProvider } from "betterbase/db/react";
+import { useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
-  SyncedAppGate,
   useAuth,
   EmptyState,
   InvitationBanner,
   reportError,
-  accountScopeKey,
-  useDbScope,
-  DbScopeGate,
-  runtimeDomain,
   useDefaultRecord,
-  defaultRecordId,
+  ScopedAppTree,
 } from "@betterbase/examples-shared";
 import { db, lists, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
+import { defaultData } from "@/lib/defaults";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
 import { TasksSidebar } from "@/components/TasksSidebar";
 import { TaskList } from "@/components/TaskList";
-
-// Local path writes go straight to the module db (no sync adapter).
-const localTodoOps = createTodoOps(db);
 
 // ---------------------------------------------------------------------------
 // LocalTasksApp — offline-first, no sharing (unauthenticated path)
@@ -34,26 +27,24 @@ function LocalTasksApp() {
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const autoCreated = useRef(false);
 
+  // Per mount, not module level: the component lives inside the
+  // scope-keyed subtree, so this always captures the CURRENT database
+  // (the module binding swaps on scope changes — a module-level capture
+  // would write into a closed instance after a login/logout cycle).
+  const localTodoOps = useMemo(() => createTodoOps(db), []);
+
   const result = useQuery(lists, { sort: [{ field: "createdAt", direction: "asc" }] });
   const allLists = result?.records ?? [];
 
   useEffect(() => {
     if (result && result.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      const id = defaultRecordId(lists);
-      // A tombstone under the default id means the user deleted the
-      // default list — don't recreate it (put onto a tombstone is
-      // rejected anyway).
-      db.get(lists, id, { includeDeleted: true })
-        .then((deleted) =>
-          deleted === null
-            ? db.put(lists, { name: "My Tasks", color: "indigo", todos: [] }, { id })
-            : undefined,
-        )
-        .catch((err) => {
-          reportError(err, "Couldn't create default list");
-          autoCreated.current = false;
-        });
+      // Declared defaults (lib/defaults.ts): seed() skips ids already
+      // present, tombstones included — a deleted default stays deleted.
+      defaultData.seed(db, [lists]).catch((err) => {
+        reportError(err, "Couldn't create default list");
+        autoCreated.current = false;
+      });
     }
   }, [result]);
 
@@ -146,7 +137,7 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   useDefaultRecord(
     phase === "ready",
     lists,
-    (id) => createList("My Tasks", "indigo", id),
+    (id) => defaultData.seedRecord(db, lists, id),
     "Couldn't create default list",
   );
 
@@ -229,42 +220,16 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const { isAuthenticated, session, clientId, logout } = useAuth();
-  const {
-    ready: dbReady,
-    key: dbScopeKey,
-    error: dbError,
-  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   return (
-    <DatabaseProvider value={db}>
-      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-        {isAuthenticated && session ? (
-          <BetterbaseProvider
-            adapter={db}
-            collections={[lists]}
-            session={session}
-            clientId={clientId}
-            domain={runtimeDomain()}
-            onAuthError={logout}
-          >
-            <SyncedAppGate
-              retireAnonymous={
-                session
-                  ? {
-                      appName: DB_NAME,
-                      scopeKey: accountScopeKey(session),
-                      deleteAnonymousDb: deleteAnonymousDatabase,
-                    }
-                  : undefined
-              }
-            >
-              <TasksApp personalSpaceId={session.getPersonalSpaceId()} />
-            </SyncedAppGate>
-          </BetterbaseProvider>
-        ) : (
-          <LocalTasksApp />
-        )}
-      </DbScopeGate>
-    </DatabaseProvider>
+    <ScopedAppTree
+      appName={DB_NAME}
+      collections={[lists]}
+      openDatabaseForScope={openDatabaseForScope}
+      deleteAnonymousDatabase={deleteAnonymousDatabase}
+      getDb={() => db}
+      local={<LocalTasksApp />}
+    >
+      {(session) => <TasksApp personalSpaceId={session.getPersonalSpaceId()} />}
+    </ScopedAppTree>
   );
 }

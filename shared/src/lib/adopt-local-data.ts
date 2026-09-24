@@ -46,6 +46,7 @@
 import { mergeDatabaseRecords } from "betterbase/db";
 import type { CollectionDefHandle } from "betterbase/db";
 import type { Database } from "betterbase/db";
+import type { MergeDatabaseRecordsOptions, MergeDatabaseRecordsResult } from "betterbase/db";
 import { accountScopeHash } from "./account-db.js";
 
 /** Marker value once the anonymous database files have been deleted. */
@@ -71,20 +72,36 @@ export interface AdoptLocalDataOptions {
   target: Database;
   /** Collections whose records should be adopted. */
   collections: ReadonlyArray<CollectionDefHandle>;
+  /**
+   * Declared-default filter (`mergeDatabaseRecords`'s `skipRecord`):
+   * pristine default/sample records are phantom data and never adopt.
+   * Apps pass their `defineDefaultData(...).isPristine`.
+   */
+  skipRecord?: MergeDatabaseRecordsOptions["skipRecord"];
 }
 
 /**
  * Merge all records of `collections` from the anonymous database into the
- * account database. Returns the number of records adopted (0 when there
- * is nothing to do or this scope already adopted).
+ * account database. Returns the merge breakdown (`.merged` is 0 when
+ * there is nothing to adopt or this scope already adopted).
  *
- * Throws on bulk errors — callers run this before marking the scope ready,
- * so a failed adoption surfaces as a scope-open error rather than a
- * silently empty app.
+ * A pristine-only anonymous workspace (a first visit that only seeded
+ * defaults) adopts nothing and marks nothing — the correct end state is
+ * "no user data", and the unmarked marker keeps the next login's
+ * adoption armed for data created after this one (the anonymous db is
+ * also the logged-out workspace, so it is deliberately NOT deleted).
+ *
+ * Throws on bulk errors — callers run this before marking the scope
+ * ready, so a failed adoption surfaces as a scope-open error rather
+ * than a silently empty app.
  */
-export async function adoptLocalData(options: AdoptLocalDataOptions): Promise<number> {
-  const { appName, scopeKey, anonymous, target, collections } = options;
-  if (!anonymous) return 0;
+export async function adoptLocalData(
+  options: AdoptLocalDataOptions,
+): Promise<MergeDatabaseRecordsResult> {
+  const { appName, scopeKey, anonymous, target, collections, skipRecord } = options;
+  if (!anonymous) {
+    return { merged: 0, skippedPristine: 0, skippedTombstoned: 0 };
+  }
 
   const marker = await adoptionMarkerKey(appName, scopeKey);
   const state = localStorage.getItem(marker);
@@ -92,18 +109,21 @@ export async function adoptLocalData(options: AdoptLocalDataOptions): Promise<nu
   // re-arms adoption — the anonymous database was deleted, so anything in
   // a re-born one was created after retirement and must merge on the
   // next login (offline-first holds for every logout/login cycle).
-  if (state !== null && state !== MARKER_RETIRED) return 0;
+  if (state !== null && state !== MARKER_RETIRED) {
+    return { merged: 0, skippedPristine: 0, skippedTombstoned: 0 };
+  }
 
-  const adopted = await mergeDatabaseRecords({
+  const result = await mergeDatabaseRecords({
     source: anonymous,
     target,
     collections,
+    skipRecord,
   });
 
-  if (adopted > 0) {
+  if (result.merged > 0) {
     localStorage.setItem(marker, "adopted");
   }
-  return adopted;
+  return result;
 }
 
 export interface RetireLocalDataOptions {

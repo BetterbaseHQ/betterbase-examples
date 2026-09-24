@@ -1,21 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Kanban } from "lucide-react";
-import { BetterbaseProvider, useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
-import { useQuery, DatabaseProvider } from "betterbase/db/react";
+import { useQuery } from "betterbase/db/react";
 import {
-  LessAppShell,
-  SyncedAppGate,
-  useAuth,
   EmptyState,
   InvitationBanner,
-  reportError,
-  accountScopeKey,
-  useDbScope,
-  DbScopeGate,
-  runtimeDomain,
-  useDefaultRecord,
+  LessAppShell,
+  ScopedAppTree,
   defaultRecordId,
+  reportError,
+  useAuth,
+  useDefaultRecord,
 } from "@betterbase/examples-shared";
 import {
   db,
@@ -27,6 +23,7 @@ import {
   DB_NAME,
 } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
+import { defaultData } from "@/lib/defaults";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
@@ -89,19 +86,15 @@ function LocalBoardApp() {
     }
   }, [allBoards, selectedBoardId]);
 
-  // Auto-create a default board on first run (parity with the synced path)
+  // Auto-create a default board on first run (parity with the synced path).
+  // Declared defaults (lib/defaults.ts), gated on the BOARD's tombstone:
+  // a deleted default board must stay deleted — columns included, or
+  // they would seed as orphans under a board that no longer exists.
   useEffect(() => {
     if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
       autoCreated.current = true;
-      // A tombstone under the default id means the user deleted the
-      // default board — don't recreate it. AUD-053: release the guard on
-      // failure so retry isn't blocked.
       db.get(boards, defaultRecordId(boards), { includeDeleted: true })
-        .then((deleted) =>
-          deleted === null
-            ? createBoardWithColumns("My Board", defaultRecordId(boards))
-            : undefined,
-        )
+        .then((deleted) => (deleted === null ? defaultData.seed(db, [boards, columns]) : undefined))
         .catch((err) => {
           reportError(err, "Couldn't create board");
           autoCreated.current = false;
@@ -241,7 +234,9 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   useDefaultRecord(
     phase === "ready",
     boards,
-    (id) => createBoard("My Board", id),
+    // Board + its columns come from one declaration; seed() is idempotent
+    // and respects tombstones for each declared id.
+    () => defaultData.seed(db, [boards, columns]),
     "Couldn't create default board",
   );
 
@@ -371,42 +366,16 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const { isAuthenticated, session, clientId, logout } = useAuth();
-  const {
-    ready: dbReady,
-    key: dbScopeKey,
-    error: dbError,
-  } = useDbScope(openDatabaseForScope, session ? accountScopeKey(session) : null);
   return (
-    <DatabaseProvider value={db}>
-      <DbScopeGate key={dbScopeKey} ready={dbReady} error={dbError}>
-        {isAuthenticated && session ? (
-          <BetterbaseProvider
-            adapter={db}
-            collections={[boards, columns, cards]}
-            session={session}
-            clientId={clientId}
-            domain={runtimeDomain()}
-            onAuthError={logout}
-          >
-            <SyncedAppGate
-              retireAnonymous={
-                session
-                  ? {
-                      appName: DB_NAME,
-                      scopeKey: accountScopeKey(session),
-                      deleteAnonymousDb: deleteAnonymousDatabase,
-                    }
-                  : undefined
-              }
-            >
-              <BoardApp personalSpaceId={session.getPersonalSpaceId()} />
-            </SyncedAppGate>
-          </BetterbaseProvider>
-        ) : (
-          <LocalBoardApp />
-        )}
-      </DbScopeGate>
-    </DatabaseProvider>
+    <ScopedAppTree
+      appName={DB_NAME}
+      collections={[boards, columns, cards]}
+      openDatabaseForScope={openDatabaseForScope}
+      deleteAnonymousDatabase={deleteAnonymousDatabase}
+      getDb={() => db}
+      local={<LocalBoardApp />}
+    >
+      {(session) => <BoardApp personalSpaceId={session.getPersonalSpaceId()} />}
+    </ScopedAppTree>
   );
 }

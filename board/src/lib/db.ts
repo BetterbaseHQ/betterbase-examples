@@ -1,6 +1,7 @@
 import { createDatabase, deleteDatabase, type CollectionRead } from "betterbase/db";
 import { accountDbName, adoptLocalData } from "@betterbase/examples-shared";
 import { boards, columns, cards } from "./collections.js";
+import { defaultData } from "./defaults.js";
 
 export { boards, columns, cards } from "./collections.js";
 
@@ -82,6 +83,7 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
         anonymous: prev,
         target: next,
         collections: [boards, columns, cards],
+        skipRecord: defaultData.isPristine,
       });
     }
   } catch (err) {
