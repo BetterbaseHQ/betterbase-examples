@@ -12,7 +12,7 @@ import type { RetireAnonymousConfig } from "./SyncedAppGate.js";
 /** What `useAuth` reports for a signed-in session (opaque shared type). */
 type AuthSession = NonNullable<ReturnType<typeof useAuth>["session"]>;
 
-export interface ScopedAppTreeProps {
+interface ScopedAppTreeBaseProps {
   /** Bare app/database name — the anonymous namespace and marker namespace. */
   appName: string;
   /** Collections this app syncs (also passed to BetterbaseProvider). */
@@ -29,12 +29,11 @@ export interface ScopedAppTreeProps {
   /** Reads the app's live `db` module binding — called at render time. */
   getDb: () => Database;
   /**
-   * Signed-out tree (the app's local/unauthenticated UI): a node, or a
-   * function of the FileStore when `createFileStore` is configured
-   * (photos' local path writes through the shared default cache).
-   * Omit for no signed-out UI (chat's sign-in gate).
+   * Signed-out tree (the app's local/unauthenticated UI). Omit for no
+   * signed-out UI (chat's sign-in gate). The WithStores variant widens
+   * this to also accept a function of the scoped FileStore.
    */
-  local?: ReactNode | ((fileStore: FileStore) => ReactNode);
+  local?: ReactNode;
   /**
    * Signed-in tree, rendered inside BetterbaseProvider + SyncedAppGate
    * (which also fires anonymous-database retirement after first sync).
@@ -44,18 +43,29 @@ export interface ScopedAppTreeProps {
   children: (session: AuthSession, fileStore: FileStore | null) => ReactNode;
   /** Collections using edit chains (chat's messages). */
   editChainCollections?: string[];
-  /**
-   * Photos' file-bytes isolation (AUD-045): when present, a FileStore is
-   * created inside the scope-keyed subtree — the app's scope-suffix
-   * getter (`currentScopeDbName`) is read post-open so account caches
-   * get their own database — disposed on scope switch, passed to
-   * BetterbaseProvider and to `children`; the signed-out tree is
-   * wrapped in a FileStoreProvider with the shared default store.
-   */
-  createFileStore?: (scopeDbName: string | null) => FileStore;
   /** Synchronous scope-suffix getter (photos' `currentScopeDbName`). */
   getCurrentScopeDbName?: () => string | null;
 }
+
+/**
+ * FileStore-configured variant (photos): the store is created inside
+ * the scope-keyed subtree — the scope-suffix getter is read post-open
+ * so account caches get their own database — disposed on scope switch,
+ * passed to BetterbaseProvider and `children`; the signed-out tree is
+ * wrapped in a FileStoreProvider and may take the (non-null) store.
+ */
+export interface ScopedAppTreeWithStoresProps extends Omit<ScopedAppTreeBaseProps, "local"> {
+  createFileStore: (scopeDbName: string | null) => FileStore;
+  /** Signed-out tree: a node, or a function of the scoped FileStore. */
+  local?: ReactNode | ((fileStore: FileStore) => ReactNode);
+}
+
+/** Without a FileStore there is nothing to pass a function-form `local`. */
+export interface ScopedAppTreePlainProps extends ScopedAppTreeBaseProps {
+  createFileStore?: undefined;
+}
+
+export type ScopedAppTreeProps = ScopedAppTreeWithStoresProps | ScopedAppTreePlainProps;
 
 /**
  * The provider wiring every example app repeats — one component instead
@@ -67,10 +77,12 @@ export interface ScopedAppTreeProps {
  * ready gate + anonymous-db retirement after the bootstrap sync) → app
  * UI; signed-out renders `local` instead.
  *
- * The DatabaseProvider pin lives INSIDE the scope-keyed subtree (not in
- * main.tsx): pinning at bootstrap captures the post-callback anonymous
- * database, which the login swap later closes and retires — logged-out
- * consumers then query a terminated worker (issue #4).
+ * The provider's value is re-read from the live `db` binding on every
+ * render via `getDb()` (not pinned once, as main.tsx once did — issue
+ * #4: a bootstrap pin captures the post-callback anonymous database,
+ * which the login swap later closes and retires, leaving logged-out
+ * consumers querying a terminated worker). It sits above the gate so
+ * signed-out trees can consume Database context too.
  */
 export function ScopedAppTree({
   appName,

@@ -119,8 +119,9 @@ describe("adoptLocalData", () => {
     });
     expect(adopted).toEqual({
       merged: 0,
-      skippedPristine: 1,
+      skipped: 1,
       skippedTombstoned: 0,
+      skippedConflict: 0,
     });
     expect(target.bulkPut).not.toHaveBeenCalled();
     // No marker: the anonymous db is the logged-out workspace and the

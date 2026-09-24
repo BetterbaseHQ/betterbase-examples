@@ -32,6 +32,11 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // Wipe both scopes: an authenticated render leaves `db` on the account
+  // database, and the anonymous one carries over between tests — an
+  // unwiped anonymous record would merge into the next test's account.
+  await wipeCollections(db, [lists]);
+  await openDatabaseForScope(null);
   await wipeCollections(db, [lists]);
 });
 
@@ -85,7 +90,10 @@ describe("Tasks adoption cycles (declared defaults)", () => {
     // Real data merged → marker armed for retirement, and the record
     // lives in the account database. The default list appears exactly
     // once: the pristine anonymous seed did not adopt (deterministic id
-    // — the account's own post-sync seed owns that id).
+    // — the account's own post-sync seed owns that id). The
+    // "seeds do not adopt" half is truly pinned by case 2's marker
+    // assertion: here a leaked pristine seed would field-merge onto the
+    // account's same-id record and look identical.
     expect(localStorage.getItem(marker)).toBe("adopted");
     const accountLists = (await db.getAll(lists)).map((r) => r.name);
     expect(accountLists).toContain("Anonymous Real Work");

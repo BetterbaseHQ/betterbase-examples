@@ -95,13 +95,19 @@ export interface AdoptLocalDataOptions {
  * ready, so a failed adoption surfaces as a scope-open error rather
  * than a silently empty app.
  */
+/** Nothing-to-do result shared by the early returns. */
+const NOTHING_ADOPTED: MergeDatabaseRecordsResult = {
+  merged: 0,
+  skipped: 0,
+  skippedTombstoned: 0,
+  skippedConflict: 0,
+};
+
 export async function adoptLocalData(
   options: AdoptLocalDataOptions,
 ): Promise<MergeDatabaseRecordsResult> {
   const { appName, scopeKey, anonymous, target, collections, skipRecord } = options;
-  if (!anonymous) {
-    return { merged: 0, skippedPristine: 0, skippedTombstoned: 0 };
-  }
+  if (!anonymous) return NOTHING_ADOPTED;
 
   const marker = await adoptionMarkerKey(appName, scopeKey);
   const state = localStorage.getItem(marker);
@@ -109,9 +115,7 @@ export async function adoptLocalData(
   // re-arms adoption — the anonymous database was deleted, so anything in
   // a re-born one was created after retirement and must merge on the
   // next login (offline-first holds for every logout/login cycle).
-  if (state !== null && state !== MARKER_RETIRED) {
-    return { merged: 0, skippedPristine: 0, skippedTombstoned: 0 };
-  }
+  if (state !== null && state !== MARKER_RETIRED) return NOTHING_ADOPTED;
 
   const result = await mergeDatabaseRecords({
     source: anonymous,

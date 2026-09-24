@@ -15,6 +15,10 @@ import { createBoardWithColumns } from "./App";
 // One db per file — tests share it, so wipe records between tests to keep
 // them independent (the auto-created board belongs to whichever test ran first)
 afterEach(async () => {
+  // Let in-flight default-seed writes settle first: the seeding effect
+  // puts board and columns sequentially, and a wipe racing those puts
+  // leaves orphan columns alive for the next test.
+  await new Promise((r) => setTimeout(r, 250));
   await wipeCollections(db, [cards, columns, boards]);
 });
 

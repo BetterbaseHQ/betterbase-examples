@@ -235,7 +235,10 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     phase === "ready",
     boards,
     // Board + its columns come from one declaration; seed() is idempotent
-    // and respects tombstones for each declared id.
+    // and respects tombstones for each declared id. The hook's `id`
+    // argument is deliberately ignored — it IS the declaration's
+    // defaultRecordId(boards), and seeding by declaration keeps every
+    // record's id from the one source.
     () => defaultData.seed(db, [boards, columns]),
     "Couldn't create default board",
   );

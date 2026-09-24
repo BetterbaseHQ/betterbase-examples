@@ -77,7 +77,7 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
       // account opened on this profile (idempotent, one-time per scope).
       // Runs before the swap commits so a failure keeps the previous
       // database current (openName unchanged) and a retry re-runs the merge.
-      await adoptLocalData({
+      const adopted = await adoptLocalData({
         appName: DB_NAME,
         scopeKey,
         anonymous: prev,
@@ -85,6 +85,15 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
         collections: [boards, columns, cards],
         skipRecord: defaultData.isPristine,
       });
+      if (adopted.merged > 0) {
+        // Structural completeness: an EDITED default board adopts while
+        // its pristine columns were skipped — and a non-empty boards
+        // collection means the emptiness-gated seeders never fire. Seed
+        // the declared columns of alive declared boards so adopted cards
+        // don't dangle on missing columns (idempotent, tombstones
+        // respected on both sides).
+        await defaultData.seedChildren(next, [boards, columns], "boardId");
+      }
     }
   } catch (err) {
     deferredClose(next);
