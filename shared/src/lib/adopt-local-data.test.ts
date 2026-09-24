@@ -166,4 +166,43 @@ describe("retireLocalData", () => {
     ).rejects.toThrow("lock timeout");
     expect(localStorage.getItem(key)).toBe("adopted");
   });
+
+  it("transfers un-uploaded blobs before deleting the anonymous cache", async () => {
+    const key = await markerKey();
+    localStorage.setItem(key, "adopted");
+    const order: string[] = [];
+    const transfer = vi.fn(async () => {
+      order.push("transfer");
+    });
+    const del = vi.fn(async () => {
+      order.push("delete");
+    });
+    const ran = await retireLocalData({
+      appName: "tasks",
+      scopeKey: "scope-1",
+      deleteAnonymousDb: del,
+      transferFiles: transfer,
+    });
+    expect(ran).toBe(true);
+    expect(order).toEqual(["transfer", "delete"]);
+  });
+
+  it("a failed transfer aborts retirement — bytes survive for the retry", async () => {
+    const key = await markerKey();
+    localStorage.setItem(key, "adopted");
+    const transfer = vi.fn(async () => {
+      throw new Error("quota exceeded");
+    });
+    const del = vi.fn(async () => undefined);
+    await expect(
+      retireLocalData({
+        appName: "tasks",
+        scopeKey: "scope-1",
+        deleteAnonymousDb: del,
+        transferFiles: transfer,
+      }),
+    ).rejects.toThrow("quota exceeded");
+    expect(del).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).toBe("adopted");
+  });
 });

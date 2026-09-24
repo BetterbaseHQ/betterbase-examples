@@ -38,9 +38,10 @@
  * - Deletion goes through the SDK's deleteDatabase, which refuses to run
  *   while another tab holds the database open — retirement then simply
  *   retries later.
- * - Adoption copies records only. Cached file blobs (FileStore) are not
- *   migrated; apps with file fields should treat adopted-but-unsynced
- *   file references as missing until re-uploaded.
+ * - Records keep their ids; file bytes transfer via `transferFiles` (when
+ *   provided): every anonymous-cache blob still queued for its first
+ *   upload moves into the scoped store's queue, so a connected store
+ *   pushes them to the server after retirement.
  */
 
 import { mergeDatabaseRecords } from "betterbase/db";
@@ -136,6 +137,13 @@ export interface RetireLocalDataOptions {
   /** Account scope key that performed the adoption. */
   scopeKey: string;
   /**
+   * Moves still-unuploaded file blobs out of the anonymous cache before it
+   * is deleted (e.g. `FileStore.transferUnuploadedFrom`). Must run after the
+   * adoption marker confirms a pending retirement and before deletion — a
+   * failure aborts retirement so the bytes survive for the next attempt.
+   */
+  transferFiles?: () => Promise<void>;
+  /**
    * Deletes the anonymous database files (e.g. the app's
    * `deleteAnonymousDatabase`, built on the SDK's `deleteDatabase`).
    */
@@ -154,10 +162,15 @@ export interface RetireLocalDataOptions {
  * login's ready transition to retry.
  */
 export async function retireLocalData(options: RetireLocalDataOptions): Promise<boolean> {
-  const { appName, scopeKey, deleteAnonymousDb } = options;
+  const { appName, scopeKey, deleteAnonymousDb, transferFiles } = options;
   const marker = await adoptionMarkerKey(appName, scopeKey);
   const state = localStorage.getItem(marker);
   if (state === null || state === MARKER_RETIRED) return false;
+
+  // Preserve un-uploaded blobs before the cache is deleted. A failure here
+  // throws and leaves the marker pending — retirement (and deletion)
+  // retries on the next ready transition instead of losing the bytes.
+  if (transferFiles) await transferFiles();
 
   await deleteAnonymousDb();
   localStorage.setItem(marker, MARKER_RETIRED);

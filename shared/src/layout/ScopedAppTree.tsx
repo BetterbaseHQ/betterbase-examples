@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DatabaseProvider } from "betterbase/db/react";
 import { BetterbaseProvider, FileStoreProvider } from "betterbase/sync/react";
 import { FileStore } from "betterbase/sync";
@@ -169,10 +169,29 @@ function ScopedAppInner({
   const [fileStore] = useState(() =>
     createFileStore ? createFileStore(getCurrentScopeDbName?.() ?? null) : null,
   );
+  const disposeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    return () => fileStore?.dispose();
+    // StrictMode's double-mount runs cleanup immediately after setup — a
+    // synchronous dispose would kill the live store (revoked object URLs,
+    // dropped subscribers). Dispose is deferred to a macrotask and
+    // cancelled on remount; real unmounts still dispose on the next tick.
+    if (disposeTimer.current !== null) {
+      clearTimeout(disposeTimer.current);
+      disposeTimer.current = null;
+    }
+    return () => {
+      disposeTimer.current = setTimeout(() => fileStore?.dispose(), 0);
+    };
   }, [fileStore]);
 
+  // Adoption moved the records; the blobs they reference still sit in the
+  // anonymous cache (a different FileStore database). Transfer them into
+  // the scoped store's upload queue before retirement deletes that cache —
+  // a connected store then pushes them to the server like any queued file.
+  const transferFiles = useMemo(() => {
+    if (!createFileStore || !fileStore) return undefined;
+    return () => fileStore.transferUnuploadedFrom(new FileStore()).then(() => undefined);
+  }, [createFileStore, fileStore]);
   return (
     <BetterbaseProvider
       adapter={getDb()}
@@ -184,7 +203,7 @@ function ScopedAppInner({
       onAuthError={logout}
       fileStore={fileStore ?? undefined}
     >
-      <SyncedAppGate retireAnonymous={retireAnonymous}>
+      <SyncedAppGate retireAnonymous={{ ...retireAnonymous, transferFiles }}>
         {children(session, fileStore)}
       </SyncedAppGate>
     </BetterbaseProvider>
@@ -204,8 +223,16 @@ function LocalFileStores({
   local?: ReactNode | ((fileStore: FileStore) => ReactNode);
 }) {
   const [fileStore] = useState(() => createFileStore(null));
+  const disposeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    return () => fileStore.dispose();
+    // Deferred for StrictMode — see ScopedAppInner.
+    if (disposeTimer.current !== null) {
+      clearTimeout(disposeTimer.current);
+      disposeTimer.current = null;
+    }
+    return () => {
+      disposeTimer.current = setTimeout(() => fileStore.dispose(), 0);
+    };
   }, [fileStore]);
   return (
     <FileStoreProvider fileStore={fileStore}>

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useSyncDb } from "betterbase/sync/react";
 import type { CollectionDefHandle, SchemaShape } from "betterbase/db";
 import { reportError } from "../notify.js";
+import { DEFAULTS_NAMESPACE, uuidV5 } from "./uuid-v5.js";
 
 /**
  * Deterministic record id for a collection's default record.
@@ -11,10 +12,25 @@ import { reportError } from "../notify.js";
  * server's copy) would otherwise create two distinct "My Tasks" records
  * that CRDTs can never collapse. With one stable id, the concurrent seeds
  * merge into a single record instead of duplicating.
+ *
+ * The id is a namespaced UUID v5: the sync server rejects non-UUID record
+ * ids outright (`InvalidRecordId`), which the original `default_<name>`
+ * scheme hit — the record then never synced and every push attempt was
+ * rejected and quarantined. v5 keeps determinism while staying valid.
  */
 export function defaultRecordId(collection: { name: string }): string {
+  return uuidV5(collection.name, DEFAULTS_NAMESPACE);
+}
+
+/**
+ * The pre-v5 scheme (`default_<name>`). Kept only for the one-time
+ * migration off records the server refuses to store.
+ */
+export function legacyDefaultRecordId(collection: { name: string }): string {
   return `default_${collection.name}`;
 }
+
+const HYPHENATED_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Auto-create a default record once bootstrap sync completes — only when the
@@ -40,6 +56,8 @@ export function useDefaultRecord(
   collection: CollectionDefHandle<string, SchemaShape>,
   create: (id: string) => Promise<unknown>,
   errorMessage: string,
+  /** Extra collections to sweep for unsyncable non-UUID ids (e.g. board columns). */
+  alsoSweep?: ReadonlyArray<CollectionDefHandle<string, SchemaShape>>,
 ): void {
   const db = useSyncDb();
   const attempted = useRef(false);
@@ -50,7 +68,20 @@ export function useDefaultRecord(
     const id = defaultRecordId(collection);
     db.getAll(collection)
       .then(async (existing) => {
-        if (existing.length > 0) return;
+        // One-time migration off the pre-v5 id scheme: the sync server
+        // rejects non-UUID record ids (`InvalidRecordId`), so such records
+        // can never sync and their pushes get quarantined. Tombstone them
+        // and let the seed below recreate the default under a valid id.
+        for (const c of [collection, ...(alsoSweep ?? [])]) {
+          const rows = c === collection ? existing : await db.getAll(c);
+          for (const row of rows) {
+            if (!HYPHENATED_UUID_RE.test(row.id)) {
+              await db.delete(c, row.id).catch(() => undefined);
+            }
+          }
+        }
+        // Re-read: the sweep may have emptied the collection
+        if ((await db.getAll(collection)).length > 0) return;
         // Respect a deliberate deletion: a tombstone under the
         // deterministic id means the user removed this default on some
         // device — recreating it would resurrect it (and put onto a
@@ -66,5 +97,5 @@ export function useDefaultRecord(
         reportError(err, errorMessage);
         attempted.current = false;
       });
-  }, [ready, db, collection, create, errorMessage]);
+  }, [ready, db, collection, create, errorMessage, alsoSweep]);
 }

@@ -10,6 +10,8 @@ export interface RetireAnonymousConfig {
   scopeKey: string;
   /** Deletes the anonymous database files (SDK deleteDatabase under the hood). */
   deleteAnonymousDb: () => Promise<void>;
+  /** Moves un-uploaded anonymous blobs into the scoped store before deletion. */
+  transferFiles?: () => Promise<void>;
 }
 
 /**
@@ -21,13 +23,18 @@ export interface RetireAnonymousConfig {
  * transition. The state machine is idempotent, so overlapping or
  * repeated attempts are harmless.
  */
-function RetireAnonymousEffect({ appName, scopeKey, deleteAnonymousDb }: RetireAnonymousConfig) {
+function RetireAnonymousEffect({
+  appName,
+  scopeKey,
+  deleteAnonymousDb,
+  transferFiles,
+}: RetireAnonymousConfig) {
   const { phase } = useSync();
 
   useEffect(() => {
     if (phase !== "ready") return;
     const attempt = (isRetry: boolean) => {
-      retireLocalData({ appName, scopeKey, deleteAnonymousDb }).catch((err) => {
+      retireLocalData({ appName, scopeKey, deleteAnonymousDb, transferFiles }).catch((err) => {
         console.error("Failed to retire adopted anonymous database:", err);
         if (!isRetry) {
           // One deliberate in-session retry — e.g. the leader lock
@@ -41,8 +48,22 @@ function RetireAnonymousEffect({ appName, scopeKey, deleteAnonymousDb }: RetireA
     // Primitives only — a config object identity would re-fire this on
     // every App render while phase === "ready".
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, appName, scopeKey, deleteAnonymousDb]);
+  }, [phase, appName, scopeKey, deleteAnonymousDb, transferFiles]);
 
+  return null;
+}
+
+/**
+ * Debug aid: surfaces engine errors that no app UI currently renders.
+ * Mounts only after the ready gate, so the provider value is non-null.
+ */
+function SyncErrorReporter() {
+  const { error, phase } = useSync();
+  useEffect(() => {
+    if (error) {
+      console.error("[synced-app-gate] engine error", { phase, error });
+    }
+  }, [error, phase]);
   return null;
 }
 
@@ -74,6 +95,7 @@ export function SyncedAppGate({
   return (
     <>
       {retireAnonymous && <RetireAnonymousEffect {...retireAnonymous} />}
+      <SyncErrorReporter />
       {children}
     </>
   );

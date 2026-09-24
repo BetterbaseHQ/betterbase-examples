@@ -1,0 +1,1 @@
+{"root":["./playwright.config.ts","./tests/board.spec.ts","./tests/chat.spec.ts","./tests/fixtures.ts","./tests/notes.spec.ts","./tests/passwords.spec.ts","./tests/photos.spec.ts","./tests/tasks.spec.ts"],"version":"5.9.3"}

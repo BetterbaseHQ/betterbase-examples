@@ -241,6 +241,8 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     // record's id from the one source.
     () => defaultData.seed(db, [boards, columns]),
     "Couldn't create default board",
+    // Columns are part of the same declaration — sweep their legacy ids too
+    [columns],
   );
 
   useEffect(() => {
