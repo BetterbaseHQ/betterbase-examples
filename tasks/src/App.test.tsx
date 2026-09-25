@@ -48,6 +48,36 @@ describe("Tasks app sync wiring", () => {
     expect(names).toEqual(["lists"]);
   });
 
+  it("synced path: the first-run CTA creates the list through the sync wiring", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope("cta-synced-test");
+    setSyncDb(db);
+    renderWithProviders(<App />, {
+      db,
+      auth: {
+        isAuthenticated: true,
+        session: makeFakeSession({ getPersonalSpaceId: () => "cta-synced-test" }),
+        handle: "alice",
+      },
+    });
+
+    // Wait for the synced tree (status badge), then drive the CTA modal.
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      { timeout: 4000 },
+    );
+    await screen.findByText("No lists yet");
+    await user.click(screen.getByRole("button", { name: "Create your first list" }));
+    await user.type(await screen.findByRole("textbox", { name: "List name" }), "Synced list");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+
+    // Created through useLists' sync path (shareTree), rendered and selected.
+    await waitFor(() => expect(screen.getAllByText("Synced list").length).toBeGreaterThan(0), {
+      timeout: 8000,
+    });
+    await waitFor(() => expect(screen.queryByText("No lists yet")).toBeNull());
+  });
+
   it("remounting neither duplicates nor creates lists", async () => {
     // Nothing auto-creates: remounts over an empty workspace must stay
     // empty, and a user-created list must stay exactly one.
@@ -88,6 +118,17 @@ describe("Tasks local flow", () => {
     await screen.findByText("No lists yet");
     await user.click(screen.getByRole("button", { name: "Create your first list" }));
 
+    // Modal opens focused on the name field; whitespace doesn't enable Create
+    const input = await screen.findByRole("textbox", { name: "List name" });
+    await waitFor(() => expect(input).toHaveFocus());
+    await user.type(input, "   ");
+    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+
+    // Escape dismisses without creating; the CTA remains for a retry
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "List name" })).toBeNull());
+    await user.click(screen.getByRole("button", { name: "Create your first list" }));
+
     // Name it and create — the list appears and the empty state is gone
     await user.type(await screen.findByRole("textbox", { name: "List name" }), "Errands");
     await user.click(screen.getByRole("button", { name: "Create" }));
@@ -95,6 +136,23 @@ describe("Tasks local flow", () => {
       timeout: 4000,
     });
     await waitFor(() => expect(screen.queryByText("No lists yet")).toBeNull());
+  });
+
+  it("a populated workspace never flashes the first-run CTA while loading", async () => {
+    await openDatabaseForScope(null);
+    await db.put(lists, { name: "Existing", color: "indigo", todos: [] });
+    renderWithProviders(<App />, { db });
+
+    // The query is undefined until its first emission — the first-run CTA
+    // must not render in that window (a fast click would mint duplicates).
+    expect(screen.queryByRole("button", { name: "Create your first list" })).toBeNull();
+    expect(screen.queryByText("No lists yet")).toBeNull();
+
+    // Loaded: the list renders and there is still no CTA.
+    await waitFor(() => expect(screen.getAllByText("Existing").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    expect(screen.queryByRole("button", { name: "Create your first list" })).toBeNull();
   });
 
   it("adds, completes, and deletes tasks through the real local db", async () => {

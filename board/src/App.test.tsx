@@ -122,6 +122,49 @@ describe("Board first-run", () => {
     expect((await db.query(boards, {})).records).toHaveLength(1);
     expect((await db.query(columns, {})).records).toHaveLength(3);
   });
+
+  it("a populated workspace never flashes the first-run CTA while loading", async () => {
+    await openDatabaseForScope(null);
+    await createBoardWithColumns("Existing Board");
+    renderWithProviders(<App />, { db });
+
+    // The query is undefined until its first emission — the first-run CTA
+    // must not render in that window (a fast click would mint duplicates).
+    expect(screen.queryByRole("button", { name: "Create your first board" })).toBeNull();
+    expect(screen.queryByText("No boards yet")).toBeNull();
+
+    // Loaded: the board renders and there is still no CTA.
+    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
+    expect(screen.queryByRole("button", { name: "Create your first board" })).toBeNull();
+  });
+
+  it("synced path: the first-run CTA creates the board (with columns) through the sync wiring", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope("cta-synced-board-test");
+    setSyncDb(db);
+    renderWithProviders(<App />, {
+      db,
+      auth: {
+        isAuthenticated: true,
+        session: makeFakeSession({ getPersonalSpaceId: () => "cta-synced-board-test" }),
+        handle: "alice",
+      },
+    });
+
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      { timeout: 4000 },
+    );
+    await screen.findByText("No boards yet");
+    await user.click(screen.getByRole("button", { name: "Create your first board" }));
+    await user.type(await screen.findByRole("textbox", { name: "Board name" }), "Synced board");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+
+    // Created through useBoards' wiring, selected, with its columns.
+    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
+    expect(screen.getByText("In Progress")).toBeVisible();
+    await waitFor(() => expect(screen.queryByText("No boards yet")).toBeNull());
+  });
 });
 
 describe("Board local cascade deletes", () => {

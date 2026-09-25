@@ -22,6 +22,11 @@ function listColor(color: string): ListColor {
   return (LIST_COLORS as readonly string[]).includes(color) ? (color as ListColor) : "indigo";
 }
 
+/** The single color-rotation policy for new lists (sidebar + first-run CTA). */
+export function nextListColor(count: number): ListColor {
+  return LIST_COLORS[count % LIST_COLORS.length]!;
+}
+
 type SidebarList = List & { _spaceId?: string };
 
 interface TasksSidebarProps {
@@ -50,7 +55,7 @@ export function TasksSidebar({
       personalSpaceId={personalSpaceId}
       selectedId={selectedListId}
       onSelect={onSelect}
-      onCreate={(name) => onCreate(name, LIST_COLORS[lists.length % LIST_COLORS.length]!)}
+      onCreate={(name) => onCreate(name, nextListColor(lists.length))}
       onDelete={onDelete}
       createPlaceholder="New list..."
       getItemIcon={(list) => {

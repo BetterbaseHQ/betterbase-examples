@@ -71,6 +71,8 @@ export function useLists() {
 
   return {
     lists: allLists,
+    /** False until the adapter's first emission — gates first-run UI. */
+    listsLoaded: result.loaded,
     invitations: invitations.records,
     createList,
     deleteList,

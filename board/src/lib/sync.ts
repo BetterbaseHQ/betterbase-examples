@@ -223,6 +223,8 @@ export function useBoards() {
 
   return {
     boards: allBoards,
+    /** False until the adapter's first emission — gates first-run UI. */
+    boardsLoaded: boardResult.loaded,
     columns: allColumns,
     cards: allCards,
     invitations: invitations.records,

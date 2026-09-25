@@ -14,7 +14,7 @@ import {
 import { db, lists, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
-import { TasksSidebar, LIST_COLORS } from "@/components/TasksSidebar";
+import { TasksSidebar, nextListColor } from "@/components/TasksSidebar";
 import { TaskList } from "@/components/TaskList";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +33,9 @@ function LocalTasksApp() {
 
   const result = useQuery(lists, { sort: [{ field: "createdAt", direction: "asc" }] });
   const allLists = result?.records ?? [];
+  // The query hook is undefined until its first emission — a populated
+  // workspace must not flash the first-run CTA while loading.
+  const listsLoaded = result !== undefined;
 
   const [firstList] = allLists;
   useEffect(() => {
@@ -44,10 +47,9 @@ function LocalTasksApp() {
     if (selectedListId && !selectedList && firstList) setSelectedListId(firstList.id);
   }, [selectedListId, selectedList, firstList]);
 
+  const createListRaw = (name: string, color: string) => db.put(lists, { name, color, todos: [] });
   const createList = (name: string, color: string) => {
-    db.put(lists, { name, color, todos: [] }).catch((err) =>
-      reportError(err, "Couldn't create list"),
-    );
+    createListRaw(name, color).catch((err) => reportError(err, "Couldn't create list"));
   };
 
   const deleteList = (id: string) => {
@@ -84,19 +86,17 @@ function LocalTasksApp() {
       ) : (
         <EmptyState
           icon={<ListPlus size={32} />}
-          title={allLists.length === 0 ? "No lists yet" : "No list selected"}
+          title={listsLoaded && allLists.length === 0 ? "No lists yet" : "No list selected"}
           description={
-            allLists.length === 0
+            listsLoaded && allLists.length === 0
               ? "Create your first list to start tracking your to-dos."
               : "Create a list to get started"
           }
           action={
-            allLists.length === 0 ? (
+            listsLoaded && allLists.length === 0 ? (
               <CreateFirstItem
                 noun="list"
-                onCreate={(name) =>
-                  createList(name, LIST_COLORS[allLists.length % LIST_COLORS.length]!)
-                }
+                onCreate={(name) => createListRaw(name, nextListColor(allLists.length))}
               />
             ) : undefined
           }
@@ -118,6 +118,7 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   const {
     lists: allLists,
+    listsLoaded,
     invitations,
     createList,
     deleteList,
@@ -196,21 +197,17 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
       ) : (
         <EmptyState
           icon={<ListPlus size={32} />}
-          title={allLists.length === 0 ? "No lists yet" : "No list selected"}
+          title={listsLoaded && allLists.length === 0 ? "No lists yet" : "No list selected"}
           description={
-            allLists.length === 0
+            listsLoaded && allLists.length === 0
               ? "Create your first list to start tracking your to-dos."
               : "Create a list to get started"
           }
           action={
-            allLists.length === 0 ? (
+            listsLoaded && allLists.length === 0 ? (
               <CreateFirstItem
                 noun="list"
-                onCreate={(name) =>
-                  createList(name, LIST_COLORS[allLists.length % LIST_COLORS.length]!).catch(
-                    (err) => reportError(err, "Couldn't create list"),
-                  )
-                }
+                onCreate={(name) => createList(name, nextListColor(allLists.length))}
               />
             ) : undefined
           }

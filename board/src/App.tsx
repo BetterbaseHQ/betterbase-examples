@@ -46,6 +46,9 @@ function LocalBoardApp() {
     ],
   });
   const allBoards = boardResult?.records ?? [];
+  // The query hook is undefined until its first emission — a populated
+  // workspace must not flash the first-run CTA while loading.
+  const boardsLoaded = boardResult !== undefined;
 
   const columnResult = useQuery(columns, {
     sort: [
@@ -73,12 +76,11 @@ function LocalBoardApp() {
     }
   }, [allBoards, selectedBoardId]);
 
+  const createBoardAndSelect = (name: string) =>
+    createBoardWithColumns(name).then((record) => setSelectedBoardId(record.id));
   const createBoard = (name: string) => {
-    createBoardWithColumns(name)
-      .then((record) => setSelectedBoardId(record.id))
-      .catch((err) => reportError(err, "Couldn't create board"));
+    createBoardAndSelect(name).catch((err) => reportError(err, "Couldn't create board"));
   };
-
   const deleteBoard = (id: string) => {
     // Cascade covers columns and cards (declared parent edges).
     deleteTree(db, boards, id).catch((err) => reportError(err, "Couldn't delete board"));
@@ -159,18 +161,18 @@ function LocalBoardApp() {
         >
           <EmptyState
             icon={<Kanban size={32} />}
-            title={allBoards.length === 0 ? "No boards yet" : "No board selected"}
+            title={boardsLoaded && allBoards.length === 0 ? "No boards yet" : "No board selected"}
             description={
-              allBoards.length === 0
+              boardsLoaded && allBoards.length === 0
                 ? "Create your first board to get started."
                 : "Create a board to get started"
             }
             action={
-              allBoards.length === 0 ? (
+              boardsLoaded && allBoards.length === 0 ? (
                 <CreateFirstItem
                   noun="board"
                   helperText="Starts with To Do, In Progress, and Done columns."
-                  onCreate={createBoard}
+                  onCreate={createBoardAndSelect}
                 />
               ) : undefined
             }
@@ -193,6 +195,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   const {
     boards: allBoards,
+    boardsLoaded,
     columns: allColumns,
     cards: allCards,
     invitations,
@@ -248,6 +251,11 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     }
   };
 
+  // One create-and-select closure for the sidebar and the first-run CTA;
+  // each call site handles rejections its own way.
+  const createBoardAndSelect = (name: string) =>
+    createBoard(name).then((r) => setSelectedBoardId(r.id));
+
   const banner =
     invitations.length > 0 ? (
       <InvitationBanner
@@ -269,9 +277,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           selectedBoardId={selectedBoardId}
           onSelect={setSelectedBoardId}
           onCreate={(name) =>
-            createBoard(name)
-              .then((r) => setSelectedBoardId(r.id))
-              .catch((err) => reportError(err, "Couldn't create board"))
+            createBoardAndSelect(name).catch((err) => reportError(err, "Couldn't create board"))
           }
           onDelete={handleDeleteBoard}
           cardCounts={cardCounts}
@@ -323,22 +329,18 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
         >
           <EmptyState
             icon={<Kanban size={32} />}
-            title={allBoards.length === 0 ? "No boards yet" : "No board selected"}
+            title={boardsLoaded && allBoards.length === 0 ? "No boards yet" : "No board selected"}
             description={
-              allBoards.length === 0
+              boardsLoaded && allBoards.length === 0
                 ? "Create your first board to get started."
                 : "Create a board to get started"
             }
             action={
-              allBoards.length === 0 ? (
+              boardsLoaded && allBoards.length === 0 ? (
                 <CreateFirstItem
                   noun="board"
                   helperText="Starts with To Do, In Progress, and Done columns."
-                  onCreate={(name) =>
-                    createBoard(name)
-                      .then((r) => setSelectedBoardId(r.id))
-                      .catch((err) => reportError(err, "Couldn't create board"))
-                  }
+                  onCreate={createBoardAndSelect}
                 />
               ) : undefined
             }
