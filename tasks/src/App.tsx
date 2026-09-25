@@ -6,6 +6,7 @@ import {
   LessAppShell,
   useAuth,
   EmptyState,
+  CreateFirstItem,
   InvitationBanner,
   reportError,
   ScopedAppTree,
@@ -13,7 +14,7 @@ import {
 import { db, lists, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
-import { TasksSidebar } from "@/components/TasksSidebar";
+import { TasksSidebar, LIST_COLORS } from "@/components/TasksSidebar";
 import { TaskList } from "@/components/TaskList";
 
 // ---------------------------------------------------------------------------
@@ -83,8 +84,22 @@ function LocalTasksApp() {
       ) : (
         <EmptyState
           icon={<ListPlus size={32} />}
-          title="No list selected"
-          description="Create a list to get started"
+          title={allLists.length === 0 ? "No lists yet" : "No list selected"}
+          description={
+            allLists.length === 0
+              ? "Create your first list to start tracking your to-dos."
+              : "Create a list to get started"
+          }
+          action={
+            allLists.length === 0 ? (
+              <CreateFirstItem
+                noun="list"
+                onCreate={(name) =>
+                  createList(name, LIST_COLORS[allLists.length % LIST_COLORS.length]!)
+                }
+              />
+            ) : undefined
+          }
         />
       )}
     </LessAppShell>
@@ -181,8 +196,24 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
       ) : (
         <EmptyState
           icon={<ListPlus size={32} />}
-          title="No list selected"
-          description="Create a list to get started"
+          title={allLists.length === 0 ? "No lists yet" : "No list selected"}
+          description={
+            allLists.length === 0
+              ? "Create your first list to start tracking your to-dos."
+              : "Create a list to get started"
+          }
+          action={
+            allLists.length === 0 ? (
+              <CreateFirstItem
+                noun="list"
+                onCreate={(name) =>
+                  createList(name, LIST_COLORS[allLists.length % LIST_COLORS.length]!).catch(
+                    (err) => reportError(err, "Couldn't create list"),
+                  )
+                }
+              />
+            ) : undefined
+          }
         />
       )}
     </LessAppShell>

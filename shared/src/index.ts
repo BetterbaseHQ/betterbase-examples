@@ -24,6 +24,7 @@ export type { ScopedAppTreeProps } from "./layout/ScopedAppTree.js";
 
 // Components
 export { EmptyState } from "./components/EmptyState.js";
+export { CreateFirstItem } from "./components/CreateFirstItem.js";
 export { ConfirmDialog } from "./components/ConfirmDialog.js";
 export { InlineTextInput } from "./components/InlineTextInput.js";
 

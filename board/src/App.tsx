@@ -4,6 +4,7 @@ import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
+  CreateFirstItem,
   EmptyState,
   InvitationBanner,
   LessAppShell,
@@ -158,8 +159,21 @@ function LocalBoardApp() {
         >
           <EmptyState
             icon={<Kanban size={32} />}
-            title="No board selected"
-            description="Create a board to get started"
+            title={allBoards.length === 0 ? "No boards yet" : "No board selected"}
+            description={
+              allBoards.length === 0
+                ? "Create your first board to get started."
+                : "Create a board to get started"
+            }
+            action={
+              allBoards.length === 0 ? (
+                <CreateFirstItem
+                  noun="board"
+                  helperText="Starts with To Do, In Progress, and Done columns."
+                  onCreate={createBoard}
+                />
+              ) : undefined
+            }
           />
         </div>
       )}
@@ -309,8 +323,25 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
         >
           <EmptyState
             icon={<Kanban size={32} />}
-            title="No board selected"
-            description="Create a board to get started"
+            title={allBoards.length === 0 ? "No boards yet" : "No board selected"}
+            description={
+              allBoards.length === 0
+                ? "Create your first board to get started."
+                : "Create a board to get started"
+            }
+            action={
+              allBoards.length === 0 ? (
+                <CreateFirstItem
+                  noun="board"
+                  helperText="Starts with To Do, In Progress, and Done columns."
+                  onCreate={(name) =>
+                    createBoard(name)
+                      .then((r) => setSelectedBoardId(r.id))
+                      .catch((err) => reportError(err, "Couldn't create board"))
+                  }
+                />
+              ) : undefined
+            }
           />
         </div>
       )}

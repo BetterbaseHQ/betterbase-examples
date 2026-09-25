@@ -35,10 +35,12 @@ describe("Tasks app sync wiring", () => {
 
     // The sync-status badge only renders on the authenticated path —
     // waiting for it proves the synced tree mounted, not just the shell.
-    await waitFor(() =>
-      expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(), {
-      timeout: 4000,
-    });
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      {
+        timeout: 4000,
+      },
+    );
 
     const names = lastProviderProps()
       .collections.map((c) => (c as { name: string }).name)
@@ -60,17 +62,15 @@ describe("Tasks app sync wiring", () => {
     );
     await user.type(await screen.findByRole("textbox", { name: /new list/i }), "Errands");
     await user.keyboard("{Enter}");
-    await waitFor(
-      () => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0),
-      { timeout: 4000 },
-    );
+    await waitFor(() => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
     first.unmount();
 
     renderWithProviders(<App />, { db, auth });
-    await waitFor(
-      () => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0),
-      { timeout: 4000 },
-    );
+    await waitFor(() => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
     await new Promise((r) => setTimeout(r, 150));
 
     const all = await db.query(lists, {});
@@ -79,6 +79,24 @@ describe("Tasks app sync wiring", () => {
 });
 
 describe("Tasks local flow", () => {
+  it("first-run empty state creates the first list via the CTA modal", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
+    renderWithProviders(<App />, { db }); // unauthenticated → LocalTasksApp
+
+    // First-run state: encouraging copy and a one-click create CTA
+    await screen.findByText("No lists yet");
+    await user.click(screen.getByRole("button", { name: "Create your first list" }));
+
+    // Name it and create — the list appears and the empty state is gone
+    await user.type(await screen.findByRole("textbox", { name: "List name" }), "Errands");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    await waitFor(() => expect(screen.queryByText("No lists yet")).toBeNull());
+  });
+
   it("adds, completes, and deletes tasks through the real local db", async () => {
     const user = userEvent.setup();
     await openDatabaseForScope(null); // align scope — no swap/boot at mount
@@ -87,10 +105,9 @@ describe("Tasks local flow", () => {
     // Empty workspace: create the list through the UI
     await user.type(await screen.findByRole("textbox", { name: /new list/i }), "Errands");
     await user.keyboard("{Enter}");
-    await waitFor(
-      () => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0),
-      { timeout: 4000 },
-    );
+    await waitFor(() => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
 
     // Add a task
     await user.type(screen.getByRole("textbox", { name: "New task" }), "write tests");

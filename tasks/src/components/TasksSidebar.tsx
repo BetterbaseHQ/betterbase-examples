@@ -2,7 +2,7 @@ import { Circle } from "lucide-react";
 import { ItemsSidebar } from "@betterbase/examples-shared";
 import type { List } from "@/lib/db";
 
-const LIST_COLORS = [
+export const LIST_COLORS = [
   "indigo",
   "blue",
   "teal",

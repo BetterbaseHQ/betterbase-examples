@@ -14,9 +14,11 @@ test.describe.serial("tasks lifecycle", () => {
   test("user-created list + todo survive connect (adoption)", async ({ page }) => {
     await page.goto(appUrl("tasks"));
 
-    // Empty workspace — no scaffolding is created. Build the list via the UI.
-    await page.getByRole("textbox", { name: "New list name" }).fill("Errands");
-    await page.getByRole("textbox", { name: "New list name" }).press("Enter");
+    // Empty workspace — no scaffolding is created. The first-run empty
+    // state's CTA opens a name-it-and-create-it modal.
+    await page.getByRole("button", { name: "Create your first list" }).click();
+    await page.getByRole("textbox", { name: "List name", exact: true }).fill("Errands");
+    await page.getByRole("button", { name: "Create", exact: true }).click();
     await expect(page.locator("nav").getByText("Errands", { exact: true })).toHaveCount(1, {
       timeout: 30_000,
     });

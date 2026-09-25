@@ -65,10 +65,7 @@ export function useBoards() {
   const allColumnsRef = useRef(allColumns);
   allColumnsRef.current = allColumns;
 
-  const createBoard = useCallback(
-    async (name: string) => createBoardIn(db, name),
-    [db],
-  );
+  const createBoard = useCallback(async (name: string) => createBoardIn(db, name), [db]);
 
   const deleteBoard = useCallback(
     async (id: string) => {

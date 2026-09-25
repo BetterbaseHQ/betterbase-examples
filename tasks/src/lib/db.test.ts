@@ -45,12 +45,19 @@ afterEach(async () => {
 describe("account-scoped databases (AUD-045)", () => {
   it("adopts the anonymous workspace into the first account, isolates later accounts, retains anonymous", async () => {
     // Anonymous (module default)
-    await db.put(lists, { id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", name: "Local groceries", color: "", todos: [] } as never);
+    await db.put(lists, {
+      id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      name: "Local groceries",
+      color: "",
+      todos: [],
+    } as never);
 
     // Account A: the anonymous records were adopted — local data
     // survives connecting (offline-first contract)
     await openDatabaseForScope("account-A");
-    expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual(["aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"]);
+    expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual([
+      "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    ]);
     await db.put(lists, { id: "a-1", name: "A's list", color: "", todos: [] } as never);
 
     // Account B: opened from A's scope, not the anonymous namespace —
@@ -61,13 +68,17 @@ describe("account-scoped databases (AUD-045)", () => {
 
     // Switching back to A restores A's records exactly (adopted + own)
     await openDatabaseForScope("account-A");
-    expect((await db.query(lists, {})).records.map((r) => r.id).sort()).toEqual(["a-1", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"]);
+    expect((await db.query(lists, {})).records.map((r) => r.id).sort()).toEqual([
+      "a-1",
+      "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    ]);
 
     // The anonymous namespace survives every switch (never modified)
     await openDatabaseForScope(null);
-    expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual(["aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"]);
+    expect((await db.query(lists, {})).records.map((r) => r.id)).toEqual([
+      "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    ]);
   });
-
 
   it("reopening the same scope is a no-op (no spurious swap)", async () => {
     await openDatabaseForScope("account-A");

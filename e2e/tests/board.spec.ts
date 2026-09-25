@@ -13,10 +13,11 @@ test.describe.serial("board lifecycle", () => {
   test("user-created board + card survive connect (adoption)", async ({ page }) => {
     await page.goto(appUrl("board"));
 
-    // Empty workspace — create the board through the sidebar. Creation
-    // includes the three workflow columns.
-    await page.getByRole("textbox", { name: "New board name" }).fill("Roadmap");
-    await page.getByRole("textbox", { name: "New board name" }).press("Enter");
+    // Empty workspace — the first-run empty state's CTA creates the
+    // board (including the three workflow columns) via its modal.
+    await page.getByRole("button", { name: "Create your first board" }).click();
+    await page.getByRole("textbox", { name: "Board name", exact: true }).fill("Roadmap");
+    await page.getByRole("button", { name: "Create", exact: true }).click();
     await expect(page.locator("nav").getByText("Roadmap", { exact: true })).toHaveCount(1, {
       timeout: 30_000,
     });

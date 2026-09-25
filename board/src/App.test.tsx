@@ -26,10 +26,12 @@ describe("Board app sync wiring", () => {
     });
 
     // The sync-status badge only renders on the authenticated path.
-    await waitFor(() =>
-      expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(), {
-      timeout: 4000,
-    });
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      {
+        timeout: 4000,
+      },
+    );
 
     const names = lastProviderProps()
       .collections.map((c) => (c as { name: string }).name)
@@ -86,16 +88,38 @@ describe("Board app sync wiring", () => {
     first.unmount();
 
     renderWithProviders(<App />, { db, auth });
-    await waitFor(
-      () => expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0),
-      { timeout: 8000 },
-    );
+    await waitFor(() => expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0), {
+      timeout: 8000,
+    });
     await new Promise((r) => setTimeout(r, 150));
 
     const all = await db.query(boards, {});
     // Exactly one board and its three columns — catches any regression
     // that auto-creates scaffolding alongside user data
     expect(all.records).toHaveLength(1);
+    expect((await db.query(columns, {})).records).toHaveLength(3);
+  });
+});
+
+describe("Board first-run", () => {
+  it("empty state creates the first board (with its columns) via the CTA modal", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
+    renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
+
+    // First-run state: encouraging copy and a one-click create CTA
+    await screen.findByText("No boards yet");
+    await user.click(screen.getByRole("button", { name: "Create your first board" }));
+
+    // Name it and create — the board appears with its default columns
+    await user.type(await screen.findByRole("textbox", { name: "Board name" }), "Roadmap");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
+    expect(screen.getByText("In Progress")).toBeVisible();
+    await waitFor(() => expect(screen.queryByText("No boards yet")).toBeNull());
+
+    // Exactly one board and three columns — nothing seeded alongside it
+    expect((await db.query(boards, {})).records).toHaveLength(1);
     expect((await db.query(columns, {})).records).toHaveLength(3);
   });
 });
