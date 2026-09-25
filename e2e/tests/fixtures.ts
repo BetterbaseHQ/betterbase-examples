@@ -143,15 +143,30 @@ export async function connectFromApp(page: Page, creds: UserCredentials): Promis
   }
 
   // The redirect should leave the app origin immediately; under dev-server
-  // load the click can land before hydration wires the handler — retry once
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const url = new URL(page.url());
-    if (url.host !== new URL(appOrigin).host) break;
-    await page.waitForTimeout(5_000);
-    if (new URL(page.url()).host === new URL(appOrigin).host) {
-      const again = page.getByRole("button", { name: "Continue with Betterbase Account" });
-      if (await again.isVisible().catch(() => false)) await again.click();
+  // load the click can land before hydration wires the handler — detect a
+  // dead redirect fast, re-click whichever trigger is present once, and
+  // fail loudly if it never leaves (a silent fall-through used to surface
+  // as an unrelated 30s selector timeout further down the flow)
+  let left = false;
+  for (let attempt = 0; attempt < 2 && !left; attempt++) {
+    left = await page
+      .waitForURL((u) => new URL(u.href).host !== new URL(appOrigin).host, {
+        timeout: attempt === 0 ? 5_000 : 15_000,
+      })
+      .then(() => true)
+      .catch(() => false);
+    if (left) break;
+    const retry =
+      page.getByRole("button", { name: "Continue with Betterbase Account" });
+    if (await retry.isVisible().catch(() => false)) {
+      await retry.click();
+    } else {
+      const signInAgain = page.getByRole("button", { name: "Sign in", exact: true });
+      if (await signInAgain.isVisible().catch(() => false)) await signInAgain.click();
     }
+  }
+  if (!left) {
+    throw new Error("OAuth redirect never left the app origin (click not wired?)");
   }
 
   // The OAuth flow redirects to accounts. The consent page may render then

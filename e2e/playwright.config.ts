@@ -63,10 +63,16 @@ export default defineConfig({
   fullyParallel: false,
   workers: Number.isFinite(configuredWorkers) && configuredWorkers > 0 ? configuredWorkers : 1,
   retries: 0,
-  timeout: 60_000, // OAuth + email-code registration (observed worst ~15s)
+  // Sized for the worst lifecycle test (chat: registration + OAuth + E2EE
+  // connect in one test) with headroom for a slow phase — each step's own
+  // bounded waits sum, so a single stalled phase can overflow a tighter cap
+  // and surface as an anonymous "timed out" with no step named
+  timeout: 120_000,
   expect: { timeout: 10_000 },
   reporter: [["list"]],
-  use: { ...devices["Desktop Chrome"] },
+  // The flake evidence chain: a recurrence keeps its trace (which await
+  // was active) instead of disappearing with the terminal
+  use: { ...devices["Desktop Chrome"], trace: "retain-on-failure" },
   webServer: appDefs.map((app) => ({
     command: `pnpm dev --port ${app.port} --strictPort`,
     cwd: path.join(root, "..", app.name),
