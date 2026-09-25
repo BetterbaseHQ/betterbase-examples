@@ -1,7 +1,6 @@
 import { createDatabase, deleteDatabase, type CollectionRead } from "betterbase/db";
 import { accountDbName, adoptLocalData } from "@betterbase/examples-shared";
 import { lists } from "./collections.js";
-import { defaultData } from "./defaults.js";
 
 export { lists } from "./collections.js";
 
@@ -84,7 +83,6 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
         anonymous: prev,
         target: next,
         collections: [lists],
-        skipRecord: defaultData.isPristine,
       });
     }
   } catch (err) {

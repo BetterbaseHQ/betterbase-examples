@@ -7,7 +7,6 @@ import {
   ScopedAppTree,
   reportError,
   useAuth,
-  useDefaultRecord,
 } from "@betterbase/examples-shared";
 import {
   db,
@@ -18,7 +17,6 @@ import {
   DB_NAME,
 } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
-import { defaultData } from "@/lib/defaults";
 import { NotesWorkspace, type NotesApi } from "@/components/NotesWorkspace";
 
 // ---------------------------------------------------------------------------
@@ -71,7 +69,7 @@ function LocalNotesApp() {
 
 function NotesApp() {
   const { session } = useAuth();
-  const { phase, error: syncError } = useSync();
+  const { error: syncError } = useSync();
   const syncStatus = useConnectionStatus();
 
   const {
@@ -89,17 +87,6 @@ function NotesApp() {
     createNote,
     deleteNote,
   } = useNotebooks();
-
-  // Auto-create a default notebook only after the full bootstrap sync
-  // completes, and only when the collection verifiably reads empty from the
-  // sync db — a reactive-query length check at ready-time races the post-pull
-  // query propagation and duplicated the notebook on every reload.
-  useDefaultRecord(
-    phase === "ready",
-    notebooks,
-    (id) => defaultData.seedRecord(db, notebooks, id),
-    "Couldn't create default notebook",
-  );
 
   const personalSpaceId = session?.getPersonalSpaceId() ?? null;
 

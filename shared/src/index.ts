@@ -43,12 +43,6 @@ export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "betterbase/syn
 
 // Hooks
 export { useFlushableDebouncedCallback } from "./useFlushableDebouncedCallback.js";
-export {
-  useDefaultRecord,
-  defaultRecordId,
-  legacyDefaultRecordId,
-} from "./lib/use-default-record.js";
-export { DEFAULTS_NAMESPACE, uuidV5 } from "./lib/uuid-v5.js";
 
 // Account-scoped databases (AUD-045)
 export { accountScopeKey, accountDbName, accountScopeHash } from "./lib/account-db.js";
@@ -56,8 +50,6 @@ export type { AccountScopeSource } from "./lib/account-db.js";
 export { useDbScope } from "./lib/use-account-db.js";
 export { adoptLocalData, retireLocalData, adoptionMarkerKey } from "./lib/adopt-local-data.js";
 export type { AdoptLocalDataOptions, RetireLocalDataOptions } from "./lib/adopt-local-data.js";
-export { defineDefaultData } from "./lib/default-data.js";
-export type { DefaultData, DefaultDataDeclaration } from "./lib/default-data.js";
 
 // Runtime configuration (deployed examples container / dev fallbacks)
 export {

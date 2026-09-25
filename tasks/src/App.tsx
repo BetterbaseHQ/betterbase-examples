@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
 import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
@@ -8,11 +8,9 @@ import {
   EmptyState,
   InvitationBanner,
   reportError,
-  useDefaultRecord,
   ScopedAppTree,
 } from "@betterbase/examples-shared";
 import { db, lists, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
-import { defaultData } from "@/lib/defaults";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
 import { TasksSidebar } from "@/components/TasksSidebar";
@@ -25,7 +23,6 @@ import { TaskList } from "@/components/TaskList";
 function LocalTasksApp() {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
-  const autoCreated = useRef(false);
 
   // Per mount, not module level: the component lives inside the
   // scope-keyed subtree, so this always captures the CURRENT database
@@ -35,18 +32,6 @@ function LocalTasksApp() {
 
   const result = useQuery(lists, { sort: [{ field: "createdAt", direction: "asc" }] });
   const allLists = result?.records ?? [];
-
-  useEffect(() => {
-    if (result && result.records.length === 0 && !autoCreated.current) {
-      autoCreated.current = true;
-      // Declared defaults (lib/defaults.ts): seed() skips ids already
-      // present, tombstones included — a deleted default stays deleted.
-      defaultData.seed(db, [lists]).catch((err) => {
-        reportError(err, "Couldn't create default list");
-        autoCreated.current = false;
-      });
-    }
-  }, [result]);
 
   const [firstList] = allLists;
   useEffect(() => {
@@ -112,7 +97,7 @@ function LocalTasksApp() {
 
 function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, error: syncError } = useSync();
+  const { error: syncError } = useSync();
   const syncStatus = useConnectionStatus();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
 
@@ -129,17 +114,6 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     isAdmin,
     todoOps,
   } = useLists();
-
-  // Auto-create a default list only after the full bootstrap sync completes,
-  // and only when the collection verifiably reads empty from the sync db —
-  // a reactive-query length check at ready-time races the post-pull query
-  // propagation and duplicated the list on every reload.
-  useDefaultRecord(
-    phase === "ready",
-    lists,
-    (id) => defaultData.seedRecord(db, lists, id),
-    "Couldn't create default list",
-  );
 
   const [firstList] = allLists;
   useEffect(() => {

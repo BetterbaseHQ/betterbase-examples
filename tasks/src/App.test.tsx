@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
 import App from "./App";
 import { db, lists, openDatabaseForScope } from "@/lib/db";
 import {
@@ -32,7 +33,7 @@ describe("Tasks app sync wiring", () => {
       auth: { isAuthenticated: true, session: makeFakeSession(), handle: "alice" },
     });
 
-    await waitFor(() => expect(screen.getAllByText("My Tasks").length).toBeGreaterThan(0), {
+    await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
       timeout: 4000,
     });
 
@@ -42,31 +43,34 @@ describe("Tasks app sync wiring", () => {
     expect(names).toEqual(["lists"]);
   });
 
-  it("regression: remounting with an existing default list does not create a second one", async () => {
-    // A page reload remounts the whole tree: the auto-create one-shot guard
-    // resets while the record already exists, and the reactive query starts
-    // empty and repopulates asynchronously although phase is "ready"
-    // immediately. Deciding emptiness from a direct db read (not the query)
-    // is what keeps reloads from duplicating the default list.
+  it("remounting neither duplicates nor creates lists", async () => {
+    // Nothing auto-creates: remounts over an empty workspace must stay
+    // empty, and a user-created list must stay exactly one.
+    const user = userEvent.setup();
     const auth = { isAuthenticated: true, session: makeFakeSession(), handle: "alice" };
     setSyncDb(db);
 
     const first = renderWithProviders(<App />, { db, auth });
-    await waitFor(() => expect(screen.getAllByText("My Tasks").length).toBeGreaterThan(0), {
+    await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
       timeout: 4000,
     });
+    await user.type(await screen.findByRole("textbox", { name: /new list/i }), "Errands");
+    await user.keyboard("{Enter}");
+    await waitFor(
+      () => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0),
+      { timeout: 4000 },
+    );
     first.unmount();
 
     renderWithProviders(<App />, { db, auth });
-    await waitFor(() => expect(screen.getAllByText("My Tasks").length).toBeGreaterThan(0), {
-      timeout: 4000,
-    });
-    // Let any erroneous duplicate put land before asserting
+    await waitFor(
+      () => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0),
+      { timeout: 4000 },
+    );
     await new Promise((r) => setTimeout(r, 150));
 
     const all = await db.query(lists, {});
-    const defaults = all.records.filter((r) => r.name === "My Tasks");
-    expect(defaults).toHaveLength(1);
+    expect(all.records).toHaveLength(1);
   });
 });
 
@@ -76,10 +80,13 @@ describe("Tasks local flow", () => {
     await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db }); // unauthenticated → LocalTasksApp
 
-    // Auto-created default list
-    await waitFor(() => expect(screen.getAllByText("My Tasks").length).toBeGreaterThan(0), {
-      timeout: 4000,
-    });
+    // Empty workspace: create the list through the UI
+    await user.type(await screen.findByRole("textbox", { name: /new list/i }), "Errands");
+    await user.keyboard("{Enter}");
+    await waitFor(
+      () => expect(screen.getAllByText("Errands").length).toBeGreaterThan(0),
+      { timeout: 4000 },
+    );
 
     // Add a task
     await user.type(screen.getByRole("textbox", { name: "New task" }), "write tests");

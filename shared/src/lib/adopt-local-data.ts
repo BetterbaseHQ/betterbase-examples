@@ -47,14 +47,11 @@
 import { mergeDatabaseRecords } from "betterbase/db";
 import type { CollectionDefHandle } from "betterbase/db";
 import type { Database } from "betterbase/db";
-import type { MergeDatabaseRecordsOptions, MergeDatabaseRecordsResult } from "betterbase/db";
+import type { MergeDatabaseRecordsResult } from "betterbase/db";
 import { accountScopeHash } from "./account-db.js";
 
 /** Marker value once the anonymous database files have been deleted. */
 const MARKER_RETIRED = "retired";
-
-/** Hyphenated UUID form — what the sync server accepts as a record id. */
-const HYPHENATED_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * localStorage key for this app+scope's adoption state machine. Exported
@@ -76,12 +73,6 @@ export interface AdoptLocalDataOptions {
   target: Database;
   /** Collections whose records should be adopted. */
   collections: ReadonlyArray<CollectionDefHandle>;
-  /**
-   * Declared-default filter (`mergeDatabaseRecords`'s `skipRecord`):
-   * pristine default/sample records are phantom data and never adopt.
-   * Apps pass their `defineDefaultData(...).isPristine`.
-   */
-  skipRecord?: MergeDatabaseRecordsOptions["skipRecord"];
 }
 
 /**
@@ -110,7 +101,7 @@ const NOTHING_ADOPTED: MergeDatabaseRecordsResult = {
 export async function adoptLocalData(
   options: AdoptLocalDataOptions,
 ): Promise<MergeDatabaseRecordsResult> {
-  const { appName, scopeKey, anonymous, target, collections, skipRecord } = options;
+  const { appName, scopeKey, anonymous, target, collections } = options;
   if (!anonymous) return NOTHING_ADOPTED;
 
   const marker = await adoptionMarkerKey(appName, scopeKey);
@@ -125,14 +116,6 @@ export async function adoptLocalData(
     source: anonymous,
     target,
     collections,
-    // Records with non-UUID ids can never be stored server-side (the sync
-    // storage layer validates ids as hyphenated UUIDs): adopting one would
-    // wedge the collection's whole push stream — every batch containing
-    // it is rejected atomically. They stay in the anonymous database and
-    // are deleted at retirement. The pre-v5 `default_<name>` id scheme is
-    // the known producer of such records.
-    skipRecord: (_def, record) =>
-      !HYPHENATED_UUID_RE.test(String(record.id)) || (skipRecord?.(_def, record) ?? false),
   });
 
   if (result.merged > 0) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Kanban } from "lucide-react";
 import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
@@ -8,10 +8,8 @@ import {
   InvitationBanner,
   LessAppShell,
   ScopedAppTree,
-  defaultRecordId,
   reportError,
   useAuth,
-  useDefaultRecord,
 } from "@betterbase/examples-shared";
 import {
   db,
@@ -24,7 +22,6 @@ import {
 } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { createBoardIn } from "@/lib/create-board";
-import { defaultData } from "@/lib/defaults";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
@@ -34,8 +31,8 @@ import { BoardView } from "@/components/BoardView";
  * UUIDs — the sync server rejects non-UUID ids, which is exactly how the
  * pre-v5 `${id}-col-N` scheme silently broke column syncing.
  */
-export async function createBoardWithColumns(name: string, id?: string) {
-  return createBoardIn(db, name, id);
+export async function createBoardWithColumns(name: string) {
+  return createBoardIn(db, name);
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +42,6 @@ export async function createBoardWithColumns(name: string, id?: string) {
 function LocalBoardApp() {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
-  const autoCreated = useRef(false);
 
   const boardResult = useQuery(boards, {
     sort: [
@@ -80,22 +76,6 @@ function LocalBoardApp() {
       setSelectedBoardId(allBoards[0]!.id);
     }
   }, [allBoards, selectedBoardId]);
-
-  // Auto-create a default board on first run (parity with the synced path).
-  // Declared defaults (lib/defaults.ts), gated on the BOARD's tombstone:
-  // a deleted default board must stay deleted — columns included, or
-  // they would seed as orphans under a board that no longer exists.
-  useEffect(() => {
-    if (boardResult && boardResult.records.length === 0 && !autoCreated.current) {
-      autoCreated.current = true;
-      db.get(boards, defaultRecordId(boards), { includeDeleted: true })
-        .then((deleted) => (deleted == null ? defaultData.seed(db, [boards, columns]) : undefined))
-        .catch((err) => {
-          reportError(err, "Couldn't create board");
-          autoCreated.current = false;
-        });
-    }
-  }, [boardResult]);
 
   const createBoard = (name: string) => {
     createBoardWithColumns(name)
@@ -198,7 +178,7 @@ function LocalBoardApp() {
 
 function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const { phase, error: syncError } = useSync();
+  const { error: syncError } = useSync();
   const syncStatus = useConnectionStatus();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
 
@@ -221,24 +201,6 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     addCard,
     moveCard,
   } = useBoards();
-
-  // Auto-create a default board only after the full bootstrap sync completes,
-  // and only when the collection verifiably reads empty from the sync db —
-  // a reactive-query length check at ready-time races the post-pull query
-  // propagation and duplicated the board on every reload.
-  useDefaultRecord(
-    phase === "ready",
-    boards,
-    // Board + its columns come from one declaration; seed() is idempotent
-    // and respects tombstones for each declared id. The hook's `id`
-    // argument is deliberately ignored — it IS the declaration's
-    // defaultRecordId(boards), and seeding by declaration keeps every
-    // record's id from the one source.
-    () => defaultData.seed(db, [boards, columns]),
-    "Couldn't create default board",
-    // Columns are part of the same declaration — sweep their legacy ids too
-    [columns],
-  );
 
   useEffect(() => {
     if (allBoards.length > 0 && !allBoards.find((b) => b.id === selectedBoardId)) {

@@ -105,29 +105,6 @@ describe("adoptLocalData", () => {
     expect(adopted.merged).toBe(1);
     expect(localStorage.getItem(key)).toBe("adopted");
   });
-
-  it("a pristine-only anonymous workspace adopts nothing and writes no marker", async () => {
-    const anon = fakeDb([{ id: "default_lists", name: "My Tasks", color: "indigo", todos: [] }]);
-    const target = fakeDb();
-    const adopted = await adoptLocalData({
-      appName: "tasks",
-      scopeKey: "scope-1",
-      anonymous: anon as never,
-      target: target as never,
-      collections: [def],
-      skipRecord: (_def, record) => record.id === "default_lists",
-    });
-    expect(adopted).toEqual({
-      merged: 0,
-      skipped: 1,
-      skippedTombstoned: 0,
-      skippedConflict: 0,
-    });
-    expect(target.bulkPut).not.toHaveBeenCalled();
-    // No marker: the anonymous db is the logged-out workspace and the
-    // next login must still adopt anything real created later.
-    expect(Object.keys(localStorage).filter((k) => k.startsWith("bb_local_adopted"))).toEqual([]);
-  });
 });
 
 describe("retireLocalData", () => {
@@ -207,12 +184,12 @@ describe("retireLocalData", () => {
   });
 });
 
-describe("adoptLocalData — non-UUID id guard", () => {
-  it("skips records whose ids the server could never store", async () => {
+describe("adoptLocalData — records adopt as-is", () => {
+  it("merges every anonymous record; ids are untouched", async () => {
     localStorage.clear();
     const anon = fakeDb([
-      { id: "default_lists", name: "My Tasks" },
-      { id: "22222222-3333-4444-8555-666666666666", name: "Real list" },
+      { id: "11111111-2222-4333-8444-555555555555", name: "List A" },
+      { id: "22222222-3333-4444-8555-666666666666", name: "List B" },
     ]);
     const target = fakeDb();
     const result = await adoptLocalData({
@@ -222,8 +199,11 @@ describe("adoptLocalData — non-UUID id guard", () => {
       target: target as unknown as Database,
       collections: [def],
     });
-    expect(result.merged).toBe(1);
+    expect(result.merged).toBe(2);
     const putArg = target.bulkPut.mock.calls[0]?.[1] as Array<Record<string, unknown>>;
-    expect(putArg.map((r) => r.id)).toEqual(["22222222-3333-4444-8555-666666666666"]);
+    expect(putArg.map((r) => r.id)).toEqual([
+      "11111111-2222-4333-8444-555555555555",
+      "22222222-3333-4444-8555-666666666666",
+    ]);
   });
 });

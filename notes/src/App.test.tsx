@@ -23,8 +23,9 @@ describe("Notes app sync wiring", () => {
       auth: { isAuthenticated: true, session: makeFakeSession(), handle: "alice" },
     });
 
-    // Wait for the auto-created notebook to appear (created when phase is ready)
-    await waitFor(() => expect(screen.getByText("My Notebook")).toBeVisible(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getAllByText(/notebooks/i).length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
 
     const names = lastProviderProps()
       .collections.map((c) => (c as { name: string }).name)
@@ -32,31 +33,30 @@ describe("Notes app sync wiring", () => {
     expect(names).toEqual(["notebooks", "notes"]);
   });
 
-  it("regression: remounting with an existing default notebook does not create a second one", async () => {
-    // A page reload remounts the whole tree: the auto-create one-shot guard
-    // resets while the record already exists, and the reactive query starts
-    // empty and repopulates asynchronously although phase is "ready"
-    // immediately. Deciding emptiness from a direct db read (not the query)
-    // is what keeps reloads from duplicating the default notebook.
-    // Isolated scope: shared-scope runs tombstone the deterministic default
-    // id in afterEach wipes, and a tombstoned default must not resurrect.
-    await openDatabaseForScope("default-remount-test");
-    const session = makeFakeSession({ getPersonalSpaceId: () => "default-remount-test" });
+  it("remounting neither duplicates nor creates notebooks", async () => {
+    // Nothing auto-creates: a user-created notebook stays exactly one
+    // across a full remount.
+    const user = userEvent.setup();
+    await openDatabaseForScope("notebook-remount-test");
+    const session = makeFakeSession({ getPersonalSpaceId: () => "notebook-remount-test" });
     const auth = { isAuthenticated: true, session, handle: "alice" };
     setSyncDb(db);
 
     const first = renderWithProviders(<App />, { db, auth });
-    await waitFor(() => expect(screen.getByText("My Notebook")).toBeVisible(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getAllByText(/notebooks/i).length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    await user.type(await screen.findByRole("textbox", { name: /new notebook/i }), "Journal");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByText("Journal")).toBeVisible(), { timeout: 4000 });
     first.unmount();
 
     renderWithProviders(<App />, { db, auth });
-    await waitFor(() => expect(screen.getByText("My Notebook")).toBeVisible(), { timeout: 4000 });
-    // Let any erroneous duplicate put land before asserting
+    await waitFor(() => expect(screen.getByText("Journal")).toBeVisible(), { timeout: 4000 });
     await new Promise((r) => setTimeout(r, 150));
 
     const all = await db.query(notebooks, {});
-    const defaults = all.records.filter((r) => r.name === "My Notebook");
-    expect(defaults).toHaveLength(1);
+    expect(all.records.filter((r) => r.name === "Journal")).toHaveLength(1);
   });
 });
 
