@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { MessageCircle } from "lucide-react";
 import { Box, Button } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import {
   EmptyState,
@@ -19,7 +20,7 @@ import {
   DB_NAME,
 } from "@/lib/db";
 import { useConversations } from "@/lib/sync";
-import { ConversationSidebar } from "@/components/ConversationSidebar";
+import { ConversationSidebar, NewChatModal } from "@/components/ConversationSidebar";
 import { ChatView } from "@/components/ChatView";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ function SignInGate() {
       appIcon={<MessageCircle size={22} color="var(--mantine-color-indigo-6)" />}
       isAuthenticated={false}
       handle={handle}
+      authMode="auth"
       onLogin={login}
       onLogout={logout}
     >
@@ -117,6 +119,14 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   const convMessages = allMessages.filter((m) => m.conversationId === selectedConvId);
 
+  // The new-conversation modal is owned here so both entry points — the
+  // sidebar "+" and the first-run empty-state CTA — open the same dialog.
+  const [newChatOpened, { open: openNewChat, close: closeNewChat }] = useDisclosure(false);
+  const handleStartChat = async (recipientHandle: string, name?: string) => {
+    const newConv = await startConversation(recipientHandle, name);
+    selectConv(newConv.id);
+  };
+
   const handleDeleteConversation = (id: string) => {
     deleteConversation(id)
       .catch((err) => reportError(err, "Couldn't delete conversation"))
@@ -155,10 +165,7 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           currentHandle={handle}
           selectedConversationId={selectedConvId}
           onSelect={setSelectedConvId}
-          onStartChat={async (recipientHandle, name) => {
-            const newConv = await startConversation(recipientHandle, name);
-            selectConv(newConv.id);
-          }}
+          onOpenNewChat={openNewChat}
           onDelete={handleDeleteConversation}
           onRename={(id, name) => {
             const conv = allConversations.find((c) => c.id === id);
@@ -178,11 +185,14 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
       onLogin={login}
       onLogout={logout}
     >
+      <NewChatModal opened={newChatOpened} onClose={closeNewChat} onStartChat={handleStartChat} />
       <ChatView
         conversation={selectedConv}
         messages={convMessages}
         currentHandle={handle}
         isAdmin={selectedConv?._spaceId ? isAdmin(selectedConv._spaceId) : false}
+        hasConversations={allConversations.length > 0}
+        onStartConversation={openNewChat}
         onSendMessage={handleSendMessage}
         onInvite={
           selectedConv ? (h) => inviteToConversation(selectedConv, h) : () => Promise.resolve()

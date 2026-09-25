@@ -191,3 +191,70 @@ describe("Notes concurrency", () => {
     );
   });
 });
+
+describe("Notes first run", () => {
+  it("zero notes: the empty state's CTA creates and opens the first note", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope(null); // align scope — no swap/boot at mount
+    renderWithProviders(<App />, { db }); // unauthenticated → local notes
+
+    // First-run CTA replaces the old dead-end "select a note or create" copy
+    const cta = await screen.findByRole(
+      "button",
+      { name: "Create your first note" },
+      { timeout: 4000 },
+    );
+    await user.click(cta);
+
+    // The created note opens in the editor and actually landed in the db
+    await screen.findByLabelText("Note title", {}, { timeout: 4000 });
+    await waitFor(
+      async () => {
+        const all = await db.query(notes, {});
+        expect(all.records).toHaveLength(1);
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it("notes exist but none selected: stays passive (no second creation path)", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope(null);
+    renderWithProviders(<App />, { db });
+
+    // Create one note (All Notes view) so the workspace is populated
+    const cta = await screen.findByRole(
+      "button",
+      { name: "Create your first note" },
+      { timeout: 4000 },
+    );
+    await user.click(cta);
+    await screen.findByLabelText("Note title", {}, { timeout: 4000 });
+
+    // Re-clicking the current view clears the selection without emptying it
+    await user.click(screen.getByText("All Notes"));
+    expect(await screen.findByText("No note selected")).toBeInTheDocument();
+    expect(screen.queryByText("Create your first note")).toBeNull();
+  });
+
+  it("notes exist: an empty view (Favorites) stays passive, never claims 'No notes yet'", async () => {
+    const user = userEvent.setup();
+    await openDatabaseForScope(null);
+    renderWithProviders(<App />, { db });
+
+    // Create one note (All Notes view)
+    const cta = await screen.findByRole(
+      "button",
+      { name: "Create your first note" },
+      { timeout: 4000 },
+    );
+    await user.click(cta);
+    await screen.findByLabelText("Note title", {}, { timeout: 4000 });
+
+    // Favorites is an empty VIEW, not an empty workspace — the first-run CTA
+    // must not appear (its copy would be wrong, and it creates in All Notes)
+    await user.click(screen.getByText("Favorites"));
+    expect(await screen.findByText("No note selected")).toBeInTheDocument();
+    expect(screen.queryByText("Create your first note")).toBeNull();
+  });
+});

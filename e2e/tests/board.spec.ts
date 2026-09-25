@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Board lifecycle: user-created board (with its default columns) + created
@@ -36,7 +36,7 @@ test.describe.serial("board lifecycle", () => {
     await registerUser(page, creds);
     await page.goto(appUrl("board"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     // The board (with columns) and card were adopted — exactly one board,
     // exactly one set of columns, nothing seeded alongside
@@ -64,7 +64,7 @@ test.describe.serial("board lifecycle", () => {
     await page.goto(appUrl("board"));
     // Nothing seeds on a fresh device — connect and download the account's data
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("lifecycle card")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("nav").getByText("Roadmap", { exact: true })).toHaveCount(1, {

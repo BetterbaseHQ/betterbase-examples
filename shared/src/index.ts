@@ -8,7 +8,6 @@ export type { AuthContextValue, AuthProviderProps } from "betterbase/auth/react"
 // Layout
 export { LessAppShell } from "./layout/LessAppShell.js";
 export { HeaderBar, DEFAULT_LAUNCHPAD_URL, resolveLaunchpadUrl } from "./layout/HeaderBar.js";
-export { EncryptionIndicator } from "./layout/EncryptionIndicator.js";
 export { UserArea } from "./layout/UserArea.js";
 export { ConnectSyncModal } from "./layout/ConnectSyncModal.js";
 export { SyncStatusBadge } from "./layout/SyncStatusBadge.js";

@@ -133,14 +133,24 @@ export async function connectFromApp(page: Page, creds: UserCredentials): Promis
   });
 
   // Entry points differ: most apps open a "Connect Sync" modal first; chat's
-  // sign-in gate starts the OAuth redirect directly
-  const signIn = page.getByRole("button", { name: "Sign in", exact: true });
-  if (await signIn.isVisible().catch(() => false)) {
-    await signIn.click();
-  } else {
-    await page.getByRole("button", { name: "Connect Sync" }).click();
-    await page.getByRole("button", { name: "Continue with Betterbase Account" }).click();
-  }
+  // sign-in gate starts the OAuth redirect directly (and renders two "Sign in"
+  // buttons — header + centered CTA — either starts the flow). Wait for
+  // whichever entry point this app renders instead of instant visibility
+  // probes that race page hydration.
+  const entry = page
+    .getByRole("button", { name: "Sign in", exact: true })
+    .first()
+    .or(page.getByRole("button", { name: "Connect Sync" }))
+    .first();
+  await entry.click({ timeout: 30_000 });
+
+  // Sign-in buttons redirect directly; the connect button opens the modal first
+  const continueBtn = page.getByRole("button", { name: "Continue with Betterbase Account" });
+  const modalShown = await continueBtn
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (modalShown) await continueBtn.click();
 
   // The redirect should leave the app origin immediately; under dev-server
   // load the click can land before hydration wires the handler — detect a
@@ -161,7 +171,7 @@ export async function connectFromApp(page: Page, creds: UserCredentials): Promis
     if (await retry.isVisible().catch(() => false)) {
       await retry.click();
     } else {
-      const signInAgain = page.getByRole("button", { name: "Sign in", exact: true });
+      const signInAgain = page.getByRole("button", { name: "Sign in", exact: true }).first();
       if (await signInAgain.isVisible().catch(() => false)) await signInAgain.click();
     }
   }
@@ -197,9 +207,14 @@ export async function connectFromApp(page: Page, creds: UserCredentials): Promis
   await page.waitForURL(`${appOrigin}/**`, { timeout: 30_000 });
 }
 
-/** Wait for the app to finish connecting (encryption indicator). */
-export async function waitForEncrypted(page: Page): Promise<void> {
-  await expect(page.getByText("Encrypted").first()).toBeVisible({ timeout: 30_000 });
+/**
+ * Wait for the app to finish connecting: the header avatar (account menu)
+ * only renders once the OAuth round-trip and session adoption completed.
+ */
+export async function waitForConnected(page: Page): Promise<void> {
+  await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /**

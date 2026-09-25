@@ -47,10 +47,11 @@ describe("Passwords local flow", () => {
     const user = userEvent.setup();
     renderWithProviders(<App />, { db });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: /add/i })).toBeVisible(), {
-      timeout: 4000,
-    });
-    await user.click(screen.getByRole("button", { name: /add/i }));
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Add your first password" })).toBeVisible(),
+      { timeout: 4000 },
+    );
+    await user.click(screen.getByRole("button", { name: "Add your first password" }));
 
     await user.type(screen.getByLabelText(/site/i), "example.com");
     await user.type(screen.getByLabelText(/username/i), "alice");

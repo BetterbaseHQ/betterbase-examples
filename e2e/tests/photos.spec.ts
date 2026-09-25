@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Photos lifecycle: upload, connect, returning device. Exercises the file
@@ -32,7 +32,7 @@ test.describe.serial("photos lifecycle", () => {
     await registerUser(page, creds);
     await page.goto(appUrl("photos"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     // Let the upload queue drain before this context goes away — the
     // returning device can only download what reached the server
@@ -49,7 +49,7 @@ test.describe.serial("photos lifecycle", () => {
 
     await page.goto(appUrl("photos"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     // Blob download can lag the record
     await expect(page.locator("main img").first()).toBeVisible({ timeout: 30_000 });

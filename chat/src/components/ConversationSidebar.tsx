@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { Stack, NavLink, TextInput, ActionIcon, Group, Text, Modal, Button } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
 import { useMembers } from "betterbase/sync/react";
 import { MessageCircle, Plus, Trash2, Pencil } from "lucide-react";
 import { ConfirmDialog } from "@betterbase/examples-shared";
@@ -13,7 +12,8 @@ interface ConversationSidebarProps {
   currentHandle: string | null;
   selectedConversationId: string | null;
   onSelect: (id: string) => void;
-  onStartChat: (recipientHandle: string, name?: string) => Promise<void>;
+  /** Opens the shared new-conversation modal (owned by the app shell). */
+  onOpenNewChat: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }
@@ -22,7 +22,7 @@ interface ConversationSidebarProps {
 // NewChatModal
 // ---------------------------------------------------------------------------
 
-function NewChatModal({
+export function NewChatModal({
   opened,
   onClose,
   onStartChat,
@@ -217,11 +217,10 @@ export function ConversationSidebar({
   currentHandle,
   selectedConversationId,
   onSelect,
-  onStartChat,
+  onOpenNewChat,
   onDelete,
   onRename,
 }: ConversationSidebarProps) {
-  const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const [pendingDelete, setPendingDelete] = useState<(Conversation & { _spaceId?: string }) | null>(
     null,
   );
@@ -232,12 +231,15 @@ export function ConversationSidebar({
         <Text size="xs" fw={600} c="dimmed" tt="uppercase">
           Conversations
         </Text>
-        <ActionIcon size="xs" variant="subtle" aria-label="New conversation" onClick={openModal}>
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          aria-label="New conversation"
+          onClick={onOpenNewChat}
+        >
           <Plus size={14} />
         </ActionIcon>
       </Group>
-
-      <NewChatModal opened={modalOpened} onClose={closeModal} onStartChat={onStartChat} />
 
       {conversations.map((conv) => (
         <ConversationNavItem

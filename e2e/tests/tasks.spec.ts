@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Tasks lifecycle: user-created list + todo, anonymous → account adoption,
@@ -30,7 +30,7 @@ test.describe.serial("tasks lifecycle", () => {
     await registerUser(page, creds);
     await page.goto(appUrl("tasks"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("lifecycle todo")).toBeVisible({ timeout: 30_000 });
     // Exactly one copy of the adopted list — nothing seeded alongside it
@@ -53,7 +53,7 @@ test.describe.serial("tasks lifecycle", () => {
 
     await page.goto(appUrl("tasks"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("lifecycle todo")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("nav").getByText("Errands", { exact: true })).toHaveCount(1, {

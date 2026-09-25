@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Passwords lifecycle: created entry, connect, returning device. No default
@@ -25,7 +25,7 @@ test.describe.serial("passwords lifecycle", () => {
     await registerUser(page, creds);
     await page.goto(appUrl("passwords"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("example.com")).toBeVisible({ timeout: 30_000 });
 
@@ -41,7 +41,7 @@ test.describe.serial("passwords lifecycle", () => {
 
     await page.goto(appUrl("passwords"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("example.com")).toBeVisible({ timeout: 30_000 });
 

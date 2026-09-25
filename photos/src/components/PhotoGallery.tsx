@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Group, Text, ActionIcon, Button } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { Upload, ImagePlus } from "lucide-react";
-import { RowsPhotoAlbum } from "react-photo-album";
+import { ColumnsPhotoAlbum } from "react-photo-album";
 import Lightbox from "yet-another-react-lightbox";
 import { EmptyState, ShareButton, MembersPanel, reportError } from "@betterbase/examples-shared";
 import { isShared } from "betterbase/sync";
@@ -10,7 +10,7 @@ import type { Photo, Album } from "@/lib/db";
 import { PhotoCard } from "@/components/PhotoCard";
 import { LightboxSlide } from "@/components/LightboxSlide";
 
-import "react-photo-album/rows.css";
+import "react-photo-album/columns.css";
 import "yet-another-react-lightbox/styles.css";
 
 interface PhotoGalleryProps {
@@ -61,10 +61,13 @@ export function PhotoGallery({
 
   // Map photos to react-photo-album format.
   // src is a placeholder — PhotoCard handles actual image loading via render.photo.
+  // Dimensions fall back to a square and are floored at 1: layout math
+  // divides by aspect ratio, and missing/zero metadata (side-car-less
+  // imports) would otherwise produce NaN or unbounded tiles.
   const albumPhotos = photos.map((p) => ({
     src: "",
-    width: p.width,
-    height: p.height,
+    width: Math.max(p.width ?? 1, 1),
+    height: Math.max(p.height ?? 1, 1),
     key: p.id,
   }));
 
@@ -163,12 +166,13 @@ export function PhotoGallery({
         </Dropzone>
       </Group>
 
-      {/* Photo grid */}
-      <RowsPhotoAlbum
+      {/* Photo grid — fixed columns (not rows): a degenerate aspect ratio
+          (missing metadata, 1×1 imports) can't stretch a row to fill the
+          container width, so every tile stays bounded and uniform. */}
+      <ColumnsPhotoAlbum
         photos={albumPhotos}
-        targetRowHeight={200}
+        columns={3}
         spacing={8}
-        rowConstraints={{ maxPhotos: 5 }}
         render={{
           photo: (_, { index, width, height }) => (
             <PhotoCard

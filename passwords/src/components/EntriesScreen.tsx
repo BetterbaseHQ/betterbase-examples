@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { KeyRound, Plus } from "lucide-react";
-import { Box, Loader } from "@mantine/core";
+import { Box, Button, Loader } from "@mantine/core";
 import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
 import type { ConnectionStatus } from "betterbase/sync/react";
 import { useEditableRecord } from "betterbase/db/react";
@@ -132,7 +132,11 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
         icon={<KeyRound size={32} />}
         title="No passwords yet"
         description="Add your first password to get started"
-        action={<Plus size={16} style={{ display: "inline", verticalAlign: "middle" }} />}
+        action={
+          <Button leftSection={<Plus size={16} />} size="xs" onClick={() => setCreating(true)}>
+            Add your first password
+          </Button>
+        }
       />
     ) : (
       <EmptyState icon={<KeyRound size={32} />} title="No matches" />

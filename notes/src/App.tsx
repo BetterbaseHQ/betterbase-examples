@@ -2,12 +2,7 @@ import { useMemo } from "react";
 import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
-import {
-  InvitationBanner,
-  ScopedAppTree,
-  reportError,
-  useAuth,
-} from "@betterbase/examples-shared";
+import { InvitationBanner, ScopedAppTree, reportError, useAuth } from "@betterbase/examples-shared";
 import {
   db,
   notebooks,

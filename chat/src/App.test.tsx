@@ -62,6 +62,8 @@ describe("ChatView", () => {
         messages={messages as never}
         currentHandle="alice"
         isAdmin
+        hasConversations
+        onStartConversation={() => {}}
         onSendMessage={onSendMessage}
         onInvite={() => Promise.resolve()}
         onRemoveMember={() => Promise.resolve()}
@@ -240,6 +242,8 @@ describe("ChatView", () => {
         messages={history as never}
         currentHandle="alice"
         isAdmin
+        hasConversations
+        onStartConversation={() => {}}
         onSendMessage={() => Promise.resolve()}
         onInvite={() => Promise.resolve()}
         onRemoveMember={() => Promise.resolve()}
@@ -261,5 +265,49 @@ describe("ChatView", () => {
       // Pinned to (or within one message of) the bottom, not at the top
       expect(viewport!.scrollTop).toBeGreaterThan(viewport!.scrollHeight * 0.5);
     });
+  });
+
+  it("first run: the empty state's CTA opens the new-conversation flow", async () => {
+    const { ChatView } = await import("./components/ChatView");
+    const user = userEvent.setup();
+    let startRequested = false;
+    renderWithProviders(
+      <ChatView
+        conversation={null}
+        messages={[]}
+        currentHandle="alice"
+        isAdmin={false}
+        hasConversations={false}
+        onStartConversation={() => {
+          startRequested = true;
+        }}
+        onSendMessage={() => Promise.resolve()}
+        onInvite={() => Promise.resolve()}
+        onRemoveMember={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "New conversation" }));
+    expect(startRequested).toBe(true);
+  });
+
+  it("conversations exist but none selected: passive copy, no creation CTA", async () => {
+    const { ChatView } = await import("./components/ChatView");
+    renderWithProviders(
+      <ChatView
+        conversation={null}
+        messages={[]}
+        currentHandle="alice"
+        isAdmin={false}
+        hasConversations
+        onStartConversation={() => {}}
+        onSendMessage={() => Promise.resolve()}
+        onInvite={() => Promise.resolve()}
+        onRemoveMember={() => Promise.resolve()}
+      />,
+    );
+
+    expect(screen.getByText("No conversation selected")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New conversation" })).toBeNull();
   });
 });

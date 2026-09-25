@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Notes lifecycle: user-created notebook + note, anonymous → account
@@ -27,7 +27,7 @@ test.describe.serial("notes lifecycle", () => {
     await registerUser(page, creds);
     await page.goto(appUrl("notes"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     // The notebook and note were adopted; nothing seeded alongside them
     await expect(page.getByText("lifecycle note")).toBeVisible({ timeout: 30_000 });
@@ -47,7 +47,7 @@ test.describe.serial("notes lifecycle", () => {
 
     await page.goto(appUrl("notes"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("lifecycle note")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("nav").getByText("Journal", { exact: true })).toHaveCount(1, {

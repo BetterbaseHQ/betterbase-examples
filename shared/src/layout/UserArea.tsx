@@ -3,12 +3,14 @@ import { Button, Menu, Avatar, Group, Text, Divider, UnstyledButton } from "@man
 import { LogOut, ExternalLink } from "lucide-react";
 import { useAuth } from "betterbase/auth/react";
 import { ConnectSyncModal } from "./ConnectSyncModal.js";
-import { SyncStatusBadge, type SyncStatus } from "./SyncStatusBadge.js";
+import { SyncStatusBadge, STATUS_APPEARANCE, type SyncStatus } from "./SyncStatusBadge.js";
 
 interface UserAreaProps {
   isAuthenticated: boolean;
   handle: string | null;
   syncStatus?: SyncStatus;
+  /** Detail surfaced in the badge tooltip when syncStatus is "error". */
+  syncError?: string;
   onLogin: () => Promise<void>;
   onLogout: () => void;
   /**
@@ -29,23 +31,11 @@ function getInitials(handle: string): string {
   return parts.length > 0 ? parts.join("") : "?";
 }
 
-function getSyncLabel(status: SyncStatus): { label: string; color: string } {
-  switch (status) {
-    case "synced":
-      return { label: "Synced", color: "green" };
-    case "syncing":
-      return { label: "Syncing...", color: "blue" };
-    case "offline":
-      return { label: "Offline", color: "gray" };
-    case "error":
-      return { label: "Sync error", color: "yellow" };
-  }
-}
-
 export function UserArea({
   isAuthenticated,
   handle,
   syncStatus = "synced",
+  syncError,
   onLogin,
   onLogout,
   mode = "sync",
@@ -76,11 +66,11 @@ export function UserArea({
   }
 
   const initials = handle ? getInitials(handle) : "?";
-  const sync = getSyncLabel(syncStatus);
+  const sync = STATUS_APPEARANCE[syncStatus];
 
   return (
     <Group gap="xs">
-      <SyncStatusBadge status={syncStatus} />
+      <SyncStatusBadge status={syncStatus} errorDetail={syncError} />
       <Menu shadow="md" width={200} position="bottom-end">
         <Menu.Target>
           <UnstyledButton aria-label="Account menu" style={{ borderRadius: "50%" }}>

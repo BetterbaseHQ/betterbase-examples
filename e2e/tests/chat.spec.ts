@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForEncrypted, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Chat lifecycle: chat requires an account before any conversation UI
@@ -21,10 +21,11 @@ test.describe.serial("chat lifecycle", () => {
     await expect(page.getByText("Sign in to start chatting")).toBeVisible({ timeout: 30_000 });
 
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     // Self-conversation + message
-    await page.getByRole("button", { name: "New conversation" }).click();
+    // The first-run CTA in the main pane (the sidebar "+" has the same name)
+    await page.getByRole("main").getByRole("button", { name: "New conversation" }).click();
     await page.getByPlaceholder("user@domain").fill(ownHandle());
     await page.getByRole("button", { name: "Start conversation" }).click();
 
@@ -46,7 +47,7 @@ test.describe.serial("chat lifecycle", () => {
 
     await page.goto(appUrl("chat"));
     await connectFromApp(page, creds);
-    await waitForEncrypted(page);
+    await waitForConnected(page);
 
     await expect(page.getByText("lifecycle message").first()).toBeVisible({ timeout: 60_000 });
 

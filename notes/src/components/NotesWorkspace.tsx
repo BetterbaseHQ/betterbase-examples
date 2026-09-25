@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
-import { FileText } from "lucide-react";
-import { Box } from "@mantine/core";
+import { FileText, Plus } from "lucide-react";
+import { Box, Button } from "@mantine/core";
 import type { ConnectionStatus } from "betterbase/sync/react";
 import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
 import type { Note, Notebook } from "@/lib/db";
@@ -196,12 +196,27 @@ export function NotesWorkspace({
         />
         {selectedNote ? (
           <NoteEditor note={selectedNote} onDelete={deleteNote} />
+        ) : allNotes.length === 0 && !search ? (
+          // Global zero-note state (not view-filtered): an empty Favorites or
+          // notebook view with notes elsewhere must not claim "no notes yet"
+          <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
+            <EmptyState
+              icon={<FileText size={32} />}
+              title="No notes yet"
+              description="Create your first note to get started"
+              action={
+                <Button leftSection={<Plus size={16} />} size="xs" onClick={createNote}>
+                  Create your first note
+                </Button>
+              }
+            />
+          </Box>
         ) : (
           <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
             <EmptyState
               icon={<FileText size={32} />}
               title="No note selected"
-              description="Select a note or create a new one"
+              description="Select a note from the list"
             />
           </Box>
         )}

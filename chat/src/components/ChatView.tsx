@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Stack, Group, Text, TextInput, ActionIcon, ScrollArea, Box } from "@mantine/core";
+import { Stack, Group, Text, TextInput, ActionIcon, ScrollArea, Box, Button } from "@mantine/core";
 import { Send, MessageCircle } from "lucide-react";
 import {
   EmptyState,
@@ -20,6 +20,10 @@ interface ChatViewProps {
   messages: readonly Message[];
   currentHandle: string | null;
   isAdmin: boolean;
+  /** Whether any conversation exists — first-run gets a creation CTA. */
+  hasConversations: boolean;
+  /** Opens the new-conversation modal (shared with the sidebar "+"). */
+  onStartConversation: () => void;
   /** `id` (when provided) makes the commit idempotent across retries. */
   onSendMessage: (text: string, id?: string) => Promise<void>;
   onInvite: (handle: string) => Promise<void>;
@@ -31,6 +35,8 @@ export function ChatView({
   messages,
   currentHandle,
   isAdmin,
+  hasConversations,
+  onStartConversation,
   onSendMessage,
   onInvite,
   onRemoveMember,
@@ -116,6 +122,7 @@ export function ChatView({
   }, [messages, handleByDid]);
 
   if (!conversation) {
+    const firstRun = !hasConversations;
     return (
       <Box
         style={{
@@ -128,8 +135,19 @@ export function ChatView({
       >
         <EmptyState
           icon={<MessageCircle size={32} />}
-          title="No conversation selected"
-          description='Click "+" to start a new conversation'
+          title={firstRun ? "No conversations yet" : "No conversation selected"}
+          description={
+            firstRun
+              ? "Start a conversation to exchange encrypted messages"
+              : "Pick a conversation from the sidebar"
+          }
+          action={
+            firstRun ? (
+              <Button size="xs" onClick={onStartConversation}>
+                New conversation
+              </Button>
+            ) : undefined
+          }
         />
       </Box>
     );

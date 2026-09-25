@@ -1,5 +1,4 @@
 import { Group, Burger, Text, UnstyledButton } from "@mantine/core";
-import { EncryptionIndicator } from "./EncryptionIndicator.js";
 import { UserArea } from "./UserArea.js";
 import { UploadQueueStatus } from "./UploadQueueStatus.js";
 import { runtimeConfig } from "../lib/runtime-config.js";
@@ -90,15 +89,11 @@ export function HeaderBar({
             onRetry={uploadQueue.onRetry}
           />
         )}
-        <EncryptionIndicator
-          isAuthenticated={isAuthenticated}
-          hasError={syncStatus === "error"}
-          errorMessage={syncError}
-        />
         <UserArea
           isAuthenticated={isAuthenticated}
           handle={handle}
           syncStatus={syncStatus}
+          syncError={syncError}
           onLogin={onLogin}
           onLogout={onLogout}
           mode={authMode}
