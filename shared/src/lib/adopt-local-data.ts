@@ -9,8 +9,8 @@
  * silently disappeared from the UI (still on disk, recoverable only by
  * logging out). Offline-first means local data must survive connecting —
  * this helper merges the anonymous records into the account database
- * before the app renders (and before default-record seeding can observe
- * emptiness), so the first `flushAll` pushes them to the personal space.
+ * before the app renders, so the first `flushAll` pushes them to the
+ * personal space.
  *
  * Adoption alone would leave a frozen duplicate of the data in the
  * anonymous namespace: logging out would show a stale copy the user has
@@ -80,11 +80,10 @@ export interface AdoptLocalDataOptions {
  * account database. Returns the merge breakdown (`.merged` is 0 when
  * there is nothing to adopt or this scope already adopted).
  *
- * A pristine-only anonymous workspace (a first visit that only seeded
- * defaults) adopts nothing and marks nothing — the correct end state is
- * "no user data", and the unmarked marker keeps the next login's
- * adoption armed for data created after this one (the anonymous db is
- * also the logged-out workspace, so it is deliberately NOT deleted).
+ * An empty anonymous workspace adopts nothing and marks nothing — the
+ * unmarked marker keeps the next login's adoption armed for data created
+ * after this one (the anonymous db is also the logged-out workspace, so
+ * it is deliberately NOT deleted).
  *
  * Throws on bulk errors — callers run this before marking the scope
  * ready, so a failed adoption surfaces as a scope-open error rather

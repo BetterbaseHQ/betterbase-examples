@@ -25,7 +25,11 @@ describe("Board app sync wiring", () => {
       auth: { isAuthenticated: true, session: makeFakeSession(), handle: "alice" },
     });
 
-    await waitFor(() => expect(screen.getAllByText(/boards/i).length).toBeGreaterThan(0));
+    // The sync-status badge only renders on the authenticated path.
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(), {
+      timeout: 4000,
+    });
 
     const names = lastProviderProps()
       .collections.map((c) => (c as { name: string }).name)
@@ -89,7 +93,10 @@ describe("Board app sync wiring", () => {
     await new Promise((r) => setTimeout(r, 150));
 
     const all = await db.query(boards, {});
-    expect(all.records.filter((r) => r.name === "Roadmap")).toHaveLength(1);
+    // Exactly one board and its three columns — catches any regression
+    // that auto-creates scaffolding alongside user data
+    expect(all.records).toHaveLength(1);
+    expect((await db.query(columns, {})).records).toHaveLength(3);
   });
 });
 
@@ -99,8 +106,6 @@ describe("Board local cascade deletes", () => {
     await openDatabaseForScope(null); // align scope — no swap/boot at mount
     renderWithProviders(<App />, { db }); // unauthenticated → LocalBoardApp
 
-    // Explicit unique-id board: the previous test's wipe tombstoned the
-    // deterministic default id, and a deleted default must stay deleted.
     await createBoardWithColumns("Cascade Board");
     await waitFor(() => expect(screen.getByText("Done")).toBeVisible(), { timeout: 8000 });
 
@@ -163,9 +168,9 @@ describe("Board local cascade deletes", () => {
 
     await waitFor(
       async () => {
-        // Scoped to this board: a default-seed write racing an earlier
-        // suite's wipe can leave orphan default columns behind — the
-        // cascade property is that THIS board's columns go with the delete.
+        // Scoped to this board: other suites may hold columns of their
+        // own boards — the cascade property is that THIS board's columns
+        // go with the delete.
         const remaining = (await db.query(columns, {})).records.filter(
           (c) => c.boardId === cascadeBoard.id,
         );

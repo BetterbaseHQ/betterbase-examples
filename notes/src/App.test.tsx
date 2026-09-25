@@ -23,9 +23,11 @@ describe("Notes app sync wiring", () => {
       auth: { isAuthenticated: true, session: makeFakeSession(), handle: "alice" },
     });
 
-    await waitFor(() => expect(screen.getAllByText(/notebooks/i).length).toBeGreaterThan(0), {
-      timeout: 4000,
-    });
+    // The sync-status badge only renders on the authenticated path.
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      { timeout: 4000 },
+    );
 
     const names = lastProviderProps()
       .collections.map((c) => (c as { name: string }).name)
@@ -43,9 +45,10 @@ describe("Notes app sync wiring", () => {
     setSyncDb(db);
 
     const first = renderWithProviders(<App />, { db, auth });
-    await waitFor(() => expect(screen.getAllByText(/notebooks/i).length).toBeGreaterThan(0), {
-      timeout: 4000,
-    });
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      { timeout: 4000 },
+    );
     await user.type(await screen.findByRole("textbox", { name: /new notebook/i }), "Journal");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByText("Journal")).toBeVisible(), { timeout: 4000 });
@@ -56,7 +59,9 @@ describe("Notes app sync wiring", () => {
     await new Promise((r) => setTimeout(r, 150));
 
     const all = await db.query(notebooks, {});
-    expect(all.records.filter((r) => r.name === "Journal")).toHaveLength(1);
+    // Exactly one record total — catches any regression that auto-creates
+    // scaffolding alongside user data
+    expect(all.records).toHaveLength(1);
   });
 });
 

@@ -33,7 +33,10 @@ describe("Tasks app sync wiring", () => {
       auth: { isAuthenticated: true, session: makeFakeSession(), handle: "alice" },
     });
 
-    await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
+    // The sync-status badge only renders on the authenticated path —
+    // waiting for it proves the synced tree mounted, not just the shell.
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(), {
       timeout: 4000,
     });
 
@@ -51,9 +54,10 @@ describe("Tasks app sync wiring", () => {
     setSyncDb(db);
 
     const first = renderWithProviders(<App />, { db, auth });
-    await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
-      timeout: 4000,
-    });
+    await waitFor(
+      () => expect(document.querySelector('[data-testid^="sync-status-"]')).not.toBeNull(),
+      { timeout: 4000 },
+    );
     await user.type(await screen.findByRole("textbox", { name: /new list/i }), "Errands");
     await user.keyboard("{Enter}");
     await waitFor(
@@ -187,8 +191,6 @@ describe("Tasks scope-swap wiring", () => {
     );
 
     // Page load, logged out: pins A in the outer provider (as main.tsx did).
-    // (Shell marker, not "My Tasks": earlier suites' wipes tombstone the
-    // deterministic default id, which legitimately suppresses re-seeding.)
     const first = renderWithProviders(<App />, { db: pinned });
     await waitFor(() => expect(screen.getAllByText("Lists").length).toBeGreaterThan(0), {
       timeout: 4000,

@@ -73,10 +73,9 @@ export async function openDatabaseForScope(scopeKey: string | null): Promise<voi
     if (scopeKey !== null && wasAnonymous) {
       // Offline-first: the logged-out workspace merges into the first
       // account opened on this profile (idempotent, one-time per scope).
-      // Pristine default records are declared data, not user data — they
-      // never adopt (see lib/defaults.ts). Runs before the swap commits
-      // so a failure keeps the previous database current (openName
-      // unchanged) and a retry re-runs the merge.
+      // Runs before the swap commits so a failure keeps the previous
+      // database current (openName unchanged) and a retry re-runs the
+      // merge.
       await adoptLocalData({
         appName: DB_NAME,
         scopeKey,

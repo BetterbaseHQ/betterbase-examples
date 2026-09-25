@@ -172,9 +172,10 @@ records, prompt: **Merge / Discard**.
   records that are valid UUIDs and would wedge post-016.
 - **prod**: 015 never shipped (release pin `a333b35` predates `1f21876`).
   Next upgrade applies 015+016 back-to-back — a no-op round trip on data
-  that has always had the global PK. No prod data migration for record ids;
-  legacy `default_<name>` anonymous records remain handled client-side by
-  the adoption guard.
+  that has always had the global PK. No prod data migration for record ids.
+  Pre-v5 `default_<name>` anonymous records (if any remain in the wild)
+  now adopt as-is; the server permanently rejects their pushes and the
+  client's push quarantine surfaces them — no compat code.
 
 ## What gets removed / changed in betterbase-examples
 
@@ -188,11 +189,11 @@ Removed:
   the exact resurrect-on-empty behavior this decision bans
 - Account-side seeding paths in tasks/notes/board sync setup (including
   notes' post-ready "My Notebook" seeding)
-- `defaultData.isPristine`, `seed`, `seedRecord`, and `seedChildren` — the
-  recognition and re-seeding halves have no post-change role; sample trees
-  adopt as units, so structural re-seeding is obsolete. What remains of
-  `default-data.ts` is a creation-template helper (multi-record sample
-  construction with minted, threaded ids)
+- `default-data.ts` in its entirety (declaration, recognition via
+  `isPristine`, `seed`/`seedRecord`, structural re-seeding via
+  `seedChildren`) — sample trees adopt as units and nothing seeds, so
+  neither half has a role. A creation-template helper returns with the
+  Phase 2 prompts
 
 Kept (unchanged semantics):
 - Adoption/retirement plumbing, blob transfer, StrictMode-safe disposal,
@@ -234,8 +235,9 @@ these bug classes escaped before):
 - `fixtures.ts`: onboarding-prompt interaction helpers (gate + sample
   accept/decline), Pattern C merge/discard helpers for second-connect
   scenarios.
-- New tripwire for the decision's core promise: an emptied account (delete
-  everything) + fresh device **never** re-materializes scaffolding.
+- Planned tripwire (Phase 2): an emptied account (delete everything) +
+  fresh device **never** re-materializes scaffolding. Not yet implemented —
+  nothing seeds anymore, so the risk it guards is a reintroduced seeder.
 
 ## Consequences
 

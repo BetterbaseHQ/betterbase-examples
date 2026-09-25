@@ -25,12 +25,7 @@ import { createBoardIn } from "@/lib/create-board";
 import { BoardSidebar } from "@/components/BoardSidebar";
 import { BoardView } from "@/components/BoardView";
 
-/**
- * Create a board with its three default columns. Deterministic ids when
- * `id` is given (concurrent seeds collapse); column ids are v5-derived
- * UUIDs — the sync server rejects non-UUID ids, which is exactly how the
- * pre-v5 `${id}-col-N` scheme silently broke column syncing.
- */
+/** Board creation on the module (anonymous) db — see lib/create-board. */
 export async function createBoardWithColumns(name: string) {
   return createBoardIn(db, name);
 }
@@ -164,7 +159,7 @@ function LocalBoardApp() {
           <EmptyState
             icon={<Kanban size={32} />}
             title="No board selected"
-            description="Select a board or create a new one"
+            description="Create a board to get started"
           />
         </div>
       )}
@@ -315,7 +310,7 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           <EmptyState
             icon={<Kanban size={32} />}
             title="No board selected"
-            description="Select a board or create a new one"
+            description="Create a board to get started"
           />
         </div>
       )}

@@ -21,7 +21,7 @@ interface ScopedAppTreeBaseProps {
    * Opens the database for a scope (null = anonymous). Adoption of the
    * anonymous workspace happens inside this function, before the swap
    * commits — pass the app's `openDatabaseForScope` including its
-   * `adoptLocalData` call (with the app's declared-defaults filter).
+   * `adoptLocalData` call (unconditionally (all anonymous records adopt)).
    */
   openDatabaseForScope: (scopeKey: string | null) => Promise<void>;
   /** Deletes the anonymous database files (SDK deleteDatabase). */
