@@ -113,6 +113,10 @@ export function useAlbums(fileStore?: FileStore) {
             );
           }
         } catch (err) {
+          // Migration failures never reject the share: the records are the
+          // source of truth and the invitation already went out. Affected
+          // photos render "Unavailable" until re-added; retryable
+          // failures heal on a re-attempted migration.
           console.warn("shareAlbum: blob migration failed — records shared without bytes", err);
         }
       }

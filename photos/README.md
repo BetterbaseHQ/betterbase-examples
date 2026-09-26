@@ -43,7 +43,8 @@ normal album delete takes).
 4. Tab two accepts the invitation — the album, its photo records, _and the
    blobs themselves_ appear, decrypted with the shared space key. Uploads in
    either tab sync to the other live: file operations route to the owning
-   space (per-space epoch keys, UCAN auth), and blobs cached before a share
-   are migrated into the shared space and re-uploaded under its key. (Blobs
-   migrate when cached on the sharing device — photos whose bytes live only
-   on another device or were evicted show "Unavailable" until re-uploaded.)
+   space (per-space epoch keys, UCAN auth), and blobs are migrated into the
+   shared space and re-uploaded under its key — including blobs that were
+   never on the sharing device (they're fetched from the personal space's
+   server copy first). Only blobs the source space can no longer serve
+   show "Unavailable".
