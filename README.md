@@ -18,6 +18,18 @@ Everything here works offline, syncs in real time, and encrypts data before it l
 
 All apps share common UI components via the [`shared`](./shared) package (`@betterbase/examples-shared`).
 
+## A reading order
+
+Each app is this same app plus one more idea — read them in this order:
+
+1. [launchpad](./launchpad) — OAuth 2.0 + PKCE sign-in only. The auth seam with no data layer.
+2. [tasks](./tasks) — the simplest full app: local-first CRUD, adoption, sharing, CRDT merge. **Start here.**
+3. [notes](./notes) — rich-text editing: character-level merge of `t.text()` bodies, debounced base-anchored saves.
+4. [board](./board) — multi-record trees: parent edges, cascade deletes, children-first sharing, fractional drag ordering.
+5. [chat](./chat) — realtime: presence, typing, signed edit chains with spoof detection.
+6. [photos](./photos) — blobs: FileStore upload queue, thumbnails, per-account caches, upload-aware sync status.
+7. [passwords](./passwords) — per-record sharing and secret hygiene on a flat single collection.
+
 ## Hosting all apps (examples image)
 
 `Dockerfile` (repo root; build context is the parent workspace) builds every
@@ -80,9 +92,30 @@ Query it reactively in a component:
 import { useQuery } from "betterbase/db/react";
 
 const result = useQuery(lists, { sort: [{ field: "createdAt", direction: "asc" }] });
+if (result === undefined) return <Loading />; // first load — gate before reading
 ```
 
+The `undefined`-until-loaded gate is the one idiom every app needs: the hook
+re-fires on every local and synced change, but only the first render has no
+data yet. (Inside a synced tree, `betterbase/sync/react`'s `useQuery` adds a
+`loaded` flag and `_spaceId` instead.)
+
 The SDK handles offline storage, encryption, sync, and conflict resolution. Your app code just reads and writes data.
+
+## Testing
+
+Every app ships a browser-mode vitest suite that runs against the **real**
+local database (OPFS + worker) with the sync boundary stubbed by the SDK's
+[`betterbase/testing`](https://github.com/BetterbaseHQ/betterbase) doubles
+(see the alias in any `vitest.browser.config.ts`). Run one app's checks:
+
+```bash
+pnpm -C tasks check   # prettier + typecheck + build + tests
+```
+
+Cross-app flows (sign-up, adoption, returning devices) are covered by the
+Playwright suite in the workspace root's `e2e/` (`just e2e` from
+`betterbase-dev`).
 
 ## Stack
 

@@ -18,10 +18,11 @@ export default defineConfig({
       // link: symlink can't create a duplicate module id
       "@betterbase/examples-shared/test": resolve(__dirname, "../shared/src/test/index.ts"),
       "@betterbase/examples-shared": resolve(__dirname, "../shared/src"),
-      // Component tests stub the sync boundary (SDK testing double). Resolved
-      // to the linked SDK's real path so the alias shares one module instance
-      // with `betterbase/testing` imports.
-      "betterbase/sync/react": resolve(__dirname, "../../betterbase/js/src/testing/mock-sync.tsx"),
+      // Component tests stub the sync boundary (SDK testing double). Aliased
+      // to the SDK's public testing double subpath — a specifier (not a raw
+      // path) keeps app configs independent of SDK file layout while still
+      // sharing one module instance with `betterbase/testing` imports.
+      "betterbase/sync/react": "betterbase/testing/mock-sync",
     },
   },
   server: {

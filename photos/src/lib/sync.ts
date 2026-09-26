@@ -43,7 +43,7 @@ export function useAlbums() {
 
   const invitations = usePendingInvitations();
 
-  // Keep a ref to allPhotos to avoid stale closure in shareAlbum/deleteAlbum
+  // Keep a ref to allPhotos to avoid stale closure in shareAlbum
   const allPhotosRef = useRef(allPhotos);
   allPhotosRef.current = allPhotos;
 
@@ -53,17 +53,6 @@ export function useAlbums() {
       await db.put(albums, { name, sortOrder: maxOrder + 1 });
     },
     [db, allAlbums],
-  );
-
-  /** Delete an album and all its photo records. Caller is responsible for evicting files. */
-  const deleteAlbum = useCallback(
-    async (id: string) => {
-      const albumPhotos = allPhotosRef.current.filter((p) => p.albumId === id);
-      await Promise.all(albumPhotos.map((p) => db.delete(photos, p.id)));
-      await db.delete(albums, id);
-      return albumPhotos;
-    },
-    [db],
   );
 
   /**
@@ -138,7 +127,6 @@ export function useAlbums() {
     photos: allPhotos,
     invitations: invitations.records,
     createAlbum,
-    deleteAlbum,
     shareAlbum,
     inviteToAlbum,
     acceptInvitation,

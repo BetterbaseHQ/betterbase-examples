@@ -3,9 +3,6 @@ import react from "@vitejs/plugin-react";
 import wasm from "vite-plugin-wasm";
 import path from "path";
 
-const accountsUrl = process.env.ACCOUNTS_URL || "http://localhost:5377";
-const syncUrl = process.env.SYNC_URL || "http://localhost:5379";
-
 export default defineConfig({
   // Path-based hosting in the examples container (e.g. /tasks/); "/" in dev.
   base: process.env.VITE_BASE_PATH || "/",
@@ -23,29 +20,6 @@ export default defineConfig({
   server: {
     port: 5383,
     strictPort: true,
-    proxy: {
-      "/oauth": {
-        target: accountsUrl,
-        changeOrigin: true,
-      },
-      "/v1/users": {
-        target: accountsUrl,
-        changeOrigin: true,
-      },
-      "/health": {
-        target: syncUrl,
-        changeOrigin: true,
-      },
-      "/api/v1/ws": {
-        target: syncUrl,
-        changeOrigin: true,
-        ws: true,
-      },
-      "/api/v1": {
-        target: syncUrl,
-        changeOrigin: true,
-      },
-    },
   },
   build: {
     outDir: "dist",

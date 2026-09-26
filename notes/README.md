@@ -20,7 +20,7 @@ export const notes = collection("notes")
     pinned: t.boolean(),
     favorite: t.boolean(),
   })
-  .build();
+  .build({ parent: { field: "notebookId", collection: () => notebooks } });
 ```
 
 ## Try it

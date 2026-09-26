@@ -205,14 +205,6 @@ export function useBoards() {
     [db],
   );
 
-  /** Delete a set of cards (e.g. when deleting a column). */
-  const deleteCards = useCallback(
-    async (ids: string[]) => {
-      await Promise.all(ids.map((id) => db.delete(cards, id)));
-    },
-    [db],
-  );
-
   /** Move a card to a different column / position (drag-and-drop). */
   const moveCard = useCallback(
     async (id: string, columnId: string, order: number) => {
@@ -240,7 +232,6 @@ export function useBoards() {
     removeMember,
     isAdmin,
     addCard,
-    deleteCards,
     moveCard,
   };
 }
