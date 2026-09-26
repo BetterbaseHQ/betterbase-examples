@@ -31,7 +31,7 @@ the removed member's album freezes — grid, dropzone, and lightbox replaced
 by a re-key notice — and photos uploaded after the rotation never decrypt on
 their device. Photos has an extra honesty wrinkle: the browser caches image
 blobs locally for offline viewing, and a cached pre-removal photo outlives
-its record. "Delete local copy" removes the records *and* evicts every
+its record. "Delete local copy" removes the records _and_ evicts every
 cached blob the album references (the same `deleteTree` + `evictAll` path a
 normal album delete takes).
 
@@ -40,13 +40,10 @@ normal album delete takes).
 1. Register a user, create an album, and drop in a few photos.
 2. In a second tab, register a second user.
 3. In tab one, open the album and share it with the second user's handle.
-4. Tab two accepts the invitation — the album and its photo *records* appear,
-   decrypted with the shared space key.
-
-**Known gap:** photo *blobs* don't yet cross accounts. The SDK's file layer
-still routes uploads/downloads through a single personal-space client, so a
-recipient's image fetches 404 and photos added to an already-shared album
-queue an upload error on the uploader's side. Personal albums and
-same-account devices are unaffected. This is next up — see the per-space
-file support work — at which point uploads in either tab will sync to the
-other live and this note goes away.
+4. Tab two accepts the invitation — the album, its photo records, _and the
+   blobs themselves_ appear, decrypted with the shared space key. Uploads in
+   either tab sync to the other live: file operations route to the owning
+   space (per-space epoch keys, UCAN auth), and blobs cached before a share
+   are migrated into the shared space and re-uploaded under its key. (Blobs
+   migrate when cached on the sharing device — photos whose bytes live only
+   on another device or were evicted show "Unavailable" until re-uploaded.)

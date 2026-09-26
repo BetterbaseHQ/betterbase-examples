@@ -5,8 +5,9 @@ import { albums, photos } from "./collections.js";
 
 export { albums, photos } from "./collections.js";
 
-export type Album = CollectionRead<typeof albums>;
-export type Photo = CollectionRead<typeof photos>;
+/** Records gain `_spaceId` once shared (spaces middleware). */
+export type Album = CollectionRead<typeof albums> & { _spaceId?: string };
+export type Photo = CollectionRead<typeof photos> & { _spaceId?: string };
 
 export const DB_NAME = "photos";
 

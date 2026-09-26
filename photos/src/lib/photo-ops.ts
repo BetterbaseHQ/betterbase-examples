@@ -64,6 +64,7 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 /**
  * Upload one photo: full blob + grid thumbnail (best-effort — a thumbnail
  * failure downgrades to rendering the full image, never fails the upload).
+ * `spaceId` routes the blobs to a shared album's space.
  */
 export async function putPhotoFiles(
   db: PhotoDb,
@@ -71,8 +72,9 @@ export async function putPhotoFiles(
   recordId: string,
   file: File,
   fileId: string,
+  spaceId?: string,
 ): Promise<string | undefined> {
-  await fileStore.put(fileId, new Uint8Array(await file.arrayBuffer()), recordId);
+  await fileStore.put(fileId, new Uint8Array(await file.arrayBuffer()), recordId, spaceId);
   try {
     const thumb = await generateThumbnail(file);
     // The photo may have been deleted while the full blob was uploading —
@@ -80,7 +82,7 @@ export async function putPhotoFiles(
     const record = await db.get(photos, recordId);
     if (!record) return undefined;
     const thumbFileId = crypto.randomUUID();
-    await fileStore.put(thumbFileId, thumb, recordId);
+    await fileStore.put(thumbFileId, thumb, recordId, spaceId);
     return thumbFileId;
   } catch (err) {
     console.warn("Thumbnail generation failed", err);
@@ -143,6 +145,9 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
   /** Upload files into an album ("" = All Photos). Synced callers pass the album for space routing. */
   const upload = useCallback(
     async (files: File[], albumId: string, album?: Album & { _spaceId?: string }) => {
+      // Blobs upload into the album's space — shared albums keep their
+      // files with their records (per-space file routing).
+      const spaceId = album?._spaceId;
       const failed = await uploadOneByOne(files, async (file) => {
         const fileId = crypto.randomUUID();
         const { width, height } = await getImageDimensions(file);
@@ -161,7 +166,7 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
         );
         let thumbFileId: string | undefined;
         try {
-          thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId);
+          thumbFileId = await putPhotoFiles(db, fileStore, record.id, file, fileId, spaceId);
           if (thumbFileId) await db.patch(photos, { id: record.id, thumbFileId });
         } catch (err) {
           // Byte persistence failed after the record committed (quota,
@@ -178,9 +183,9 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
           // Evict every cache entry this import created — a surviving
           // thumbnail (queued against the now-deleted record) would fail
           // server-side forever and pin a permanent failure badge.
-          await fileStore.evict(fileId).catch(() => {});
+          await fileStore.evict(fileId, spaceId).catch(() => {});
           if (thumbFileId !== undefined) {
-            await fileStore.evict(thumbFileId).catch(() => {});
+            await fileStore.evict(thumbFileId, spaceId).catch(() => {});
           }
           throw err;
         }
@@ -198,11 +203,14 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
   // receive the record tombstone; their cached blobs linger until LRU).
   const deletePhoto = useCallback(
     (photo: Photo) => {
+      // Evict from the photo's space — shared albums cache under their
+      // space key, not the personal one.
+      const spaceId = photo._spaceId;
       db.delete(photos, photo.id)
         .then(() =>
           // Awaited inside one promise so a cache-eviction rejection is
           // caught here rather than escaping as an unhandled rejection.
-          Promise.all(photoFileIds(photo).map((fid) => fileStore.evict(fid))),
+          Promise.all(photoFileIds(photo).map((fid) => fileStore.evict(fid, spaceId))),
         )
         .catch((err) => reportError(err, "Couldn't delete photo"));
     },
@@ -218,7 +226,13 @@ export function usePhotoOps(db: PhotoDb, fileStore: FileStore, addPhoto?: AddPho
   const deleteAlbum = useCallback(
     (id: string, albumPhotos: readonly Photo[], onDeleted?: () => void) => {
       deleteTree(db, albums, id)
-        .then(() => fileStore.evictAll(albumPhotos.flatMap(photoFileIds)))
+        .then(() =>
+          Promise.all(
+            albumPhotos.flatMap((p) =>
+              photoFileIds(p).map((fid) => fileStore.evict(fid, p._spaceId)),
+            ),
+          ),
+        )
         .then(() => onDeleted?.())
         .catch((err) => reportError(err, "Couldn't delete album"));
     },

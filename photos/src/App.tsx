@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Image } from "lucide-react";
 import {
   useConnectionStatus,
@@ -14,6 +14,7 @@ import {
   ScopedAppTree,
   effectiveSyncStatus,
   reportError,
+  RemovedSpaceNotice,
   useAuth,
 } from "@betterbase/examples-shared";
 import {
@@ -135,8 +136,8 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
 // Module-level so it can be passed as a stable hook into the gallery's probe
 // seam (called unconditionally every render — rules-of-hooks safe).
 function useRemovedAlbumSpace(spaceId: string | null) {
-  const { status, name } = useSpaceStatus(spaceId ?? undefined);
-  return { removed: status === "removed", name };
+  const { status, name, ready } = useSpaceStatus(spaceId ?? undefined);
+  return { removed: status === "removed", name, spaceReady: ready };
 }
 
 function PhotosApp({
@@ -154,6 +155,7 @@ function PhotosApp({
   // while file bytes are still queued (AUD-052).
   const syncStatus = effectiveSyncStatus(connectionStatus, uploadQueue.pending);
   const [view, setView] = useState<View>({ kind: "all" });
+  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
 
   const {
     albums: allAlbums,
@@ -167,14 +169,51 @@ function PhotosApp({
     removeMember,
     isAdmin,
     addPhoto,
-  } = useAlbums();
+  } = useAlbums(fileStore);
   const ops = usePhotoOps(db, fileStore, addPhoto);
 
+  // Latest-known space per album id — revocation handling can transiently
+  // drop records from query results while the removal propagates, so the
+  // view-reset effect below can't rely on the record being present to
+  // learn where it lived. Safe to write during render only because a
+  // record's _spaceId never changes (moves assign fresh ids), and entries
+  // are never deleted — the freeze depends on stale ones.
+  const albumSpacesRef = useRef(new Map<string, string | undefined>());
+  for (const a of allAlbums) albumSpacesRef.current.set(a.id, a._spaceId);
+
+  const viewAlbumSpaceId =
+    view.kind === "album" ? (albumSpacesRef.current.get(view.id) ?? null) : null;
+  // Unconditional hook call (rules-of-hooks): null when no album is viewed.
+  const removedViewSpace = useRemovedAlbumSpace(viewAlbumSpaceId);
+  // Every authenticated record carries _spaceId (personal ones included) —
+  // only SHARED albums have a __spaces membership record to wait on.
+  const viewIsShared = viewAlbumSpaceId !== null && viewAlbumSpaceId !== personalSpaceId;
+
   useEffect(() => {
-    if (view.kind === "album" && !allAlbums.find((a) => a.id === view.id)) {
-      setView({ kind: "all" });
-    }
-  }, [view, allAlbums]);
+    if (view.kind !== "album") return;
+    if (allAlbums.find((a) => a.id === view.id)) return;
+    // The album dropped out of the query result. That is either transient
+    // churn (revocation propagation re-emits queries mid-flight), a real
+    // deletion, or the prelude to the removed-space freeze. Consult the
+    // record itself, and never bounce the view while the space's removal
+    // status is still unresolved — the victim must land on the freeze
+    // notice, not "All Photos".
+    let cancelled = false;
+    db.get(albums, view.id)
+      .then((record) => {
+        if (cancelled || record) return; // still exists — query churn
+        if (viewIsShared) {
+          // Shared album: wait for a definitive space record before
+          // resetting; a removed space keeps its view frozen instead.
+          if (!removedViewSpace.spaceReady || removedViewSpace.removed) return;
+        }
+        setView({ kind: "all" });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [view, allAlbums, db, viewIsShared, removedViewSpace.spaceReady, removedViewSpace.removed]);
 
   const filteredPhotos =
     view.kind === "album" ? allPhotos.filter((p) => p.albumId === view.id) : allPhotos;
@@ -250,28 +289,46 @@ function PhotosApp({
       onLogin={login}
       onLogout={logout}
     >
-      <PhotoGallery
-        photos={filteredPhotos}
-        onUpload={handleUpload}
-        onDelete={ops.deletePhoto}
-        album={selectedAlbum}
-        personalSpaceId={personalSpaceId}
-        isAdmin={selectedAlbum?._spaceId != null && isAdmin(selectedAlbum._spaceId)}
-        onShare={
-          selectedAlbum
-            ? async (handle) => {
-                const newAlbum = await shareAlbum(selectedAlbum, handle);
-                setView({ kind: "album", id: newAlbum.id });
-              }
-            : undefined
-        }
-        onInvite={selectedAlbum ? (handle) => inviteToAlbum(selectedAlbum, handle) : undefined}
-        onRemoveMember={
-          selectedAlbum?._spaceId ? (did) => removeMember(selectedAlbum._spaceId!, did) : undefined
-        }
-        useRemovedSpace={useRemovedAlbumSpace}
-        onDeleteLocalCopy={selectedAlbum ? () => deleteAlbum(selectedAlbum.id) : undefined}
-      />
+      {view.kind === "album" && removedViewSpace.removed ? (
+        // The freeze is driven by the view's remembered space, not the
+        // album record — revocation handling can transiently (or, until
+        // delete-local-copy, permanently) drop records from query results,
+        // and the victim must still land on the notice, not the gallery.
+        <RemovedSpaceNotice
+          kindLabel="album"
+          name={removedViewSpace.name}
+          deleting={deletingLocalCopy}
+          onDeleteLocalCopy={() => {
+            setDeletingLocalCopy(true);
+            Promise.resolve(deleteAlbum(view.id))
+              .catch((err) => reportError(err, "Couldn't delete local copy"))
+              .finally(() => setDeletingLocalCopy(false));
+          }}
+        />
+      ) : (
+        <PhotoGallery
+          photos={filteredPhotos}
+          onUpload={handleUpload}
+          onDelete={ops.deletePhoto}
+          album={selectedAlbum}
+          personalSpaceId={personalSpaceId}
+          isAdmin={selectedAlbum?._spaceId != null && isAdmin(selectedAlbum._spaceId)}
+          onShare={
+            selectedAlbum
+              ? async (handle) => {
+                  const newAlbum = await shareAlbum(selectedAlbum, handle);
+                  setView({ kind: "album", id: newAlbum.id });
+                }
+              : undefined
+          }
+          onInvite={selectedAlbum ? (handle) => inviteToAlbum(selectedAlbum, handle) : undefined}
+          onRemoveMember={
+            selectedAlbum?._spaceId
+              ? (did) => removeMember(selectedAlbum._spaceId!, did)
+              : undefined
+          }
+        />
+      )}
     </LessAppShell>
   );
 }

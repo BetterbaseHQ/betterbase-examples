@@ -18,11 +18,9 @@ import {
  * a photo uploaded after the rotation never decrypts on bob's device, and
  * delete-local-copy removes the records *and* his cached blobs.
  *
- * SKIPPED (whole describe) — blocked on per-space file support in the SDK's
- * client layer. Today every file operation routes through the personal-space
- * FilesClient, so a shared album's blobs never reach the recipient (records
- * sync, blob fetches 404) and post-share uploads are rejected with 400.
- * Unskip once FileStore/FilesClient route per space.
+ * This is also the cross-user file-sync proof: bob downloads the shared
+ * album's blobs from the shared space (per-space file routing), and
+ * alice's post-rotation upload lands in the re-keyed space.
  */
 
 // 40x30 solid-red PNG — a real decodable image (a 1x1 fixture never
@@ -35,7 +33,7 @@ const bobCreds = uniqueCreds();
 
 const bobHandle = () => `${bobCreds.username}@${accountsHost}`;
 
-test.describe.skip("photos two-user removal", () => {
+test.describe("photos two-user removal", () => {
   test.setTimeout(240_000);
 
   test("removed member's album freezes; post-rotation uploads never arrive", async ({
@@ -83,8 +81,19 @@ test.describe.skip("photos two-user removal", () => {
     // Bob accepts and opens the album — pre-removal access is real: the
     // record *and* the blob decrypt with the space key. (Scoped to the
     // photo's alt — the members avatar also renders an <img> in main.)
+    // The sidebar churns while the invitation acceptance settles, so a
+    // click can land on a detaching row: assert the album view actually
+    // engaged (its header carries the Members control) and re-click if
+    // not — bob's photo would otherwise render in "All Photos" and the
+    // freeze would never surface.
     await bob.locator('button[title="Accept"]').click();
-    await bob.getByText("Trip 2026").click();
+    await bob.getByText("Trip 2026").waitFor({ timeout: 30_000 });
+    await expect(async () => {
+      if ((await bob.getByTitle("Members").count()) === 0) {
+        await bob.getByText("Trip 2026").click();
+      }
+      await expect(bob.getByTitle("Members")).toBeVisible();
+    }).toPass({ timeout: 20_000 });
     await expect(bob.getByRole("img", { name: /e2e-photo/ })).toBeVisible({ timeout: 60_000 });
 
     // Alice reloads before acting: the members panel only offers removal

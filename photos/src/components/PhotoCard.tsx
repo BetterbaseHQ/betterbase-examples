@@ -14,8 +14,13 @@ interface PhotoCardProps {
 }
 
 export function PhotoCard({ photo, style, onDelete, onClick }: PhotoCardProps) {
-  // Grid renders the thumbnail when available; the lightbox uses the full blob
-  const { url, status } = useFile(photo.thumbFileId ?? photo.fileId, photo.mimeType);
+  // Grid renders the thumbnail when available; the lightbox uses the full blob.
+  // spaceId routes shared albums' blobs from their space, not personal.
+  const { url, status } = useFile(
+    photo.thumbFileId ?? photo.fileId,
+    photo.mimeType,
+    photo._spaceId,
+  );
   const [hovered, setHovered] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 

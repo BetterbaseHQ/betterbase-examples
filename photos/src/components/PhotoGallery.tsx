@@ -4,15 +4,7 @@ import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { Upload, ImagePlus } from "lucide-react";
 import { ColumnsPhotoAlbum } from "react-photo-album";
 import Lightbox from "yet-another-react-lightbox";
-import {
-  EmptyState,
-  ShareButton,
-  MembersPanel,
-  RemovedSpaceNotice,
-  reportError,
-  noRemovedSpaces,
-  type RemovedSpaceProbe,
-} from "@betterbase/examples-shared";
+import { EmptyState, ShareButton, MembersPanel, reportError } from "@betterbase/examples-shared";
 import { isShared } from "betterbase/sync";
 import type { Photo, Album } from "@/lib/db";
 import { PhotoCard } from "@/components/PhotoCard";
@@ -32,10 +24,6 @@ interface PhotoGalleryProps {
   onShare?: (handle: string) => Promise<void>;
   onInvite?: (handle: string) => Promise<void>;
   onRemoveMember?: (did: string) => Promise<void>;
-  /** Reactive removed-space probe injected by the synced path (local path stays inert). */
-  useRemovedSpace?: RemovedSpaceProbe;
-  /** Local cleanup for the victim's copy — must evict cached blobs too. */
-  onDeleteLocalCopy?: () => void | Promise<void>;
 }
 
 export function PhotoGallery({
@@ -48,12 +36,9 @@ export function PhotoGallery({
   onShare,
   onInvite,
   onRemoveMember,
-  useRemovedSpace = noRemovedSpaces,
-  onDeleteLocalCopy,
 }: PhotoGalleryProps) {
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const [uploading, setUploading] = useState(false);
-  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
 
   const handleDrop = useCallback(
     async (files: File[]) => {
@@ -73,40 +58,6 @@ export function PhotoGallery({
 
   const isSharedAlbum = album != null && isShared(album, personalSpaceId);
   const isPersonal = !isSharedAlbum;
-
-  // Called as a hook every render (stable identity per app path) — the `use`
-  // prefix keeps eslint's rules-of-hooks enforcing the unconditional call.
-  const removedSpace = useRemovedSpace(album?._spaceId ?? null);
-
-  // Victim of a removal: freeze the album — grid, dropzone, and lightbox are
-  // replaced by the re-key notice. The delete action removes records AND the
-  // locally cached blobs (an album delete evicts every file it references).
-  if (removedSpace.removed && album) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <Group justify="space-between" px="md" py={8}>
-          <Text fw={600}>{album.name}</Text>
-        </Group>
-        <div style={{ flex: 1, display: "grid", placeItems: "center", padding: "md" }}>
-          <RemovedSpaceNotice
-            kindLabel="album"
-            name={removedSpace.name}
-            deleting={deletingLocalCopy}
-            onDeleteLocalCopy={
-              onDeleteLocalCopy
-                ? () => {
-                    setDeletingLocalCopy(true);
-                    Promise.resolve(onDeleteLocalCopy())
-                      .catch((err) => reportError(err, "Couldn't delete local copy"))
-                      .finally(() => setDeletingLocalCopy(false));
-                  }
-                : undefined
-            }
-          />
-        </div>
-      </div>
-    );
-  }
 
   // Map photos to react-photo-album format.
   // src is a placeholder — PhotoCard handles actual image loading via render.photo.

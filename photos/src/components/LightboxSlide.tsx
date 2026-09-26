@@ -7,7 +7,7 @@ interface LightboxSlideProps {
 }
 
 export function LightboxSlide({ photo }: LightboxSlideProps) {
-  const { url, status } = useFile(photo.fileId, photo.mimeType);
+  const { url, status } = useFile(photo.fileId, photo.mimeType, photo._spaceId);
 
   if (status === "loading" || status === "idle") {
     return (
