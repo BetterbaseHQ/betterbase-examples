@@ -19,7 +19,7 @@ export type { ItemsSidebarItem } from "./layout/ItemsSidebar.js";
 export { SyncedAppGate } from "./layout/SyncedAppGate.js";
 export type { RetireAnonymousConfig } from "./layout/SyncedAppGate.js";
 export { DbScopeGate } from "./layout/DbScopeGate.js";
-export { ScopedAppTree } from "./layout/ScopedAppTree.js";
+export { ScopedAppTree, createScopedFileStore, filesNamespaceFor } from "./layout/ScopedAppTree.js";
 export type { ScopedAppTreeProps } from "./layout/ScopedAppTree.js";
 
 // Components

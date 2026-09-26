@@ -6,7 +6,7 @@ import {
   useSync,
   useSpaceStatus,
 } from "betterbase/sync/react";
-import { FileStore, lazyWorkerFileStorage } from "betterbase/sync";
+import type { FileStore } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
   InvitationBanner,
@@ -337,22 +337,12 @@ function PhotosApp({
 // App — wraps PhotosApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
-export default function App() {
-  const createFileStore = useCallback((scopeDbName: string | null) => {
-    if (!scopeDbName) return new FileStore(); // anonymous: IDB, retired on adoption
-    // Signed-in scopes cache blobs in their own OPFS namespace (SQLite
-    // meta + blob files in a worker — the same storage world as the
-    // records). Anonymous→account adoption transfers queued blobs across
-    // the seam; retirement deletes the anonymous IDB cache.
-    return new FileStore({
-      storage: lazyWorkerFileStorage(`files-${scopeDbName}`, {
-        worker: new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
-          type: "module",
-        }),
-      }),
-    });
-  }, []);
+const createFilesWorker = () =>
+  new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+    type: "module",
+  });
 
+export default function App() {
   return (
     <ScopedAppTree
       appName={DB_NAME}
@@ -360,15 +350,12 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
-      // Stable identity: ScopedAppTree keys effects off this prop, and an
-      // inline arrow would re-fire the retirement effect every render
-      createFileStore={createFileStore}
+      createFilesWorker={createFilesWorker}
       getCurrentScopeDbName={currentScopeDbName}
       local={(fileStore) => <LocalPhotosApp fileStore={fileStore} />}
     >
       {(session, fileStore) => (
-        // createFileStore is configured, so the scoped store exists.
-        <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore!} />
+        <PhotosApp personalSpaceId={session.getPersonalSpaceId()} fileStore={fileStore} />
       )}
     </ScopedAppTree>
   );

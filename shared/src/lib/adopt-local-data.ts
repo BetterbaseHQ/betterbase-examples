@@ -45,6 +45,7 @@
  */
 
 import { mergeDatabaseRecords } from "betterbase/db";
+import { deleteFilesNamespace } from "betterbase/sync";
 import type { CollectionDefHandle } from "betterbase/db";
 import type { Database } from "betterbase/db";
 import type { MergeDatabaseRecordsResult } from "betterbase/db";
@@ -140,6 +141,12 @@ export interface RetireLocalDataOptions {
    * `deleteAnonymousDatabase`, built on the SDK's `deleteDatabase`).
    */
   deleteAnonymousDb: () => Promise<void>;
+  /**
+   * The anonymous file-cache namespace (`filesNamespaceFor(app, null)`) —
+   * deleted after the records database. Plaintext local-only blobs must
+   * not linger after their records were adopted into the account.
+   */
+  deleteAnonymousFilesNamespace?: string;
 }
 
 /**
@@ -154,7 +161,8 @@ export interface RetireLocalDataOptions {
  * login's ready transition to retry.
  */
 export async function retireLocalData(options: RetireLocalDataOptions): Promise<boolean> {
-  const { appName, scopeKey, deleteAnonymousDb, transferFiles } = options;
+  const { appName, scopeKey, deleteAnonymousDb, transferFiles, deleteAnonymousFilesNamespace } =
+    options;
   const marker = await adoptionMarkerKey(appName, scopeKey);
   const state = localStorage.getItem(marker);
   if (state === null || state === MARKER_RETIRED) return false;
@@ -165,6 +173,9 @@ export async function retireLocalData(options: RetireLocalDataOptions): Promise<
   if (transferFiles) await transferFiles();
 
   await deleteAnonymousDb();
+  if (deleteAnonymousFilesNamespace) {
+    await deleteFilesNamespace(deleteAnonymousFilesNamespace);
+  }
   localStorage.setItem(marker, MARKER_RETIRED);
   return true;
 }

@@ -2,7 +2,14 @@ import { useMemo } from "react";
 import { useConnectionStatus, useSync, useSpaceStatus } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
 import { InvitationBanner, ScopedAppTree, useAuth } from "@betterbase/examples-shared";
-import { db, entries, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
+import {
+  db,
+  entries,
+  openDatabaseForScope,
+  deleteAnonymousDatabase,
+  DB_NAME,
+  currentScopeDbName,
+} from "@/lib/db";
 import { useEntries } from "@/lib/sync";
 import { EntriesScreen, type EntriesApi } from "@/components/EntriesScreen";
 
@@ -115,6 +122,11 @@ function PasswordsApp() {
 // App — wraps PasswordsApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
+const createFilesWorker = () =>
+  new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 export default function App() {
   return (
     <ScopedAppTree
@@ -123,6 +135,8 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
+      createFilesWorker={createFilesWorker}
+      getCurrentScopeDbName={currentScopeDbName}
       local={<LocalPasswordsApp />}
     >
       {() => <PasswordsApp />}

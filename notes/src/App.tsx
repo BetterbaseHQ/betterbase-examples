@@ -10,6 +10,7 @@ import {
   openDatabaseForScope,
   deleteAnonymousDatabase,
   DB_NAME,
+  currentScopeDbName,
 } from "@/lib/db";
 import { useNotebooks } from "@/lib/sync";
 import { NotesWorkspace, type NotesApi } from "@/components/NotesWorkspace";
@@ -140,6 +141,11 @@ function NotesApp() {
 // App — wraps NotesApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
+const createFilesWorker = () =>
+  new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 export default function App() {
   return (
     <ScopedAppTree
@@ -148,6 +154,8 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
+      createFilesWorker={createFilesWorker}
+      getCurrentScopeDbName={currentScopeDbName}
       local={<LocalNotesApp />}
     >
       {() => <NotesApp />}

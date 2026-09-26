@@ -18,6 +18,7 @@ import {
   openDatabaseForScope,
   deleteAnonymousDatabase,
   DB_NAME,
+  currentScopeDbName,
 } from "@/lib/db";
 import { useConversations } from "@/lib/sync";
 import { ConversationSidebar, NewChatModal } from "@/components/ConversationSidebar";
@@ -211,6 +212,11 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 // App — wraps ChatApp in BetterbaseProvider when authenticated, sign-in gate otherwise
 // ---------------------------------------------------------------------------
 
+const createFilesWorker = () =>
+  new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 export default function App() {
   // Signed-out renders the sign-in gate (no Database context consumed —
   // see SignInGate).
@@ -222,6 +228,8 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
+      createFilesWorker={createFilesWorker}
+      getCurrentScopeDbName={currentScopeDbName}
       local={<SignInGate />}
     >
       {(session) => <ChatApp personalSpaceId={session.getPersonalSpaceId()} />}

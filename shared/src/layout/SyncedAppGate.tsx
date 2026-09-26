@@ -12,6 +12,8 @@ export interface RetireAnonymousConfig {
   deleteAnonymousDb: () => Promise<void>;
   /** Moves un-uploaded anonymous blobs into the scoped store before deletion. */
   transferFiles?: () => Promise<void>;
+  /** Anonymous file-cache namespace — deleted after the records database. */
+  deleteAnonymousFilesNamespace?: string;
 }
 
 /**

@@ -23,7 +23,6 @@ export interface ScopedAppDbOptions {
    * e.g. photos also deletes the default-name blob cache (logged-out blobs
    * are cached plaintext and must not linger).
    */
-  retireAnonymousExtras?: () => Promise<void>;
 }
 
 export interface ScopedAppDb {
@@ -38,7 +37,7 @@ export interface ScopedAppDb {
    * the current database) if adoption fails.
    */
   openForScope(scopeKey: string | null): Promise<Database>;
-  /** Delete the anonymous database files (and any `retireAnonymousExtras`). */
+  /** Delete the anonymous database files. */
   deleteAnonymousDatabase(): Promise<void>;
   /** Suffix of the current scope, or null when anonymous. */
   currentScopeDbName(): string | null;
@@ -59,7 +58,7 @@ export interface ScopedAppDb {
  * (`const d = db` pins one scope's instance past a swap).
  */
 export async function createScopedAppDb(options: ScopedAppDbOptions): Promise<ScopedAppDb> {
-  const { appName, collections, createWorker, retireAnonymousExtras } = options;
+  const { appName, collections, createWorker } = options;
 
   const openWorker = createWorker;
 
@@ -128,7 +127,6 @@ export async function createScopedAppDb(options: ScopedAppDbOptions): Promise<Sc
 
   const deleteAnonymousDatabase = async (): Promise<void> => {
     await deleteDatabase(appName, { worker: openWorker() });
-    await retireAnonymousExtras?.();
   };
 
   const currentScopeDbName = (): string | null => (openName === appName ? null : openName);

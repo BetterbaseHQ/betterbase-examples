@@ -1,4 +1,3 @@
-import { deleteFileCacheDatabase } from "betterbase/sync";
 import type { CollectionRead } from "betterbase/db";
 import { createScopedAppDb } from "@betterbase/examples-shared";
 import { albums, photos } from "./collections.js";
@@ -20,10 +19,9 @@ export const DB_NAME = "photos";
  * live `db` binding must be owned by app code — importers must use `db`
  * directly (capturing it pins one scope's instance past a swap).
  *
- * `currentScopeDbName` feeds the per-account FileStore naming (scoped
- * blob caches), and retirement also deletes the anonymous blob cache:
- * logged-out blobs are cached plaintext and must not linger after their
- * records were adopted into an account.
+ * `currentScopeDbName` feeds the per-account file-cache namespace
+ * (scoped OPFS blob caches; the anonymous namespace is adopted-from and
+ * retired by ScopedAppTree).
  */
 const appDb = await createScopedAppDb({
   appName: DB_NAME,
@@ -32,7 +30,6 @@ const appDb = await createScopedAppDb({
     new Worker(new URL("./db-worker.ts", import.meta.url), {
       type: "module",
     }),
-  retireAnonymousExtras: deleteFileCacheDatabase,
 });
 
 export let db = appDb.db;

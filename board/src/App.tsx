@@ -20,6 +20,7 @@ import {
   openDatabaseForScope,
   deleteAnonymousDatabase,
   DB_NAME,
+  currentScopeDbName,
 } from "@/lib/db";
 import { useBoards } from "@/lib/sync";
 import { createBoardIn } from "@/lib/create-board";
@@ -364,6 +365,11 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 // App — wraps BoardApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
+const createFilesWorker = () =>
+  new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 export default function App() {
   return (
     <ScopedAppTree
@@ -372,6 +378,8 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
+      createFilesWorker={createFilesWorker}
+      getCurrentScopeDbName={currentScopeDbName}
       local={<LocalBoardApp />}
     >
       {(session) => <BoardApp personalSpaceId={session.getPersonalSpaceId()} />}

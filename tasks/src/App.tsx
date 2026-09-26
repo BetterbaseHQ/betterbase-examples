@@ -11,7 +11,14 @@ import {
   reportError,
   ScopedAppTree,
 } from "@betterbase/examples-shared";
-import { db, lists, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
+import {
+  db,
+  lists,
+  openDatabaseForScope,
+  deleteAnonymousDatabase,
+  DB_NAME,
+  currentScopeDbName,
+} from "@/lib/db";
 import { useLists } from "@/lib/sync";
 import { createTodoOps } from "@/lib/todos";
 import { TasksSidebar, nextListColor } from "@/components/TasksSidebar";
@@ -234,6 +241,11 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 // App — wraps TasksApp in BetterbaseProvider when authenticated
 // ---------------------------------------------------------------------------
 
+const createFilesWorker = () =>
+  new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 export default function App() {
   return (
     <ScopedAppTree
@@ -242,6 +254,8 @@ export default function App() {
       openDatabaseForScope={openDatabaseForScope}
       deleteAnonymousDatabase={deleteAnonymousDatabase}
       getDb={() => db}
+      createFilesWorker={createFilesWorker}
+      getCurrentScopeDbName={currentScopeDbName}
       local={<LocalTasksApp />}
     >
       {(session) => <TasksApp personalSpaceId={session.getPersonalSpaceId()} />}
