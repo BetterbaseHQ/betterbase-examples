@@ -6,7 +6,7 @@ import {
   useSync,
   useSpaceStatus,
 } from "betterbase/sync/react";
-import { FileStore } from "betterbase/sync";
+import { FileStore, lazyWorkerFileStorage } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
   InvitationBanner,
@@ -338,11 +338,20 @@ function PhotosApp({
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const createFileStore = useCallback(
-    (scopeDbName: string | null) =>
-      scopeDbName ? new FileStore({ dbName: scopeDbName }) : new FileStore(),
-    [],
-  );
+  const createFileStore = useCallback((scopeDbName: string | null) => {
+    if (!scopeDbName) return new FileStore(); // anonymous: IDB, retired on adoption
+    // Signed-in scopes cache blobs in their own OPFS namespace (SQLite
+    // meta + blob files in a worker — the same storage world as the
+    // records). Anonymous→account adoption transfers queued blobs across
+    // the seam; retirement deletes the anonymous IDB cache.
+    return new FileStore({
+      storage: lazyWorkerFileStorage(`files-${scopeDbName}`, {
+        worker: new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
+          type: "module",
+        }),
+      }),
+    });
+  }, []);
 
   return (
     <ScopedAppTree
