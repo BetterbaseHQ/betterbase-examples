@@ -32,10 +32,10 @@ export interface ScopedAppDb {
   /**
    * Open the database for the given account scope (null = anonymous),
    * adopting anonymous data into the first account opened on this profile.
-   * Returns the database that is current when the call settles — a call
-   * superseded by a newer scope returns that newer scope's database, so
-   * assigning the result to the app's live `db` binding is always correct.
-   * Throws (without changing the current database) if adoption fails.
+   * Returns the database that is current when the call settles — including
+   * when superseded by a newer scope — so assigning the result to the
+   * app's live `db` binding is always correct. Throws (without changing
+   * the current database) if adoption fails.
    */
   openForScope(scopeKey: string | null): Promise<Database>;
   /** Delete the anonymous database files (and any `retireAnonymousExtras`). */
@@ -112,6 +112,13 @@ export async function createScopedAppDb(options: ScopedAppDbOptions): Promise<Sc
     } catch (err) {
       deferredClose(next);
       throw err;
+    }
+    if (seq !== scopeSequence) {
+      // A newer scope committed while this open was adopting — committing
+      // now would regress `current` underneath it (and leak its database,
+      // which would never be closed). Discard this open instead.
+      deferredClose(next);
+      return current;
     }
     current = next;
     openName = name;

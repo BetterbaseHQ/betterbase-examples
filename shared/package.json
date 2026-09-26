@@ -21,7 +21,6 @@
   "files": [
     "dist"
   ],
-  "sideEffects": false,
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --external react --external @mantine/core --external @mantine/hooks --external @mantine/notifications --external betterbase --external lucide-react",
     "dev": "tsup src/index.ts --format esm --dts --external react --external @mantine/core --external @mantine/hooks --external @mantine/notifications --external betterbase --external lucide-react --watch",

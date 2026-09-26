@@ -37,6 +37,7 @@ export { MembersPanel } from "./sharing/MembersPanel.js";
 export { ShareButton } from "./sharing/ShareButton.js";
 export { PresenceAvatars } from "./sharing/PresenceAvatars.js";
 export { TypingIndicator } from "./sharing/TypingIndicator.js";
+export { peerGradient } from "./sharing/peerColor.js";
 export { truncateDid } from "./sharing/did.js";
 export type { SpaceRecord, SpaceFields, Member, SpaceRole } from "betterbase/sync";
 
