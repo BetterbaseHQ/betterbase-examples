@@ -127,13 +127,12 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
     selectConv(newConv.id);
   };
 
-  const handleDeleteConversation = (id: string) => {
+  const handleDeleteConversation = (id: string) =>
     deleteConversation(id)
       .catch((err) => reportError(err, "Couldn't delete conversation"))
       .finally(() => {
         if (selectedConvId === id) selectConv(null);
       });
-  };
 
   const handleSendMessage = (text: string, id?: string) => {
     if (!selectedConv || !handle) return Promise.resolve();
@@ -193,6 +192,7 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
         isAdmin={selectedConv?._spaceId ? isAdmin(selectedConv._spaceId) : false}
         hasConversations={allConversations.length > 0}
         onStartConversation={openNewChat}
+        onDeleteConversation={handleDeleteConversation}
         onSendMessage={handleSendMessage}
         onInvite={
           selectedConv ? (h) => inviteToConversation(selectedConv, h) : () => Promise.resolve()

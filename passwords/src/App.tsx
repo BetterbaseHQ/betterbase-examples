@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useConnectionStatus, useSync, useSpaceStatus } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
 import { InvitationBanner, ScopedAppTree, useAuth } from "@betterbase/examples-shared";
 import { db, entries, openDatabaseForScope, deleteAnonymousDatabase, DB_NAME } from "@/lib/db";
@@ -36,6 +36,17 @@ function LocalPasswordsApp() {
 // ---------------------------------------------------------------------------
 // PasswordsApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
+
+/**
+ * Removal probe for a shared entry's space. Called as a hook from
+ * EntriesScreen via the `sharing` seam, so the local (provider-less) path
+ * can opt out. Removal re-keys the space — this flips the detail view to
+ * the removed-space notice the moment the victim's client learns it.
+ */
+function useRemovedEntrySpace(spaceId: string | null) {
+  const { status, name } = useSpaceStatus(spaceId ?? undefined);
+  return { removed: status === "removed", name };
+}
 
 function PasswordsApp() {
   const { session } = useAuth();
@@ -75,6 +86,7 @@ function PasswordsApp() {
       shareEntry,
       inviteToEntry,
       removeMember,
+      useRemovedSpace: useRemovedEntrySpace,
     }),
     [personalSpaceId, isAdmin, shareEntry, inviteToEntry, removeMember],
   );

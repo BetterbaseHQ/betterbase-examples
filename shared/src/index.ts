@@ -34,6 +34,7 @@ export { reportError } from "./notify.js";
 // Sharing
 export { InvitationBanner } from "./sharing/InvitationBanner.js";
 export { MembersPanel } from "./sharing/MembersPanel.js";
+export { RemovedSpaceNotice } from "./sharing/RemovedSpaceNotice.js";
 export { ShareButton } from "./sharing/ShareButton.js";
 export { PresenceAvatars } from "./sharing/PresenceAvatars.js";
 export { TypingIndicator } from "./sharing/TypingIndicator.js";

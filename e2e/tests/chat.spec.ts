@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced, accountsHost } from "./fixtures";
 
 /**
  * Chat lifecycle: chat requires an account before any conversation UI
@@ -10,7 +10,7 @@ import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, wa
 
 const creds = uniqueCreds();
 
-const ownHandle = () => `${creds.username}@localhost:25377`;
+const ownHandle = () => `${creds.username}@${accountsHost}`;
 
 test.describe.serial("chat lifecycle", () => {
   test("conversation + message survive on reconnect", async ({ page }) => {

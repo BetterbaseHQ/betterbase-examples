@@ -5,9 +5,10 @@ import {
   EmptyState,
   MembersPanel,
   PresenceAvatars,
+  RemovedSpaceNotice,
   TypingIndicator,
 } from "@betterbase/examples-shared";
-import { useMembers, usePresence, useTyping } from "betterbase/sync/react";
+import { useMembers, usePresence, useSpaceStatus, useTyping } from "betterbase/sync/react";
 import type { Conversation, Message } from "@/lib/db";
 import { MessageBubble } from "./MessageBubble";
 import { shortHandle } from "@/lib/handle";
@@ -24,6 +25,8 @@ interface ChatViewProps {
   hasConversations: boolean;
   /** Opens the new-conversation modal (shared with the sidebar "+"). */
   onStartConversation: () => void;
+  /** Local cleanup when the victim of a removal deletes their copy. */
+  onDeleteConversation: (id: string) => void | Promise<void>;
   /** `id` (when provided) makes the commit idempotent across retries. */
   onSendMessage: (text: string, id?: string) => Promise<void>;
   onInvite: (handle: string) => Promise<void>;
@@ -37,12 +40,14 @@ export function ChatView({
   isAdmin,
   hasConversations,
   onStartConversation,
+  onDeleteConversation,
   onSendMessage,
   onInvite,
   onRemoveMember,
 }: ChatViewProps) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
   // AUD-051: a failed send keeps its submission id so a retry of the same
   // text overwrites the same record instead of duplicating it — the first
   // attempt may already have committed the message before its preview
@@ -58,6 +63,12 @@ export function ChatView({
   // sender attribution is verified against (the message's `senderHandle`
   // is writable content; the edit chain's author did is cryptographic).
   const { members } = useMembers(conversation?._spaceId);
+
+  // Removal flips the space's local record to "removed" (via revocation
+  // handling) — the conversation freezes: no messages render, the composer
+  // is gone, and only the local-copy cleanup remains.
+  const { status: spaceStatus } = useSpaceStatus(conversation?._spaceId);
+  const removed = spaceStatus === "removed";
 
   // Jump to the bottom once per conversation — on switch or when the first
   // batch of history arrives (queries start empty and fill in async, so the
@@ -148,6 +159,34 @@ export function ChatView({
               </Button>
             ) : undefined
           }
+        />
+      </Box>
+    );
+  }
+
+  if (removed) {
+    return (
+      <Box
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          height: "100%",
+        }}
+        px="md"
+        py="xl"
+      >
+        <RemovedSpaceNotice
+          kindLabel="conversation"
+          name={conversation.name}
+          deleting={deletingLocalCopy}
+          onDeleteLocalCopy={() => {
+            setDeletingLocalCopy(true);
+            Promise.resolve(onDeleteConversation(conversation.id)).finally(() => {
+              setDeletingLocalCopy(false);
+            });
+          }}
         />
       </Box>
     );

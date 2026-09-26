@@ -11,6 +11,7 @@ import {
   lastProviderProps,
   resetSyncMocks,
   setSpaceMembers,
+  setSpaceStatus,
 } from "@betterbase/examples-shared/test";
 
 afterEach(async () => {
@@ -64,6 +65,7 @@ describe("ChatView", () => {
         isAdmin
         hasConversations
         onStartConversation={() => {}}
+        onDeleteConversation={() => {}}
         onSendMessage={onSendMessage}
         onInvite={() => Promise.resolve()}
         onRemoveMember={() => Promise.resolve()}
@@ -244,6 +246,7 @@ describe("ChatView", () => {
         isAdmin
         hasConversations
         onStartConversation={() => {}}
+        onDeleteConversation={() => {}}
         onSendMessage={() => Promise.resolve()}
         onInvite={() => Promise.resolve()}
         onRemoveMember={() => Promise.resolve()}
@@ -281,6 +284,7 @@ describe("ChatView", () => {
         onStartConversation={() => {
           startRequested = true;
         }}
+        onDeleteConversation={() => {}}
         onSendMessage={() => Promise.resolve()}
         onInvite={() => Promise.resolve()}
         onRemoveMember={() => Promise.resolve()}
@@ -301,6 +305,7 @@ describe("ChatView", () => {
         isAdmin={false}
         hasConversations
         onStartConversation={() => {}}
+        onDeleteConversation={() => {}}
         onSendMessage={() => Promise.resolve()}
         onInvite={() => Promise.resolve()}
         onRemoveMember={() => Promise.resolve()}
@@ -309,5 +314,67 @@ describe("ChatView", () => {
 
     expect(screen.getByText("No conversation selected")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "New conversation" })).toBeNull();
+  });
+
+  it("removal freezes the conversation: notice replaces messages and composer", async () => {
+    const { ChatView } = await import("./components/ChatView");
+    const user = userEvent.setup();
+    let deletedConversationId: string | null = null;
+    setSpaceStatus("space-removed", {
+      status: "removed",
+      epoch: 2,
+      role: "write",
+      name: "Design sync",
+    });
+
+    renderWithProviders(
+      <ChatView
+        conversation={
+          {
+            id: "conv-1",
+            name: "Design sync",
+            lastMessageText: "",
+            lastMessageAt: 0,
+            createdAt: 0,
+            updatedAt: 0,
+            _spaceId: "space-removed",
+          } as never
+        }
+        messages={
+          [
+            {
+              id: "m-1",
+              conversationId: "conv-1",
+              senderHandle: "bob@example.com",
+              text: "pre-removal plaintext",
+              sentAt: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          ] as never
+        }
+        currentHandle="alice"
+        isAdmin={false}
+        hasConversations
+        onStartConversation={() => {}}
+        onDeleteConversation={(id) => {
+          deletedConversationId = id;
+        }}
+        onSendMessage={() => Promise.resolve()}
+        onInvite={() => Promise.resolve()}
+        onRemoveMember={() => Promise.resolve()}
+      />,
+    );
+
+    // The frozen state shows no history and no composer — the only action
+    // is cleaning up the local copy.
+    expect(screen.queryByText(/pre-removal plaintext/)).toBeNull();
+    expect(screen.queryByPlaceholderText(/type a message/i)).toBeNull();
+    const notice = screen.getByTestId("removed-space-notice");
+    expect(notice).toHaveTextContent("Design sync");
+    expect(notice).toHaveTextContent(/re-keyed/);
+
+    await user.click(screen.getByTestId("delete-local-copy"));
+    expect(deletedConversationId).toBe("conv-1");
   });
 });

@@ -1,6 +1,9 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
+import { accountsHost } from "../playwright.config";
+
+export { accountsHost };
 
 /**
  * Shared lifecycle fixtures for the example-app e2e specs.

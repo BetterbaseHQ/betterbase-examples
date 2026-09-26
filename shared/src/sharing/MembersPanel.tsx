@@ -11,7 +11,7 @@ import {
   Popover,
 } from "@mantine/core";
 import { Users, ChevronDown, ChevronUp, X, Check } from "lucide-react";
-import { useMembers, usePeers } from "betterbase/sync/react";
+import { useMembers, usePeers, useSpaceStatus } from "betterbase/sync/react";
 import type { Member, SpaceRole } from "betterbase/sync";
 import { useAuth } from "betterbase/auth/react";
 import { truncateDid } from "./did.js";
@@ -51,6 +51,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
   const { handle: myHandle } = useAuth();
   const { members, loading, error: membersError } = useMembers(spaceId);
   const peers = usePeers<{ handle: string }>(spaceId);
+  const { epoch } = useSpaceStatus(spaceId);
   const [open, setOpen] = useState(false);
   const [inviteHandle, setInviteHandle] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -58,6 +59,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
   const [confirmingDid, setConfirmingDid] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState("");
+  const [rekeyedHandle, setRekeyedHandle] = useState<string | null>(null);
 
   const activeCount = members.filter((m: Member) => m.status === "joined").length;
   const onlineHandles = useMemo(() => {
@@ -81,7 +83,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
     }
   };
 
-  const handleRemove = async (did: string) => {
+  const handleRemove = async (did: string, handle: string | null) => {
     if (confirmingDid !== did) {
       setConfirmingDid(did);
       return;
@@ -89,8 +91,14 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
     setRemoving(did);
     setConfirmingDid(null);
     setRemoveError("");
+    setRekeyedHandle(null);
     try {
       await onRemoveMember(did);
+      // Removal is a full re-key: every DEK rewrapped under a fresh key
+      // before the promise resolves. Show who lost access — the epoch
+      // number comes live from useSpaceStatus, so it reflects the
+      // rotation this await just landed.
+      setRekeyedHandle(handle ?? truncateDid(did));
     } catch (err) {
       setRemoveError(err instanceof Error ? err.message : "Remove failed");
     } finally {
@@ -98,12 +106,20 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
     }
   };
 
+  const removingHandle =
+    removing !== null
+      ? (members.find((m: Member) => m.did === removing)?.handle ?? truncateDid(removing))
+      : null;
+
   return (
     <Popover
       opened={open}
       onChange={(next) => {
         setOpen(next);
-        if (!next) setConfirmingDid(null);
+        if (!next) {
+          setConfirmingDid(null);
+          setRekeyedHandle(null);
+        }
       }}
       position="bottom-end"
       shadow="md"
@@ -152,7 +168,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
                     variant={confirmingDid === member.did ? "filled" : "subtle"}
                     color={confirmingDid === member.did ? "red" : "gray"}
                     loading={removing === member.did}
-                    onClick={() => handleRemove(member.did)}
+                    onClick={() => handleRemove(member.did, member.handle ?? null)}
                     aria-label={
                       confirmingDid === member.did ? "Confirm remove member" : "Remove member"
                     }
@@ -174,6 +190,25 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
             <Text size="xs" c="dimmed">
               No members yet
             </Text>
+          )}
+
+          {removing && (
+            <Text size="xs" c="dimmed" data-testid="removing-status">
+              Removing {removingHandle} — revoking access and re-keying every record…
+            </Text>
+          )}
+
+          {rekeyedHandle && !removing && (
+            <Stack gap={2} data-testid="rekeyed-notice">
+              <Text size="xs" c="teal.7">
+                Space re-keyed — {rekeyedHandle} no longer has access.
+              </Text>
+              {epoch != null && (
+                <Text size="xs" c="dimmed">
+                  Encryption epoch {epoch}
+                </Text>
+              )}
+            </Stack>
           )}
 
           {removeError && (

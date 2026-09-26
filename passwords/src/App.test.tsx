@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
@@ -9,6 +9,7 @@ import {
   setSyncDb,
   wipeCollections,
   lastProviderProps,
+  resetSyncMocks,
 } from "@betterbase/examples-shared/test";
 
 afterEach(async () => {
@@ -75,5 +76,65 @@ describe("Passwords local flow", () => {
       },
       { timeout: 4000 },
     );
+  });
+});
+
+describe("Passwords removed-space flow", () => {
+  afterEach(() => resetSyncMocks());
+
+  it("a removed entry's secret is replaced by the re-key notice and delete-local-copy", async () => {
+    const { EntriesScreen } = await import("./components/EntriesScreen");
+    const user = userEvent.setup();
+    const deleteEntry = vi.fn(async () => {});
+    const sharedEntry = {
+      id: "e1",
+      site: "Vault Bank",
+      url: "https://vault.example",
+      username: "alice",
+      password: "hunter2",
+      notes: "",
+      category: "login",
+      createdAt: 0,
+      updatedAt: 0,
+      _spaceId: "space-removed",
+    } as never;
+
+    renderWithProviders(
+      <EntriesScreen
+        api={{
+          entries: [sharedEntry],
+          createEntry: () => {},
+          updateEntry: () => {},
+          deleteEntry,
+        }}
+        sharing={
+          {
+            personalSpaceId: "personal-space-1",
+            isAdmin: () => true,
+            shareEntry: () => Promise.resolve(),
+            inviteToEntry: () => Promise.resolve(),
+            removeMember: () => Promise.resolve(),
+            // The synced path injects useSpaceStatus as this probe — here
+            // the space reads as removed (the victim's local record).
+            useRemovedSpace: (spaceId: string | null) => ({
+              removed: spaceId === "space-removed",
+              name: "Vault Bank",
+            }),
+          } as never
+        }
+      />,
+      { db },
+    );
+
+    // Opening the entry must NOT reveal the secret — the re-key notice
+    // replaces the detail view entirely.
+    await user.click(screen.getByText("Vault Bank"));
+    expect(screen.queryByText("hunter2")).toBeNull();
+    const notice = screen.getByTestId("removed-space-notice");
+    expect(notice).toHaveTextContent("You no longer have access to this password");
+    expect(notice).toHaveTextContent(/re-keyed/);
+
+    await user.click(screen.getByTestId("delete-local-copy"));
+    await waitFor(() => expect(deleteEntry).toHaveBeenCalledWith("e1"));
   });
 });

@@ -1,7 +1,13 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { Box, Button, Loader } from "@mantine/core";
-import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
+import {
+  LessAppShell,
+  useAuth,
+  EmptyState,
+  reportError,
+  RemovedSpaceNotice,
+} from "@betterbase/examples-shared";
 import type { ConnectionStatus } from "betterbase/sync/react";
 import { useEditableRecord } from "betterbase/db/react";
 import type { Entry } from "@/lib/db";
@@ -30,12 +36,22 @@ export interface EntriesApi {
   deleteEntry: (id: string) => Promise<void> | void;
 }
 
+/** Reactive probe injected by the synced path (local path stays inert). */
+export type RemovedSpaceProbe = (spaceId: string | null) => {
+  removed: boolean;
+  name: string | null;
+};
+
+const noRemovedSpaces: RemovedSpaceProbe = () => ({ removed: false, name: null });
+
 export interface EntriesSharing {
   personalSpaceId: string | null;
   isAdmin: (spaceId: string | null) => boolean;
   shareEntry: (entry: Spaced<Entry>, handle: string) => Promise<unknown>;
   inviteToEntry: (entry: Spaced<Entry>, handle: string) => Promise<void>;
   removeMember: (spaceId: string, did: string) => Promise<void>;
+  /** Hook: is this entry's space one the user was removed from? */
+  useRemovedSpace: RemovedSpaceProbe;
 }
 
 interface EntriesScreenProps {
@@ -54,6 +70,13 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
+  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
+
+  // Called as a hook every render (stable identity per app path), so the
+  // probe must be invoked unconditionally — the local path passes the inert
+  // no-op above. The `use`-prefixed alias makes eslint's rules-of-hooks
+  // own that invariant.
+  const useRemovedSpace = sharing?.useRemovedSpace ?? noRemovedSpaces;
 
   const allEntries = api.entries;
 
@@ -93,6 +116,7 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
   }, [allEntries, selectedCategory, search]);
 
   const selectedEntry = allEntries.find((e) => e.id === selectedEntryId) ?? null;
+  const removedSpace = useRemovedSpace(selectedEntry?._spaceId ?? null);
 
   // Atomic record+base for the selected entry. EntryForm initializes from
   // `record` (not the query hit) so its values and the captured base come
@@ -168,11 +192,23 @@ export function EntriesScreen({ api, sharing, banner, syncStatus, syncError }: E
           onSave={handleSave}
           onCancel={() => setCreating(false)}
         />
-      ) : editing && selectedEntry ? (
+      ) : editing && selectedEntry && !removedSpace.removed ? (
         <EntryForm
           entry={liveSelected ?? selectedEntry}
           onSave={handleSave}
           onCancel={() => setEditing(false)}
+        />
+      ) : selectedEntry && removedSpace.removed ? (
+        <RemovedSpaceNotice
+          kindLabel="password"
+          name={removedSpace.name}
+          deleting={deletingLocalCopy}
+          onDeleteLocalCopy={() => {
+            setDeletingLocalCopy(true);
+            Promise.resolve(api.deleteEntry(selectedEntry.id))
+              .catch((err) => reportError(err, "Couldn't delete local copy"))
+              .finally(() => setDeletingLocalCopy(false));
+          }}
         />
       ) : selectedEntry ? (
         <EntryDetail
