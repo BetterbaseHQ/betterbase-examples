@@ -8,6 +8,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
+const deleteNamespace = vi.fn<(ns: string) => Promise<void>>(async () => undefined);
+vi.mock("betterbase/sync", () => ({
+  deleteFilesNamespace: (ns: string) => deleteNamespace(ns),
+}));
+
 import { adoptLocalData, retireLocalData } from "./adopt-local-data.js";
 import { accountScopeHash } from "./account-db.js";
 import type { CollectionDefHandle, Database } from "betterbase/db";
@@ -162,6 +168,54 @@ describe("retireLocalData", () => {
     });
     expect(ran).toBe(true);
     expect(order).toEqual(["transfer", "delete"]);
+  });
+
+  it("deletes the anonymous files namespace after the records database", async () => {
+    const key = await markerKey();
+    localStorage.setItem(key, "adopted");
+    const order: string[] = [];
+    const del = vi.fn(async () => {
+      order.push("records-deleted");
+    });
+    deleteNamespace.mockImplementation(async (ns: string) => {
+      order.push(`files-deleted:${ns}`);
+    });
+    try {
+      const ran = await retireLocalData({
+        appName: "tasks",
+        scopeKey: "scope-1",
+        deleteAnonymousDb: del,
+        deleteAnonymousFilesNamespace: "files-tasks-anon",
+      });
+      expect(ran).toBe(true);
+      expect(order).toEqual(["records-deleted", "files-deleted:files-tasks-anon"]);
+    } finally {
+      deleteNamespace.mockImplementation(async () => undefined);
+    }
+  });
+
+  it("a failed namespace deletion leaves retirement pending for retry", async () => {
+    const key = await markerKey();
+    localStorage.setItem(key, "adopted");
+    const del = vi.fn(async () => undefined);
+    deleteNamespace.mockImplementation(async () => {
+      throw new Error("open in this profile");
+    });
+    try {
+      await expect(
+        retireLocalData({
+          appName: "tasks",
+          scopeKey: "scope-1",
+          deleteAnonymousDb: del,
+          deleteAnonymousFilesNamespace: "files-tasks-anon",
+        }),
+      ).rejects.toThrow("open in this profile");
+      // Records are gone but the marker stays pending — the next login's
+      // ready transition retries the namespace deletion (idempotent).
+      expect(localStorage.getItem(key)).toBe("adopted");
+    } finally {
+      deleteNamespace.mockImplementation(async () => undefined);
+    }
   });
 
   it("a failed transfer aborts retirement — bytes survive for the retry", async () => {

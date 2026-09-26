@@ -203,9 +203,15 @@ function ScopedAppInner({
   const transferFiles = useMemo(() => {
     return () => {
       const anon = createFileStore(null);
+      // Dispose the source ALWAYS: a failed transfer aborts retirement
+      // (source bytes survive for the retry), but the worker and its
+      // leader lock on the anonymous namespace must not leak — the next
+      // attempt spawns another.
       return fileStore
         .transferUnuploadedFrom(anon)
-        .then(() => anon.dispose())
+        .finally(() => {
+          anon.dispose();
+        })
         .then(() => undefined);
     };
   }, [createFileStore, fileStore]);

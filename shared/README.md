@@ -71,8 +71,8 @@ delegates the machinery to `createScopedAppDb`:
   unauthenticated view (AUD-045).
 - After adoption + a synced-ready phase, the anonymous namespace is
   **retired** (`deleteAnonymousDatabase`) — its records' only home is the
-  account database. Apps with blob caches extend retirement via
-  `retireAnonymousExtras` (photos deletes the default-name cache).
+  account database. The anonymous file-cache namespace
+  (`files-<app>-anon`, plaintext blobs) is deleted in the same retirement.
 - The app root remounts (React key) whenever the scope swaps, so no
   component observes a database mid-swap.
 

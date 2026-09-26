@@ -30,13 +30,20 @@ function RetireAnonymousEffect({
   scopeKey,
   deleteAnonymousDb,
   transferFiles,
+  deleteAnonymousFilesNamespace,
 }: RetireAnonymousConfig) {
   const { phase } = useSync();
 
   useEffect(() => {
     if (phase !== "ready") return;
     const attempt = (isRetry: boolean) => {
-      retireLocalData({ appName, scopeKey, deleteAnonymousDb, transferFiles }).catch((err) => {
+      retireLocalData({
+        appName,
+        scopeKey,
+        deleteAnonymousDb,
+        transferFiles,
+        deleteAnonymousFilesNamespace,
+      }).catch((err) => {
         console.error("Failed to retire adopted anonymous database:", err);
         if (!isRetry) {
           // One deliberate in-session retry — e.g. the leader lock
@@ -50,7 +57,7 @@ function RetireAnonymousEffect({
     // Primitives only — a config object identity would re-fire this on
     // every App render while phase === "ready".
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, appName, scopeKey, deleteAnonymousDb, transferFiles]);
+  }, [phase, appName, scopeKey, deleteAnonymousDb, transferFiles, deleteAnonymousFilesNamespace]);
 
   return null;
 }
