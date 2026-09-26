@@ -1,6 +1,19 @@
 import { Alert, Button, Stack, Text } from "@mantine/core";
 import { KeyRound, Trash2 } from "lucide-react";
 
+/**
+ * Reactive probe injected by an app's synced path (the provider-less local
+ * path passes an inert `() => ({ removed: false, name: null })`). Called as
+ * a hook every render — implementations must be unconditional and stable.
+ */
+export type RemovedSpaceProbe = (spaceId: string | null) => {
+  removed: boolean;
+  name: string | null;
+};
+
+/** Inert probe for provider-less local paths. */
+export const noRemovedSpaces: RemovedSpaceProbe = () => ({ removed: false, name: null });
+
 interface RemovedSpaceNoticeProps {
   /** App vocabulary for what was shared — e.g. "conversation", "vault". */
   kindLabel: string;

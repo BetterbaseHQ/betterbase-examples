@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -292,5 +292,46 @@ describe("Tasks scope-swap wiring", () => {
       timeout: 4000,
     });
     third.unmount();
+  });
+});
+
+describe("Tasks removed-space flow", () => {
+  it("a removed list's tasks are replaced by the re-key notice and delete-local-copy", async () => {
+    const { TaskList } = await import("./components/TaskList");
+    const user = userEvent.setup();
+    const onDeleteLocalCopy = vi.fn(async () => {});
+    const removedList = {
+      id: "l1",
+      name: "Groceries",
+      color: "blue",
+      createdAt: 0,
+      todos: [{ id: "t1", text: "milk", completed: false }],
+      _spaceId: "space-removed",
+    } as never;
+
+    renderWithProviders(
+      <TaskList
+        list={removedList}
+        personalSpaceId="personal-space-1"
+        onAddTodo={() => {}}
+        onToggleTodo={() => {}}
+        onDeleteTodo={() => {}}
+        useRemovedSpace={(spaceId: string | null) => ({
+          removed: spaceId === "space-removed",
+          name: "Groceries",
+        })}
+        onDeleteLocalCopy={onDeleteLocalCopy}
+      />,
+    );
+
+    // The freeze replaces the todos and the input — nothing to act on.
+    expect(screen.queryByText("milk")).toBeNull();
+    expect(screen.queryByLabelText("New task")).toBeNull();
+    const notice = screen.getByTestId("removed-space-notice");
+    expect(notice).toHaveTextContent("You no longer have access to this list");
+    expect(notice).toHaveTextContent(/re-keyed/);
+
+    await user.click(screen.getByTestId("delete-local-copy"));
+    await waitFor(() => expect(onDeleteLocalCopy).toHaveBeenCalledTimes(1));
   });
 });

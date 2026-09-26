@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
@@ -246,5 +246,59 @@ describe("Board local cascade deletes", () => {
       },
       { timeout: 8000 },
     );
+  });
+});
+
+describe("Board removed-space flow", () => {
+  it("a removed board's columns are replaced by the re-key notice and delete-local-copy", async () => {
+    const { BoardView } = await import("./components/BoardView");
+    const user = userEvent.setup();
+    const onDeleteLocalCopy = vi.fn(async () => {});
+    const removedBoard = {
+      id: "b1",
+      name: "Sprint 1",
+      createdAt: 0,
+      _spaceId: "space-removed",
+    } as never;
+
+    renderWithProviders(
+      <BoardView
+        board={removedBoard}
+        columns={[{ id: "c1", boardId: "b1", name: "Todo", createdAt: 0 }] as never}
+        cards={
+          [
+            {
+              id: "card1",
+              boardId: "b1",
+              columnId: "c1",
+              title: "ship it",
+              description: "",
+              order: 1,
+              createdAt: 0,
+            },
+          ] as never
+        }
+        personalSpaceId="personal-space-1"
+        onAddColumn={() => {}}
+        onRenameColumn={() => {}}
+        onDeleteColumn={() => {}}
+        useRemovedSpace={(spaceId: string | null) => ({
+          removed: spaceId === "space-removed",
+          name: "Sprint 1",
+        })}
+        onDeleteLocalCopy={onDeleteLocalCopy}
+      />,
+    );
+
+    // The freeze replaces the board — no columns, no cards, no add button.
+    expect(screen.queryByText("Todo")).toBeNull();
+    expect(screen.queryByText("ship it")).toBeNull();
+    expect(screen.queryByText("Add column")).toBeNull();
+    const notice = screen.getByTestId("removed-space-notice");
+    expect(notice).toHaveTextContent("You no longer have access to this board");
+    expect(notice).toHaveTextContent(/re-keyed/);
+
+    await user.click(screen.getByTestId("delete-local-copy"));
+    await waitFor(() => expect(onDeleteLocalCopy).toHaveBeenCalledTimes(1));
   });
 });

@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Image } from "lucide-react";
-import { useConnectionStatus, useFileUploadQueue, useSync } from "betterbase/sync/react";
+import {
+  useConnectionStatus,
+  useFileUploadQueue,
+  useSync,
+  useSpaceStatus,
+} from "betterbase/sync/react";
 import { FileStore } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
@@ -126,6 +131,13 @@ function LocalPhotosApp({ fileStore }: { fileStore: FileStore }) {
 // ---------------------------------------------------------------------------
 // PhotosApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
+
+// Module-level so it can be passed as a stable hook into the gallery's probe
+// seam (called unconditionally every render — rules-of-hooks safe).
+function useRemovedAlbumSpace(spaceId: string | null) {
+  const { status, name } = useSpaceStatus(spaceId ?? undefined);
+  return { removed: status === "removed", name };
+}
 
 function PhotosApp({
   personalSpaceId,
@@ -257,6 +269,8 @@ function PhotosApp({
         onRemoveMember={
           selectedAlbum?._spaceId ? (did) => removeMember(selectedAlbum._spaceId!, did) : undefined
         }
+        useRemovedSpace={useRemovedAlbumSpace}
+        onDeleteLocalCopy={selectedAlbum ? () => deleteAlbum(selectedAlbum.id) : undefined}
       />
     </LessAppShell>
   );

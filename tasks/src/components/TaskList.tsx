@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { Checkbox, TextInput, ActionIcon, Group, Stack, Text, Paper } from "@mantine/core";
 import { Plus, Trash2 } from "lucide-react";
-import { EmptyState, ShareButton, MembersPanel } from "@betterbase/examples-shared";
+import {
+  EmptyState,
+  ShareButton,
+  MembersPanel,
+  RemovedSpaceNotice,
+  reportError,
+  noRemovedSpaces,
+  type RemovedSpaceProbe,
+} from "@betterbase/examples-shared";
 import { isShared } from "betterbase/sync";
 import { CheckSquare } from "lucide-react";
 import type { List, TodoItem } from "@/lib/db";
@@ -16,6 +24,10 @@ interface TaskListProps {
   onShare?: (handle: string) => Promise<void>;
   onInvite?: (handle: string) => Promise<void>;
   onRemoveMember?: (did: string) => Promise<void>;
+  /** Reactive removed-space probe injected by the synced path (local path stays inert). */
+  useRemovedSpace?: RemovedSpaceProbe;
+  /** Local cleanup for the victim's copy of the whole list. */
+  onDeleteLocalCopy?: () => void | Promise<void>;
 }
 
 export function TaskList({
@@ -28,8 +40,11 @@ export function TaskList({
   onShare,
   onInvite,
   onRemoveMember,
+  useRemovedSpace = noRemovedSpaces,
+  onDeleteLocalCopy,
 }: TaskListProps) {
   const [newTodoText, setNewTodoText] = useState("");
+  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
 
   const handleAdd = () => {
     const text = newTodoText.trim();
@@ -43,6 +58,10 @@ export function TaskList({
 
   const shared = isShared(list, personalSpaceId);
   const isPersonal = !shared;
+
+  // Called as a hook every render (stable identity per app path) — the `use`
+  // prefix keeps eslint's rules-of-hooks enforcing the unconditional call.
+  const removedSpace = useRemovedSpace(list._spaceId ?? null);
 
   return (
     <Stack gap="md">
@@ -61,7 +80,23 @@ export function TaskList({
         )}
       </Group>
 
-      {list.todos.length === 0 ? (
+      {removedSpace.removed ? (
+        <RemovedSpaceNotice
+          kindLabel="list"
+          name={removedSpace.name}
+          deleting={deletingLocalCopy}
+          onDeleteLocalCopy={
+            onDeleteLocalCopy
+              ? () => {
+                  setDeletingLocalCopy(true);
+                  Promise.resolve(onDeleteLocalCopy())
+                    .catch((err) => reportError(err, "Couldn't delete local copy"))
+                    .finally(() => setDeletingLocalCopy(false));
+                }
+              : undefined
+          }
+        />
+      ) : list.todos.length === 0 ? (
         <EmptyState
           icon={<CheckSquare size={32} />}
           title="No tasks yet"
@@ -97,27 +132,29 @@ export function TaskList({
         </Stack>
       )}
 
-      <TextInput
-        placeholder="Add a task..."
-        aria-label="New task"
-        size="md"
-        value={newTodoText}
-        onChange={(e) => setNewTodoText(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleAdd();
-        }}
-        rightSection={
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            aria-label="Add task"
-            onClick={handleAdd}
-            disabled={!newTodoText.trim()}
-          >
-            <Plus size={16} />
-          </ActionIcon>
-        }
-      />
+      {!removedSpace.removed && (
+        <TextInput
+          placeholder="Add a task..."
+          aria-label="New task"
+          size="md"
+          value={newTodoText}
+          onChange={(e) => setNewTodoText(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleAdd();
+          }}
+          rightSection={
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              aria-label="Add task"
+              onClick={handleAdd}
+              disabled={!newTodoText.trim()}
+            >
+              <Plus size={16} />
+            </ActionIcon>
+          }
+        />
+      )}
     </Stack>
   );
 }

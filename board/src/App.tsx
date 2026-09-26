@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Kanban } from "lucide-react";
-import { useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useConnectionStatus, useSync, useSpaceStatus } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import {
@@ -187,6 +187,13 @@ function LocalBoardApp() {
 // BoardApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
+// Module-level so it can be passed as a stable hook into BoardView's probe
+// seam (called unconditionally every render — rules-of-hooks safe).
+function useRemovedBoardSpace(spaceId: string | null) {
+  const { status, name } = useSpaceStatus(spaceId ?? undefined);
+  return { removed: status === "removed", name };
+}
+
 function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { error: syncError } = useSync();
@@ -316,6 +323,8 @@ function BoardApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           onRemoveMember={(did) =>
             selectedBoard._spaceId ? removeMember(selectedBoard._spaceId, did) : Promise.resolve()
           }
+          useRemovedSpace={useRemovedBoardSpace}
+          onDeleteLocalCopy={() => deleteBoard(selectedBoard.id)}
         />
       ) : (
         <div

@@ -23,6 +23,19 @@ export const notes = collection("notes")
   .build({ parent: { field: "notebookId", collection: () => notebooks } });
 ```
 
+## Removal re-keys the notebook
+
+Removing a member from a shared notebook is a full key rotation: UCANs
+revoked, the space advanced to a fresh key with `set_min_epoch` (the server
+rejects the removed device's stale-epoch writes immediately), every DEK
+rewrapped, and the membership log rebuilt under the new key. The admin sees
+"Space re-keyed — {handle} no longer has access" with the new epoch number;
+the removed member's notebook view freezes behind a re-key notice, and notes
+written after the rotation never decrypt on their device. The notebook view
+is what freezes — notes that existed before removal are part of the local
+copy and stay readable until the notebook is deleted (the honest local-first
+guarantee).
+
 ## Try it
 
 Run `just dev` from the repo root, then open [localhost:5382](http://localhost:5382). Sign up, create a notebook, and write a note. Now open a second tab, sign in again, open the same note, and type in both tabs — the text merges live in both directions with no conflicts.

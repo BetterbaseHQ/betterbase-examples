@@ -2,7 +2,15 @@ import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { FileText, Plus } from "lucide-react";
 import { Box, Button } from "@mantine/core";
 import type { ConnectionStatus } from "betterbase/sync/react";
-import { LessAppShell, useAuth, EmptyState, reportError } from "@betterbase/examples-shared";
+import {
+  LessAppShell,
+  useAuth,
+  EmptyState,
+  reportError,
+  RemovedSpaceNotice,
+  noRemovedSpaces,
+  type RemovedSpaceProbe,
+} from "@betterbase/examples-shared";
 import type { Note, Notebook } from "@/lib/db";
 import { extractText, getExcerpt } from "@/lib/tiptap-text";
 import { NotebookSidebar } from "./NotebookSidebar";
@@ -31,6 +39,8 @@ export interface NotesSharing {
   shareNotebook: (notebook: Spaced<Notebook>, handle: string) => Promise<unknown>;
   inviteToNotebook: (notebook: Spaced<Notebook>, handle: string) => Promise<void>;
   removeMember: (spaceId: string, did: string) => Promise<void>;
+  /** Hook: is this notebook's space one the user was removed from? */
+  useRemovedSpace: RemovedSpaceProbe;
 }
 
 interface NotesWorkspaceProps {
@@ -117,6 +127,42 @@ export function NotesWorkspace({
   const selectedNotebook =
     view.kind === "notebook" ? (allNotebooks.find((nb) => nb.id === view.id) ?? null) : null;
 
+  // Called as a hook every render (stable identity per app path) — the `use`
+  // prefix keeps eslint's rules-of-hooks enforcing the unconditional call.
+  const useRemovedSpace = sharing?.useRemovedSpace ?? noRemovedSpaces;
+  const removedSpace = useRemovedSpace(selectedNotebook?._spaceId ?? null);
+
+  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
+
+  // Victim of a removal: the notebook view freezes — list and editor are
+  // replaced by the re-key notice (the sidebar stays so navigation works).
+  // Ternary, not `&&`: `false ?? children` would render nothing (nullish
+  // coalescing doesn't catch false).
+  const removedNotice =
+    removedSpace.removed && selectedNotebook ? (
+      <Box
+        style={{
+          flex: 1,
+          display: "grid",
+          placeItems: "center",
+          padding: "md",
+          overflow: "auto",
+        }}
+      >
+        <RemovedSpaceNotice
+          kindLabel="notebook"
+          name={removedSpace.name}
+          deleting={deletingLocalCopy}
+          onDeleteLocalCopy={() => {
+            setDeletingLocalCopy(true);
+            Promise.resolve(api.deleteNotebook(selectedNotebook.id))
+              .catch((err) => reportError(err, "Couldn't delete local copy"))
+              .finally(() => setDeletingLocalCopy(false));
+          }}
+        />
+      </Box>
+    ) : null;
+
   return (
     <LessAppShell
       appName="Notes"
@@ -159,66 +205,70 @@ export function NotesWorkspace({
           overflow: "hidden",
         }}
       >
-        <NoteList
-          notes={sortedNotes}
-          excerpts={excerpts}
-          selectedNoteId={selectedNoteId}
-          search={search}
-          onSearchChange={setSearch}
-          onSelect={setSelectedNoteId}
-          onCreate={createNote}
-          notebook={selectedNotebook}
-          personalSpaceId={sharing?.personalSpaceId}
-          isAdmin={sharing ? sharing.isAdmin(selectedNotebook?._spaceId ?? null) : false}
-          onShare={
-            sharing && selectedNotebook
-              ? (handle) =>
-                  sharing.shareNotebook(selectedNotebook, handle).then((newNotebook) => {
-                    if (newNotebook && typeof newNotebook === "object" && "id" in newNotebook) {
-                      changeView({
-                        kind: "notebook",
-                        id: (newNotebook as Spaced<Notebook>).id,
-                      });
-                    }
-                  })
-              : undefined
-          }
-          onInvite={
-            sharing && selectedNotebook
-              ? (handle) => sharing.inviteToNotebook(selectedNotebook, handle)
-              : undefined
-          }
-          onRemoveMember={
-            sharing && selectedNotebook?._spaceId
-              ? (did) => sharing.removeMember(selectedNotebook._spaceId!, did)
-              : undefined
-          }
-        />
-        {selectedNote ? (
-          <NoteEditor note={selectedNote} onDelete={deleteNote} />
-        ) : allNotes.length === 0 && !search ? (
-          // Global zero-note state (not view-filtered): an empty Favorites or
-          // notebook view with notes elsewhere must not claim "no notes yet"
-          <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
-            <EmptyState
-              icon={<FileText size={32} />}
-              title="No notes yet"
-              description="Create your first note to get started"
-              action={
-                <Button leftSection={<Plus size={16} />} size="xs" onClick={createNote}>
-                  Create your first note
-                </Button>
+        {removedNotice ?? (
+          <>
+            <NoteList
+              notes={sortedNotes}
+              excerpts={excerpts}
+              selectedNoteId={selectedNoteId}
+              search={search}
+              onSearchChange={setSearch}
+              onSelect={setSelectedNoteId}
+              onCreate={createNote}
+              notebook={selectedNotebook}
+              personalSpaceId={sharing?.personalSpaceId}
+              isAdmin={sharing ? sharing.isAdmin(selectedNotebook?._spaceId ?? null) : false}
+              onShare={
+                sharing && selectedNotebook
+                  ? (handle) =>
+                      sharing.shareNotebook(selectedNotebook, handle).then((newNotebook) => {
+                        if (newNotebook && typeof newNotebook === "object" && "id" in newNotebook) {
+                          changeView({
+                            kind: "notebook",
+                            id: (newNotebook as Spaced<Notebook>).id,
+                          });
+                        }
+                      })
+                  : undefined
+              }
+              onInvite={
+                sharing && selectedNotebook
+                  ? (handle) => sharing.inviteToNotebook(selectedNotebook, handle)
+                  : undefined
+              }
+              onRemoveMember={
+                sharing && selectedNotebook?._spaceId
+                  ? (did) => sharing.removeMember(selectedNotebook._spaceId!, did)
+                  : undefined
               }
             />
-          </Box>
-        ) : (
-          <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
-            <EmptyState
-              icon={<FileText size={32} />}
-              title="No note selected"
-              description="Select a note from the list"
-            />
-          </Box>
+            {selectedNote ? (
+              <NoteEditor note={selectedNote} onDelete={deleteNote} />
+            ) : allNotes.length === 0 && !search ? (
+              // Global zero-note state (not view-filtered): an empty Favorites or
+              // notebook view with notes elsewhere must not claim "no notes yet"
+              <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
+                <EmptyState
+                  icon={<FileText size={32} />}
+                  title="No notes yet"
+                  description="Create your first note to get started"
+                  action={
+                    <Button leftSection={<Plus size={16} />} size="xs" onClick={createNote}>
+                      Create your first note
+                    </Button>
+                  }
+                />
+              </Box>
+            ) : (
+              <Box style={{ flex: 1, display: "grid", placeItems: "center" }}>
+                <EmptyState
+                  icon={<FileText size={32} />}
+                  title="No note selected"
+                  description="Select a note from the list"
+                />
+              </Box>
+            )}
+          </>
         )}
       </Box>
     </LessAppShell>

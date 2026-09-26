@@ -7,6 +7,8 @@ import {
   EmptyState,
   reportError,
   RemovedSpaceNotice,
+  noRemovedSpaces,
+  type RemovedSpaceProbe,
 } from "@betterbase/examples-shared";
 import type { ConnectionStatus } from "betterbase/sync/react";
 import { useEditableRecord } from "betterbase/db/react";
@@ -37,12 +39,6 @@ export interface EntriesApi {
 }
 
 /** Reactive probe injected by the synced path (local path stays inert). */
-export type RemovedSpaceProbe = (spaceId: string | null) => {
-  removed: boolean;
-  name: string | null;
-};
-
-const noRemovedSpaces: RemovedSpaceProbe = () => ({ removed: false, name: null });
 
 export interface EntriesSharing {
   personalSpaceId: string | null;

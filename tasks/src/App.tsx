@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CheckSquare, ListPlus } from "lucide-react";
-import { useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useConnectionStatus, useSync, useSpaceStatus } from "betterbase/sync/react";
 import { useQuery } from "betterbase/db/react";
 import {
   LessAppShell,
@@ -110,6 +110,13 @@ function LocalTasksApp() {
 // TasksApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
+// Module-level so it can be passed as a stable hook into TaskList's probe
+// seam (called unconditionally every render — rules-of-hooks safe).
+function useRemovedListSpace(spaceId: string | null) {
+  const { status, name } = useSpaceStatus(spaceId ?? undefined);
+  return { removed: status === "removed", name };
+}
+
 function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
   const { error: syncError } = useSync();
@@ -192,6 +199,12 @@ function TasksApp({ personalSpaceId }: { personalSpaceId: string | null }) {
           onInvite={(handle) => inviteToList(selectedList, handle)}
           onRemoveMember={(did) =>
             selectedList._spaceId ? removeMember(selectedList._spaceId, did) : Promise.resolve()
+          }
+          useRemovedSpace={useRemovedListSpace}
+          onDeleteLocalCopy={() =>
+            deleteList(selectedList.id).catch((err) =>
+              reportError(err, "Couldn't delete local copy"),
+            )
           }
         />
       ) : (

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useConnectionStatus, useSync } from "betterbase/sync/react";
+import { useConnectionStatus, useSync, useSpaceStatus } from "betterbase/sync/react";
 import { deleteTree } from "betterbase/sync";
 import { useQuery } from "betterbase/db/react";
 import { InvitationBanner, ScopedAppTree, reportError, useAuth } from "@betterbase/examples-shared";
@@ -62,6 +62,13 @@ function LocalNotesApp() {
 // NotesApp — synced + sharing (authenticated path, inside BetterbaseProvider)
 // ---------------------------------------------------------------------------
 
+// Module-level so it can be passed as a stable hook into the workspace's
+// probe seam (called unconditionally every render — rules-of-hooks safe).
+function useRemovedNotebookSpace(spaceId: string | null) {
+  const { status, name } = useSpaceStatus(spaceId ?? undefined);
+  return { removed: status === "removed", name };
+}
+
 function NotesApp() {
   const { session } = useAuth();
   const { error: syncError } = useSync();
@@ -104,6 +111,7 @@ function NotesApp() {
       shareNotebook,
       inviteToNotebook,
       removeMember,
+      useRemovedSpace: useRemovedNotebookSpace,
     }),
     [personalSpaceId, isAdmin, shareNotebook, inviteToNotebook, removeMember],
   );

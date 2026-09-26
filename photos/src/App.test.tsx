@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { vi } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { putPhotoFiles, usePhotoOps } from "@/lib/photo-ops";
 import { renderWithProviders } from "@betterbase/examples-shared/test";
 import { photos } from "@/lib/db";
@@ -117,5 +119,43 @@ describe("putPhotoFiles", () => {
     expect(thumbFileId).toBeUndefined();
     // Only the full blob was written — no orphaned thumbnail
     expect(puts.map((p) => p.id)).toEqual(["file-1"]);
+  });
+});
+
+describe("Photos removed-space flow", () => {
+  it("a removed album's gallery is replaced by the re-key notice and delete-local-copy", async () => {
+    const { PhotoGallery } = await import("./components/PhotoGallery");
+    const user = userEvent.setup();
+    const onDeleteLocalCopy = vi.fn(async () => {});
+    const removedAlbum = {
+      id: "a1",
+      name: "Trip 2026",
+      createdAt: 0,
+      _spaceId: "space-removed",
+    } as never;
+
+    renderWithProviders(
+      <PhotoGallery
+        photos={[]}
+        onUpload={() => Promise.resolve()}
+        onDelete={() => {}}
+        album={removedAlbum}
+        personalSpaceId="personal-space-1"
+        useRemovedSpace={(spaceId: string | null) => ({
+          removed: spaceId === "space-removed",
+          name: "Trip 2026",
+        })}
+        onDeleteLocalCopy={onDeleteLocalCopy}
+      />,
+    );
+
+    // The freeze replaces the album view — the upload dropzone is gone.
+    expect(screen.queryByText("Drop photos here")).toBeNull();
+    const notice = screen.getByTestId("removed-space-notice");
+    expect(notice).toHaveTextContent("You no longer have access to this album");
+    expect(notice).toHaveTextContent(/re-keyed/);
+
+    await user.click(screen.getByTestId("delete-local-copy"));
+    await waitFor(() => expect(onDeleteLocalCopy).toHaveBeenCalledTimes(1));
   });
 });

@@ -38,6 +38,18 @@ transactional**: a mid-share failure can leave children temporarily in the share
 space until a retry converges. (This is the documented extension point beyond the
 SDK's single-record `shareTree`.)
 
+## Removal re-keys the board
+
+Removing a member from a shared board is a full key rotation: UCANs revoked,
+the space advanced to a fresh key with `set_min_epoch` (the server rejects
+the removed device's stale-epoch writes immediately), every DEK rewrapped,
+and the membership log rebuilt under the new key. The admin sees
+"Space re-keyed — {handle} no longer has access" with the new epoch number;
+the removed member's board freezes — columns, cards, and drag-drop replaced
+by a re-key notice, and moves made after the rotation never arrive on their
+device (the pre-removal local copy stays until they delete it — that's the
+honest local-first guarantee).
+
 ## Try it: two tabs, one card
 
 1. Sign in, create a board, add a card (`pnpm dev` → http://localhost:5384).

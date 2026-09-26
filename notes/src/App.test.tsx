@@ -258,3 +258,68 @@ describe("Notes first run", () => {
     expect(screen.queryByText("Create your first note")).toBeNull();
   });
 });
+
+describe("Notes removed-space flow", () => {
+  it("viewing a removed notebook replaces the list and editor with the re-key notice", async () => {
+    const { NotesWorkspace } = await import("./components/NotesWorkspace");
+    const user = userEvent.setup();
+    const deleteNotebook = vi.fn(async () => {});
+    const removedNotebook = {
+      id: "nb1",
+      name: "Project Notes",
+      createdAt: 0,
+      _spaceId: "space-removed",
+    } as never;
+    const removedNote = {
+      id: "n1",
+      notebookId: "nb1",
+      title: "secret plan",
+      body: "",
+      favorite: false,
+      pinned: false,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      _spaceId: "space-removed",
+    } as never;
+
+    renderWithProviders(
+      <NotesWorkspace
+        api={{
+          notebooks: [removedNotebook],
+          notes: [removedNote],
+          createNotebook: () => {},
+          deleteNotebook,
+          createNote: () => "n1",
+          deleteNote: () => {},
+        }}
+        sharing={
+          {
+            personalSpaceId: "personal-space-1",
+            isAdmin: () => true,
+            shareNotebook: () => Promise.resolve(),
+            inviteToNotebook: () => Promise.resolve(),
+            removeMember: () => Promise.resolve(),
+            // The synced path injects useSpaceStatus as this probe — here
+            // the space reads as removed (the victim's local record).
+            useRemovedSpace: (spaceId: string | null) => ({
+              removed: spaceId === "space-removed",
+              name: "Project Notes",
+            }),
+          } as never
+        }
+      />,
+    );
+
+    // Navigate into the removed notebook — its view freezes.
+    await user.click(screen.getByText("Project Notes"));
+    expect(screen.queryByText("secret plan")).toBeNull();
+    const notice = screen.getByTestId("removed-space-notice");
+    expect(notice).toHaveTextContent("You no longer have access to this notebook");
+    expect(notice).toHaveTextContent(/re-keyed/);
+
+    // The sidebar survives for navigation; delete removes the local copy.
+    expect(screen.getByText("Project Notes")).toBeInTheDocument();
+    await user.click(screen.getByTestId("delete-local-copy"));
+    await waitFor(() => expect(deleteNotebook).toHaveBeenCalledWith("nb1"));
+  });
+});

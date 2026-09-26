@@ -6,7 +6,10 @@ import {
   ShareButton,
   MembersPanel,
   InlineTextInput,
+  RemovedSpaceNotice,
   reportError,
+  noRemovedSpaces,
+  type RemovedSpaceProbe,
 } from "@betterbase/examples-shared";
 import { isShared } from "betterbase/sync";
 import { db, cards, type Column as ColumnType } from "@/lib/db";
@@ -40,6 +43,10 @@ interface BoardViewProps {
   onShare?: (handle: string) => Promise<void>;
   onInvite?: (handle: string) => Promise<void>;
   onRemoveMember?: (did: string) => Promise<void>;
+  /** Reactive removed-space probe injected by the synced path (local path stays inert). */
+  useRemovedSpace?: RemovedSpaceProbe;
+  /** Local cleanup for the victim's copy of the whole board. */
+  onDeleteLocalCopy?: () => void | Promise<void>;
 }
 
 // Optimistic override applied immediately on drag, cleared when DB catches up
@@ -63,9 +70,12 @@ export function BoardView({
   onShare,
   onInvite,
   onRemoveMember,
+  useRemovedSpace = noRemovedSpaces,
+  onDeleteLocalCopy,
 }: BoardViewProps) {
   const [addingColumn, setAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
+  const [deletingLocalCopy, setDeletingLocalCopy] = useState(false);
   // Optimistic overrides keyed by card id: applied immediately on drag so
   // there's no flicker, cleared per-card once the DB catches up (or on failure).
   const [pendingMoves, setPendingMoves] = useState<Map<string, PendingMove>>(() => new Map());
@@ -164,6 +174,10 @@ export function BoardView({
   const isSharedBoard = isShared(board, personalSpaceId);
   const isPersonal = !isSharedBoard;
 
+  // Called as a hook every render (stable identity per app path) — the `use`
+  // prefix keeps eslint's rules-of-hooks enforcing the unconditional call.
+  const removedSpace = useRemovedSpace(board._spaceId ?? null);
+
   return (
     <Box
       style={{
@@ -197,68 +211,90 @@ export function BoardView({
         )}
       </Group>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Group
-          gap="sm"
-          align="flex-start"
-          wrap="nowrap"
-          p="sm"
-          style={{
-            flex: 1,
-            overflowX: "auto",
-            overflowY: "hidden",
-            paddingRight: 48,
-          }}
-        >
-          {boardColumns.map((col) => {
-            const colCards = effectiveCards.filter((c) => c.columnId === col.id).sort(compareCards);
-            return (
-              <Column
-                key={col.id}
-                columnId={col.id}
-                columnName={col.name}
-                boardId={board.id}
-                cards={colCards}
-                onRenameColumn={(name) => onRenameColumn(col.id, name)}
-                onDeleteColumn={() => onDeleteColumn(col.id)}
-                onAddCard={
-                  onAddCard
-                    ? (columnId, title, description, order) =>
-                        onAddCard(board.id, columnId, title, description, order)
-                    : undefined
-                }
-              />
-            );
-          })}
+      {removedSpace.removed ? (
+        <Box style={{ flex: 1, display: "grid", placeItems: "center", padding: "md" }}>
+          <RemovedSpaceNotice
+            kindLabel="board"
+            name={removedSpace.name}
+            deleting={deletingLocalCopy}
+            onDeleteLocalCopy={
+              onDeleteLocalCopy
+                ? () => {
+                    setDeletingLocalCopy(true);
+                    Promise.resolve(onDeleteLocalCopy())
+                      .catch((err) => reportError(err, "Couldn't delete local copy"))
+                      .finally(() => setDeletingLocalCopy(false));
+                  }
+                : undefined
+            }
+          />
+        </Box>
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Group
+            gap="sm"
+            align="flex-start"
+            wrap="nowrap"
+            p="sm"
+            style={{
+              flex: 1,
+              overflowX: "auto",
+              overflowY: "hidden",
+              paddingRight: 48,
+            }}
+          >
+            {boardColumns.map((col) => {
+              const colCards = effectiveCards
+                .filter((c) => c.columnId === col.id)
+                .sort(compareCards);
+              return (
+                <Column
+                  key={col.id}
+                  columnId={col.id}
+                  columnName={col.name}
+                  boardId={board.id}
+                  cards={colCards}
+                  onRenameColumn={(name) => onRenameColumn(col.id, name)}
+                  onDeleteColumn={() => onDeleteColumn(col.id)}
+                  onAddCard={
+                    onAddCard
+                      ? (columnId, title, description, order) =>
+                          onAddCard(board.id, columnId, title, description, order)
+                      : undefined
+                  }
+                />
+              );
+            })}
 
-          {/* Add column */}
-          {addingColumn ? (
-            <InlineTextInput
-              placeholder="Column name"
-              ariaLabel="New column name"
-              value={newColumnName}
-              onChange={setNewColumnName}
-              onSubmit={handleAddColumn}
-              onCancel={() => {
-                setAddingColumn(false);
-                setNewColumnName("");
-              }}
-              style={{ minWidth: 200, flexShrink: 0 }}
-            />
-          ) : (
-            <Button
-              variant="subtle"
-              size="compact-sm"
-              color="gray"
-              leftSection={<Plus size={14} />}
-              onClick={() => setAddingColumn(true)}
-              style={{ flexShrink: 0 }}
-            >
-              Add column
-            </Button>
-          )}
-        </Group>
-      </DragDropContext>
+            {/* Add column */}
+            {addingColumn ? (
+              <InlineTextInput
+                placeholder="Column name"
+                ariaLabel="New column name"
+                value={newColumnName}
+                onChange={setNewColumnName}
+                onSubmit={handleAddColumn}
+                onCancel={() => {
+                  setAddingColumn(false);
+                  setNewColumnName("");
+                }}
+                style={{ minWidth: 200, flexShrink: 0 }}
+              />
+            ) : (
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                color="gray"
+                leftSection={<Plus size={14} />}
+                onClick={() => setAddingColumn(true)}
+                style={{ flexShrink: 0 }}
+              >
+                Add column
+              </Button>
+            )}
+          </Group>
+        </DragDropContext>
+      )}
     </Box>
   );
 }

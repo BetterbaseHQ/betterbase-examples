@@ -53,6 +53,18 @@ concurrent edits to the _container itself_ — that's the lesson
   `useSyncDb`/`useSpaces`/`useQuery` (from `betterbase/sync/react`) plus
   app operations like `shareList` (SDK `shareTree` + invite).
 
+## Removal re-keys the list
+
+Removing a member from a shared list is a full key rotation: UCANs revoked,
+the space advanced to a fresh key with `set_min_epoch` (the server rejects
+the removed device's stale-epoch writes immediately), every DEK rewrapped,
+and the membership log rebuilt under the new key. The admin sees
+"Space re-keyed — {handle} no longer has access" with the new epoch number;
+the removed member's list freezes — tasks and the input replaced by a re-key
+notice, and edits made after the rotation never arrive on their device (the
+pre-removal local copy stays until they delete it — that's the honest
+local-first guarantee).
+
 ## Try it: two tabs, one list
 
 1. Open [localhost:5381](http://localhost:5381) — no account yet. Create a
