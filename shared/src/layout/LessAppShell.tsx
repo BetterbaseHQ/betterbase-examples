@@ -38,6 +38,9 @@ interface LessAppShellProps {
   launchpadUrl?: string;
 }
 
+/** Fixed header height — apps subtract it for full-height workspaces. */
+export const LESS_HEADER_HEIGHT = 60;
+
 export function LessAppShell({
   appName,
   appIcon,
@@ -60,7 +63,7 @@ export function LessAppShell({
 
   return (
     <AppShell
-      header={{ height: 60 }}
+      header={{ height: LESS_HEADER_HEIGHT }}
       navbar={
         navbar
           ? {

@@ -81,7 +81,7 @@ export function ChatPanel({ model }: { model: TransformersJSLanguageModel }) {
             description="The model runs on your device — your prompts and the replies never leave this browser."
           />
         ) : (
-          <Stack gap={4} py="md" role="log" aria-live="polite" aria-label="Conversation">
+          <Stack gap={4} py="md" role="log" aria-label="Conversation">
             {messages.map((message) => {
               const text = messageText(message.parts);
               if (text === "") return null;
@@ -116,7 +116,7 @@ export function ChatPanel({ model }: { model: TransformersJSLanguageModel }) {
               );
             })}
             {status === "submitted" && (
-              <Text size="xs" c="dimmed" px="md">
+              <Text size="xs" c="dimmed" px="md" aria-live="polite">
                 Thinking…
               </Text>
             )}

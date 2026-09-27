@@ -32,9 +32,16 @@ function Workspace() {
     setError(null);
     setProgress(0);
     try {
-      const handle = createChatModel();
+      // Race the load against a worker that never starts (script-load
+      // failure, CSP block): the provider only settles on worker messages,
+      // so `loadModel` alone would hang forever in that case.
+      let rejectOnWorkerError: ((reason: unknown) => void) | undefined;
+      const workerFailed = new Promise<never>((_, reject) => {
+        rejectOnWorkerError = reject;
+      });
+      const handle = createChatModel((reason) => rejectOnWorkerError?.(reason));
       handleRef.current = handle;
-      await loadModel(handle.model, setProgress);
+      await Promise.race([loadModel(handle.model, setProgress), workerFailed]);
       setModel(handle.model);
     } catch (err) {
       handleRef.current?.dispose();

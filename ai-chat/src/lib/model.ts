@@ -27,9 +27,17 @@ export interface ChatModelHandle {
  * Build the chat model. Inference runs in a worker so the download and
  * token generation never block the UI thread — the app owns that worker so
  * it can terminate it (see `ChatModelHandle.dispose`).
+ *
+ * `onWorkerError` fires on the Worker `error` event (script-load failure,
+ * CSP block, crash before the handler posts anything) — the provider only
+ * settles on worker *messages*, so without this bridge a worker that never
+ * starts would hang the load forever.
  */
-export function createChatModel(): ChatModelHandle {
+export function createChatModel(onWorkerError?: (reason: unknown) => void): ChatModelHandle {
   const worker = new Worker(new URL("./model-worker.ts", import.meta.url), { type: "module" });
+  worker.addEventListener("error", (event) =>
+    onWorkerError?.(event.error ?? new Error(event.message || "Worker failed to start")),
+  );
   const model = transformersJS(MODEL_ID, {
     device: "webgpu",
     dtype: MODEL_DTYPE,

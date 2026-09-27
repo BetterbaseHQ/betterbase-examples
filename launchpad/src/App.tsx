@@ -66,47 +66,25 @@ interface AppCardProps {
   name: string;
   description: string;
   icon: ReactNode;
-  href?: string;
+  href: string;
 }
 
 function AppCard({ name, description, icon, href }: AppCardProps) {
-  const card = (
-    <Card
-      shadow="sm"
-      padding="lg"
-      radius="md"
-      withBorder
-      style={{
-        opacity: href ? 1 : 0.5,
-        cursor: href ? "pointer" : "not-allowed",
-      }}
-    >
-      <Group mb="md">
-        <ThemeIcon size={40} variant="light" radius="md">
-          {icon}
-        </ThemeIcon>
-        <div>
+  return (
+    <Anchor href={href} underline="never" c="inherit">
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Group mb="md">
+          <ThemeIcon size={40} variant="light" radius="md">
+            {icon}
+          </ThemeIcon>
           <Text fw={600} size="md">
             {name}
           </Text>
-          {!href && (
-            <Text size="xs" c="dimmed">
-              Coming soon
-            </Text>
-          )}
-        </div>
-      </Group>
-      <Text size="sm" c="dimmed">
-        {description}
-      </Text>
-    </Card>
-  );
-
-  if (!href) return card;
-
-  return (
-    <Anchor href={href} underline="never" c="inherit">
-      {card}
+        </Group>
+        <Text size="sm" c="dimmed">
+          {description}
+        </Text>
+      </Card>
     </Anchor>
   );
 }

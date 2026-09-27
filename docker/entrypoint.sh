@@ -80,7 +80,9 @@ for app in launchpad $ALL_APPS; do
     echo "entrypoint: invalid client ID for $app" >&2
     exit 1
   fi
-  APPS_JS="$APPS_JS  $app: { clientId: \"$id\" },
+  # Quote the key: `ai-chat` contains a hyphen and is not a valid bare
+  # identifier — an unquoted key would make the whole config.js unparsable.
+  APPS_JS="$APPS_JS  \"$app\": { clientId: \"$id\" },
 "
 done
 

@@ -6,7 +6,7 @@ export { AuthProvider, useAuth } from "betterbase/auth/react";
 export type { AuthContextValue, AuthProviderProps } from "betterbase/auth/react";
 
 // Layout
-export { LessAppShell } from "./layout/LessAppShell.js";
+export { LessAppShell, LESS_HEADER_HEIGHT } from "./layout/LessAppShell.js";
 export { AppRoot } from "./layout/AppRoot.js";
 export { HeaderBar, DEFAULT_LAUNCHPAD_URL, resolveLaunchpadUrl } from "./layout/HeaderBar.js";
 export { UserArea } from "./layout/UserArea.js";

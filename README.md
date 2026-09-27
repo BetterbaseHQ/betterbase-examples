@@ -14,8 +14,8 @@ Everything here works offline, syncs in real time, and encrypts data before it l
 | [photos](./photos) | Encrypted photo gallery with file sync | [localhost:5383](http://localhost:5383) |
 | [board](./board) | Collaborative board with live updates | [localhost:5384](http://localhost:5384) |
 | [chat](./chat) | Encrypted messaging | [localhost:5385](http://localhost:5385) |
-| [passwords](./passwords) | Encrypted password vault | [localhost:5387](http://localhost:5387) |
 | [ai-chat](./ai-chat) | Local in-browser LLM chat (WebGPU, no server) | [localhost:5386](http://localhost:5386) |
+| [passwords](./passwords) | Encrypted password vault | [localhost:5387](http://localhost:5387) |
 
 All apps share common UI components via the [`shared`](./shared) package (`@betterbase/examples-shared`).
 
