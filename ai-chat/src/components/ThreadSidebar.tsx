@@ -57,7 +57,7 @@ export function ThreadSidebar({
 
   return (
     <Box p="xs" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <UnstyledButton onClick={onCreate} mb="xs" px="xs" py={8}>
+      <UnstyledButton onClick={onCreate} mb="xs" px="xs" py={8} aria-label="Start a new chat">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" radius="md">
             <MessageSquarePlus size={16} />

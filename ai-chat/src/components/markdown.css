@@ -1,35 +1,83 @@
-/* Markdown constructs Mantine has no component for. Scoped to the app's
+/* Chat-scale typography for rendered model output. Everything inherits the
+   container's 14px/1.55 so raw elements (headings, lists, tables) don't
+   render at document scale inside a chat bubble. Scoped to the app's
    markdown container so it can't leak into app chrome. */
+.ai-chat-markdown {
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+/* Headings inside a reply are structural hints, not page titles: slightly
+   larger than body, semibold, tight rhythm. */
 .ai-chat-markdown h1,
 .ai-chat-markdown h2,
 .ai-chat-markdown h3,
-.ai-chat-markdown h4 {
-  margin-top: 0.75em;
-  margin-bottom: 0.35em;
+.ai-chat-markdown h4,
+.ai-chat-markdown h5,
+.ai-chat-markdown h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
 }
-.ai-chat-markdown h1:first-child,
-.ai-chat-markdown h2:first-child,
-.ai-chat-markdown h3:first-child {
+.ai-chat-markdown h1 {
+  font-size: 1.2em;
+}
+.ai-chat-markdown h2 {
+  font-size: 1.1em;
+}
+.ai-chat-markdown h3,
+.ai-chat-markdown h4,
+.ai-chat-markdown h5,
+.ai-chat-markdown h6 {
+  font-size: 1em;
+}
+.ai-chat-markdown > :first-child,
+.ai-chat-markdown > :first-child > :first-child {
   margin-top: 0;
-}
-.ai-chat-markdown p {
-  margin-bottom: 0.5em;
 }
 .ai-chat-markdown > :last-child,
 .ai-chat-markdown > * > :last-child {
   margin-bottom: 0;
 }
+
+.ai-chat-markdown p {
+  margin-bottom: 0.65em;
+}
+
 .ai-chat-markdown ul,
 .ai-chat-markdown ol {
-  padding-left: 1.4em;
-  margin-bottom: 0.5em;
+  margin-bottom: 0.65em;
+  padding-left: 1.5em;
 }
+.ai-chat-markdown li {
+  margin: 0.2em 0;
+}
+.ai-chat-markdown li > p {
+  margin-bottom: 0.2em;
+}
+.ai-chat-markdown li::marker {
+  color: var(--mantine-color-dimmed);
+}
+
 .ai-chat-markdown blockquote {
   border-left: 3px solid var(--mantine-color-default-border);
-  margin: 0.5em 0;
+  margin: 0.65em 0;
   padding: 0.1em 0.9em;
-  color: var(--mantine-color-dimmed-text);
+  color: var(--mantine-color-dimmed);
 }
+
+.ai-chat-markdown hr {
+  border: none;
+  border-top: 1px solid var(--mantine-color-default-border);
+  margin: 1em 0;
+}
+
+.ai-chat-markdown table {
+  font-size: inherit;
+}
+
 .ai-chat-markdown a {
   color: var(--mantine-color-blue-6);
 }

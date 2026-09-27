@@ -21,6 +21,8 @@ interface ModelSetupProps {
   /** Download progress, 0..1. */
   progress: number;
   error: string | null;
+  /** Warm load: weights are cached, this is just session setup. */
+  warm: boolean;
   onLoad: () => void;
 }
 
@@ -55,7 +57,7 @@ export function WebGpuRequired() {
 }
 
 /** First-run screen: explains the download, then loads the model. */
-export function ModelSetup({ loading, progress, error, onLoad }: ModelSetupProps) {
+export function ModelSetup({ loading, progress, error, warm, onLoad }: ModelSetupProps) {
   const percent = Math.round(progress * 100);
 
   return (
@@ -94,7 +96,7 @@ export function ModelSetup({ loading, progress, error, onLoad }: ModelSetupProps
             <Stack gap={6}>
               <Progress value={percent} animated aria-label="Model download progress" />
               <Text size="xs" c="dimmed">
-                Downloading model weights… {percent}%
+                {warm ? "Loading model…" : `Downloading model weights… ${percent}%`}
               </Text>
             </Stack>
           ) : (

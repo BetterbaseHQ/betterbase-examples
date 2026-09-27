@@ -40,6 +40,7 @@ const harness = vi.hoisted(() => ({
   dispose: vi.fn(),
   reply: "Four.",
   reasoning: "2 plus 2 is 4.",
+  modelReady: false,
 }));
 
 /**
@@ -59,6 +60,13 @@ function stubWebGpu(available: boolean) {
 vi.mock("@/lib/model", () => ({
   MODEL_LABEL: "LFM2.5 1.2B Thinking",
   MODEL_APPROX_LABEL: "~760 MB",
+  isModelReady: () => harness.modelReady,
+  markModelReady: () => {
+    harness.modelReady = true;
+  },
+  clearModelReady: () => {
+    harness.modelReady = false;
+  },
   createChatModel: () => {
     const dispose = vi.fn();
     harness.dispose = dispose;
@@ -110,6 +118,7 @@ beforeEach(() => {
   harness.resolveLoad = null;
   harness.rejectLoad = null;
   harness.dispose.mockReset();
+  harness.modelReady = false;
 });
 
 afterEach(async () => {
@@ -151,7 +160,7 @@ describe("AI Chat app", () => {
     await loadModelThroughUi();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
 
     const input = await screen.findByLabelText("Message");
     await user.type(input, "What is 2 + 2?");
@@ -216,7 +225,7 @@ describe("AI Chat app", () => {
     await loadModelThroughUi();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
     await user.type(await screen.findByLabelText("Message"), "hello");
     await user.keyboard("{Enter}");
 
@@ -228,7 +237,7 @@ describe("AI Chat app", () => {
     await loadModelThroughUi();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
     await user.type(await screen.findByLabelText("Message"), "hi");
     await user.keyboard("{Enter}");
     await screen.findByText("Four.");
@@ -243,12 +252,102 @@ describe("AI Chat app", () => {
     expect(remaining.records).toHaveLength(0);
   });
 
+  it("auto-loads the model for returning users without the download pitch", async () => {
+    harness.modelReady = true;
+    renderWithProviders(<App />);
+
+    // The consent button never appears; the load starts on its own.
+    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
+    expect(await screen.findByText(/loading model/i)).toBeVisible();
+
+    await act(async () => {
+      harness.progress?.(1);
+      harness.resolveLoad?.();
+    });
+    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+  });
+
+  it("clears the auto-load flag when the warm load fails and offers retry", async () => {
+    harness.modelReady = true;
+    renderWithProviders(<App />);
+
+    await act(async () => {
+      harness.rejectLoad?.(new Error("warm boot failed"));
+    });
+
+    expect(await screen.findByText(/couldn't load the model/i)).toBeVisible();
+    expect(screen.getByText("warm boot failed")).toBeVisible();
+    expect(screen.getByRole("button", { name: /retry download/i })).toBeVisible();
+    expect(harness.modelReady).toBe(false);
+  });
+
+  it("recovers to the workspace when the retried warm load succeeds", async () => {
+    harness.modelReady = true;
+    renderWithProviders(<App />);
+
+    await act(async () => {
+      harness.rejectLoad?.(new Error("warm boot failed"));
+    });
+    await screen.findByText(/couldn't load the model/i);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /retry download/i }));
+    await act(async () => {
+      harness.progress?.(1);
+      harness.resolveLoad?.();
+    });
+    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+  });
+
+  it("sends a suggestion chip straight into the chat", async () => {
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
+    expect(await screen.findByText(/how can i help you today\?/i)).toBeVisible();
+
+    await user.click(await screen.findByRole("button", { name: /explain a concept/i }));
+
+    // The chip's prompt becomes the user turn; the reply streams after it.
+    await waitFor(() => {
+      const log = screen.getByRole("log");
+      expect(within(log).getByText(/HTTPS keeps traffic private/)).toBeVisible();
+      expect(within(log).getByText("Four.")).toBeVisible();
+    });
+  });
+
+  it("anchors new-chat clicks to the current empty thread", async () => {
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    const newChat = () => screen.findByRole("button", { name: "Start a new chat" });
+    await user.click(await newChat());
+    await user.type(await screen.findByLabelText("Message"), "hi");
+    await user.keyboard("{Enter}");
+    await screen.findByText("Four.");
+    await screen.findByText("Math Question"); // first thread got its title
+
+    // A fresh empty thread, then another click while it's still empty:
+    // the second click must anchor, not stack another untitled entry.
+    await user.click(await newChat());
+    await screen.findByText(/how can i help you today\?/i);
+    // Sidebar lists the untitled thread (its "New chat" item + the header
+    // button make two matches; the button alone is one).
+    expect((await screen.findAllByText("New chat")).length).toBe(2);
+    await user.click(await newChat());
+
+    const all = await (db as unknown as Wipeable).query(threads as never, {});
+    expect(all.records).toHaveLength(2);
+  });
+
   it("renames a thread from the sidebar", async () => {
     renderWithProviders(<App />);
     await loadModelThroughUi();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
     await user.type(await screen.findByLabelText("Message"), "hi");
     await user.keyboard("{Enter}");
     await screen.findByText("Four.");

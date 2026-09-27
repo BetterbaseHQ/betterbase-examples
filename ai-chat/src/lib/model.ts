@@ -14,6 +14,37 @@ export const MODEL_LABEL = "LFM2.5 1.2B Thinking";
 export const MODEL_DTYPE = "q4f16";
 export const MODEL_APPROX_LABEL = "~760 MB";
 
+/**
+ * Remember that the weights have been downloaded once, so returning users
+ * skip the download pitch and go straight to (fast, cache-served) loading.
+ * Cleared if a later load fails — the cache may have been evicted.
+ */
+const MODEL_READY_KEY = "ai-chat:model-ready";
+
+export function isModelReady(): boolean {
+  try {
+    return localStorage.getItem(MODEL_READY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markModelReady(): void {
+  try {
+    localStorage.setItem(MODEL_READY_KEY, "1");
+  } catch {
+    /* storage unavailable (private mode) — worst case they see the pitch again */
+  }
+}
+
+export function clearModelReady(): void {
+  try {
+    localStorage.removeItem(MODEL_READY_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Fraction (0..1) of the model weights downloaded so far. */
 export type ModelProgressCallback = (progress: number) => void;
 
