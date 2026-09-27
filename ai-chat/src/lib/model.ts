@@ -3,13 +3,14 @@ import { transformersJS, type TransformersJSLanguageModel } from "@browser-ai/tr
 /**
  * Local, in-browser model — no inference server involved.
  *
- * LFM2.5 is Liquid AI's edge model; the ONNX export is what Transformers.js
- * runs on WebGPU. `q4f16` is the recommended quantization for the browser
- * (~760 MB of weights) — it downloads once and is then served from the
- * browser cache.
+ * LFM2.5 Thinking is Liquid AI's reasoning variant: it works through the
+ * problem inside `<think>…</think>` before answering. The ONNX export is
+ * what Transformers.js runs on WebGPU; `q4f16` is the recommended
+ * quantization for the browser (~760 MB of weights) — it downloads once and
+ * is then served from the browser cache.
  */
-export const MODEL_ID = "LiquidAI/LFM2.5-1.2B-Instruct-ONNX";
-export const MODEL_LABEL = "LFM2.5 1.2B Instruct";
+export const MODEL_ID = "LiquidAI/LFM2.5-1.2B-Thinking-ONNX";
+export const MODEL_LABEL = "LFM2.5 1.2B Thinking";
 export const MODEL_DTYPE = "q4f16";
 export const MODEL_APPROX_LABEL = "~760 MB";
 

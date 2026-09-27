@@ -1,22 +1,45 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, screen } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { UIMessageChunk } from "ai";
 import { renderWithProviders } from "@betterbase/examples-shared/test";
 import App from "./App";
+import { db, openDatabaseForScope, threads, messages } from "@/lib/db";
+import { deleteTree } from "betterbase/sync";
+
+interface Wipeable {
+  query(c: never, o: unknown): Promise<{ records: Array<{ id: string }> }>;
+  delete(c: never, id: string): Promise<unknown>;
+}
+
+/** Leave the module in the anonymous state, cleaned, for other test files.
+ * Threads are deleted with their cascade; orphaned messages (if a test was
+ * interrupted mid-cascade) are swept individually. */
+async function wipeAnonymous() {
+  await openDatabaseForScope(null);
+  const current = db as unknown as Wipeable;
+  const allThreads = await current.query(threads as never, {});
+  for (const t of allThreads.records) {
+    await deleteTree(db, threads as never, t.id);
+  }
+  const orphans = await current.query(messages as never, {});
+  await Promise.all(orphans.records.map((m) => current.delete(messages as never, m.id)));
+}
 
 /**
- * The model and transport boundaries are stubbed: real inference needs WebGPU
- * and a ~760 MB download, which has no place in a unit test. These tests pin
- * the UI lifecycle (gate → load → progress → chat), the streaming render, and
- * the failure/retry paths.
+ * The model and inference boundaries are stubbed: real inference needs
+ * WebGPU and a ~760 MB download, which has no place in a unit test. The
+ * database is real (OPFS-backed, same as production) and wiped between
+ * tests. These tests pin the UI lifecycle (gate → load → progress →
+ * workspace), the thread/chat flow through the db, and the failure/retry
+ * paths.
  */
 const harness = vi.hoisted(() => ({
   progress: null as null | ((progress: number) => void),
   resolveLoad: null as null | (() => void),
   rejectLoad: null as null | ((error: Error) => void),
-  sendMessages: vi.fn(),
   dispose: vi.fn(),
+  reply: "Four.",
+  reasoning: "2 plus 2 is 4.",
 }));
 
 /**
@@ -34,7 +57,7 @@ function stubWebGpu(available: boolean) {
 }
 
 vi.mock("@/lib/model", () => ({
-  MODEL_LABEL: "LFM2.5 1.2B Instruct",
+  MODEL_LABEL: "LFM2.5 1.2B Thinking",
   MODEL_APPROX_LABEL: "~760 MB",
   createChatModel: () => {
     const dispose = vi.fn();
@@ -50,33 +73,27 @@ vi.mock("@/lib/model", () => ({
   },
 }));
 
-vi.mock("@/lib/chat-transport", () => ({
-  LocalChatTransport: class {
-    sendMessages = harness.sendMessages;
-    reconnectToStream = async () => null;
-  },
-}));
+vi.mock("@/lib/chat-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/chat-service")>();
+  return {
+    ...actual,
+    // Inference stub: streams the configured reply/reasoning in two steps.
+    streamReply: vi.fn(
+      async (
+        _model: unknown,
+        _history: unknown,
+        options: { onUpdate: (state: { reasoning: string; text: string }) => void },
+      ) => {
+        options.onUpdate({ reasoning: harness.reasoning, text: "" });
+        options.onUpdate({ reasoning: harness.reasoning, text: harness.reply });
+        return { state: { reasoning: harness.reasoning, text: harness.reply }, error: null };
+      },
+    ),
+    generateThreadTitle: vi.fn(async () => "Math Question"),
+  };
+});
 
-/** Minimal but valid UI message stream: one text part, then finish. */
-function replyStream(text: string): ReadableStream<UIMessageChunk> {
-  const chunks: UIMessageChunk[] = [
-    { type: "start", messageId: "assistant-1" },
-    { type: "start-step" },
-    { type: "text-start", id: "text-1" },
-    { type: "text-delta", id: "text-1", delta: text },
-    { type: "text-end", id: "text-1" },
-    { type: "finish-step" },
-    { type: "finish", finishReason: "stop" },
-  ];
-  return new ReadableStream({
-    start(controller) {
-      for (const chunk of chunks) controller.enqueue(chunk);
-      controller.close();
-    },
-  });
-}
-
-/** Drives the app from the load screen to a ready chat. */
+/** Drives the app from the load screen to the ready workspace. */
 async function loadModelThroughUi() {
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: /download .* model/i }));
@@ -84,7 +101,6 @@ async function loadModelThroughUi() {
     harness.progress?.(1);
     harness.resolveLoad?.();
   });
-  await screen.findByLabelText("Message");
   return user;
 }
 
@@ -94,13 +110,12 @@ beforeEach(() => {
   harness.resolveLoad = null;
   harness.rejectLoad = null;
   harness.dispose.mockReset();
-  harness.sendMessages.mockReset();
-  harness.sendMessages.mockImplementation(async () => replyStream("Four."));
 });
 
-afterEach(() => {
+afterEach(async () => {
   if (originalGpu) Object.defineProperty(navigator, "gpu", originalGpu);
   else delete (navigator as { gpu?: unknown }).gpu;
+  await wipeAnonymous().catch(() => undefined);
 });
 
 describe("AI Chat app", () => {
@@ -112,7 +127,7 @@ describe("AI Chat app", () => {
     expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
   });
 
-  it("shows download progress while the model loads, then the chat", async () => {
+  it("shows download progress while the model loads, then the workspace", async () => {
     renderWithProviders(<App />);
     const user = userEvent.setup();
 
@@ -127,34 +142,37 @@ describe("AI Chat app", () => {
       harness.progress?.(1);
       harness.resolveLoad?.();
     });
-    expect(await screen.findByLabelText("Message")).toBeVisible();
-    expect(screen.queryByText(/downloading model weights/i)).toBeNull();
+    // Signed-out empty state: chats live in the local database.
+    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
   });
 
-  it("streams an assistant reply after sending a message", async () => {
+  it("runs a full exchange: send, stream, reason, and title the thread", async () => {
     renderWithProviders(<App />);
-    const user = await loadModelThroughUi();
+    await loadModelThroughUi();
 
-    await user.type(screen.getByLabelText("Message"), "What is 2 + 2?");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+
+    const input = await screen.findByLabelText("Message");
+    await user.type(input, "What is 2 + 2?");
     await user.keyboard("{Enter}");
 
-    expect(await screen.findByText("Four.")).toBeVisible();
-    expect(screen.getByText("What is 2 + 2?")).toBeVisible();
+    // The reply (markdown-rendered) and the user message both appear.
+    // Re-query inside waitFor: streaming updates re-render the message
+    // nodes, which can detach a node captured between updates.
+    await waitFor(() => {
+      const log = screen.getByRole("log");
+      expect(within(log).getByText("Four.")).toBeVisible();
+      expect(within(log).getByText("What is 2 + 2?")).toBeVisible();
+    });
 
-    const sent = harness.sendMessages.mock.calls[0]![0];
-    const last = sent.messages.at(-1);
-    expect(last?.role).toBe("user");
-    expect(last?.parts).toContainEqual({ type: "text", text: "What is 2 + 2?" });
-  });
+    // The thinking trace collapses behind its toggle (present but hidden).
+    expect(screen.getByText(harness.reasoning)).not.toBeVisible();
+    await user.click(screen.getByRole("button", { name: /show thinking/i }));
+    await waitFor(() => expect(screen.getByText(harness.reasoning)).toBeVisible());
 
-  it("does not send an empty message", async () => {
-    renderWithProviders(<App />);
-    const user = await loadModelThroughUi();
-
-    await user.click(screen.getByRole("button", { name: /send message/i }));
-
-    expect(harness.sendMessages).not.toHaveBeenCalled();
-    expect(screen.getByText(/ask the local model/i)).toBeVisible();
+    // The model named the thread (sidebar shows it, not "New chat").
+    expect(await screen.findByText("Math Question")).toBeVisible();
   });
 
   it("surfaces a model load failure and offers a retry", async () => {
@@ -188,14 +206,59 @@ describe("AI Chat app", () => {
   });
 
   it("shows the real error when generation fails", async () => {
-    harness.sendMessages.mockRejectedValueOnce(new Error("WebGPU device lost"));
-    renderWithProviders(<App />);
-    const user = await loadModelThroughUi();
+    const { streamReply } = await import("@/lib/chat-service");
+    vi.mocked(streamReply).mockResolvedValueOnce({
+      state: { reasoning: "", text: "" },
+      error: new Error("WebGPU device lost"),
+    });
 
-    await user.type(screen.getByLabelText("Message"), "hello");
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.type(await screen.findByLabelText("Message"), "hello");
     await user.keyboard("{Enter}");
 
-    expect(await screen.findByText(/generation failed/i)).toBeVisible();
-    expect(screen.getByText("WebGPU device lost")).toBeVisible();
+    expect(await screen.findByText(/webgpu device lost/i)).toBeVisible();
+  });
+
+  it("deletes a thread from the sidebar", async () => {
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.type(await screen.findByLabelText("Message"), "hi");
+    await user.keyboard("{Enter}");
+    await screen.findByText("Four.");
+
+    await user.click(screen.getByRole("button", { name: /delete chat/i }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+    // The cascade is real: the thread's message records must be gone too,
+    // not just the thread (orphaned messages would keep syncing forever).
+    const remaining = await (db as unknown as Wipeable).query(messages as never, {});
+    expect(remaining.records).toHaveLength(0);
+  });
+
+  it("renames a thread from the sidebar", async () => {
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /new chat/i }));
+    await user.type(await screen.findByLabelText("Message"), "hi");
+    await user.keyboard("{Enter}");
+    await screen.findByText("Four.");
+
+    await user.click(screen.getByRole("button", { name: /rename chat/i }));
+    const modal = await screen.findByRole("dialog");
+    const field = within(modal).getByRole("textbox");
+    await user.clear(field);
+    await user.type(field, "My renamed chat{Enter}");
+
+    expect(await screen.findByText("My renamed chat")).toBeVisible();
   });
 });

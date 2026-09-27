@@ -1,0 +1,35 @@
+/* Markdown constructs Mantine has no component for. Scoped to the app's
+   markdown container so it can't leak into app chrome. */
+.ai-chat-markdown h1,
+.ai-chat-markdown h2,
+.ai-chat-markdown h3,
+.ai-chat-markdown h4 {
+  margin-top: 0.75em;
+  margin-bottom: 0.35em;
+}
+.ai-chat-markdown h1:first-child,
+.ai-chat-markdown h2:first-child,
+.ai-chat-markdown h3:first-child {
+  margin-top: 0;
+}
+.ai-chat-markdown p {
+  margin-bottom: 0.5em;
+}
+.ai-chat-markdown > :last-child,
+.ai-chat-markdown > * > :last-child {
+  margin-bottom: 0;
+}
+.ai-chat-markdown ul,
+.ai-chat-markdown ol {
+  padding-left: 1.4em;
+  margin-bottom: 0.5em;
+}
+.ai-chat-markdown blockquote {
+  border-left: 3px solid var(--mantine-color-default-border);
+  margin: 0.5em 0;
+  padding: 0.1em 0.9em;
+  color: var(--mantine-color-dimmed-text);
+}
+.ai-chat-markdown a {
+  color: var(--mantine-color-blue-6);
+}

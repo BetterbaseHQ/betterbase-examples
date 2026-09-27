@@ -1,86 +1,87 @@
-# AI Chat — a local LLM in the browser
+# AI Chat — a local, thinking LLM in the browser
 
 A chat app where the model runs **entirely on the device**. There is no
-inference server, no API key, and no account: the browser downloads an ONNX
-build of Liquid AI's [LFM2.5-1.2B-Instruct](https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-ONNX)
+inference server and no API key: the browser downloads an ONNX build of
+Liquid AI's [LFM2.5-1.2B-Thinking](https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking-ONNX)
 once, runs it on WebGPU via [Transformers.js](https://huggingface.co/docs/transformers.js),
-and streams tokens back through the Vercel AI SDK. Runs on port 5386
-(`pnpm dev`).
+and streams tokens back through the Vercel AI SDK. Chats live in the local
+betterbase database and sync end-to-end encrypted across your devices.
+Runs on port 5386 (`pnpm dev`).
 
-This is the odd one out in the examples suite: it demonstrates the _local_
-half of local-first — compute that never leaves the device — rather than sync
-and encryption.
+It demonstrates both halves of local-first at once: **compute that never
+leaves the device** and **data that syncs without a server seeing it**.
+
+## Features
+
+- **Thread sidebar** — list, rename, delete; newest first. Threads are
+  auto-named by the model itself after the first exchange (with a
+  truncation fallback).
+- **Thinking trace** — the model reasons inside `<think>…</think>`; the AI
+  SDK's `extractReasoningMiddleware` splits that out of the stream, so
+  reasoning streams into its own field and collapses behind a
+  "Show thinking" toggle.
+- **Markdown replies** — GFM tables, lists, fenced code blocks with a
+  language label and copy button. Rendered as React nodes (no raw HTML),
+  so model output has no script-injection surface.
+- **Message actions** — copy, edit & regenerate a user message, regenerate
+  a reply, stop mid-stream.
+- **Synced history** — works fully offline and signed out (anonymous local
+  database); signing in adopts that history into the account database and
+  syncs it E2EE. Sync is per-record, so streaming a reply costs one small
+  blob, not the whole thread.
 
 ## Model lifecycle
 
-`src/App.tsx` has three states: **idle → loading → ready**.
+`src/App.tsx` has two phases: **model gate** (idle → loading → ready) and
+**workspace**.
 
 - **Idle** (`ModelSetup`): explains the download and offers a button. Nothing
   is fetched until the user asks for it.
 - **Loading**: `createChatModel()` builds the provider and `loadModel()` forces
   the otherwise-lazy initialization. The progress bar tracks the weight
-  download.
-- **Ready** (`ChatPanel`): the chat UI.
+  download. A worker that fails before posting anything (script-load failure,
+  CSP block) is bridged into the load path so it can't hang forever.
+- **Ready**: the workspace mounts and the worker stays warm across thread
+  switches and account swaps — only the UI re-mounts.
 
-`LiquidAI/LFM2.5-1.2B-Instruct-ONNX` at `q4f16` is ~760 MB. It downloads once
-and is then served from the browser's Cache Storage — a warm profile goes
-straight to 100%. WebGPU is required; without it the app shows a
-"WebGPU required" screen instead of a degraded mode (`src/lib/webgpu.ts`).
+`LiquidAI/LFM2.5-1.2B-Thinking-ONNX` at `q4f16` is ~760 MB. It downloads once
+and is then served from the browser's cache — a warm profile goes straight to
+100%. WebGPU is required; without it the app shows a "WebGPU required" screen
+instead of a degraded mode (`src/lib/webgpu.ts`).
 
-## How the AI SDK is wired
+## How the pieces fit
 
-`LocalChatTransport` (`src/lib/chat-transport.ts`) implements the AI SDK's
-`ChatTransport` interface without any HTTP. `sendMessages()` calls
-`streamText()` directly on the Transformers.js model and re-encodes its stream
-with `toUIMessageStream()`, so `useChat()` sees exactly the same streaming
-chunks it would from a server endpoint. `reconnectToStream()` returns `null` —
-there is no server-side stream to reattach to.
+- **`src/lib/collections.ts`** — `threads` and `messages` collections.
+  Messages are separate records (not embedded in the thread) with a declared
+  parent edge: concurrent appends from two devices both survive the CRDT
+  merge, each record syncs as its own small encrypted blob, and deleting a
+  thread cascades its messages. The assistant's reasoning is its own
+  `reasoning` field (`t.text`), separate from the answer.
+- **`src/lib/db.ts`** — the scoped-database pattern shared with the other
+  examples: anonymous namespace by default, per-account namespace on sign-in,
+  with anonymous → account adoption handled by `createScopedAppDb`.
+- **`src/lib/use-ai-chat.ts`** — the domain hook: queries, thread CRUD, and
+  one assistant turn (stream into the placeholder message record, throttled
+  db writes, final authoritative write, then title generation).
+- **`src/lib/chat-service.ts`** — wraps the Transformers.js model in
+  `extractReasoningMiddleware({ tagName: "think" })` and exposes
+  `streamReply` / `generateThreadTitle`.
+- **`src/lib/runtime.ts`** — feeds the db-backed state into
+  [assistant-ui](https://www.assistant-ui.com/) as an external store; its
+  primitives drive the message list and composer while Mantine renders.
+- **`src/components/`** — `ThreadSidebar`, `ChatThread` (messages, reasoning
+  panel, composer), `Markdown`.
 
 ## Why inference runs in a worker
 
-`src/lib/model-worker.ts` wraps `TransformersJSWorkerHandler`, and the app
-constructs the `Worker` itself (`createChatModel`). Owning the worker lets the
-app terminate it: `createChatModel` returns a handle whose `dispose()` kills the
-worker, so a failed load's worker (and its partial download) is released before
-a retry starts, and on unmount.
+`@browser-ai/transformers-js` runs the model in a Web Worker so downloads
+and token generation never block the UI thread — and the app owns that
+worker, so it can terminate it (`createChatModel`'s `dispose`) on retry and
+unmount.
 
-Loading is explicit. `loadModel()` calls the provider's
-`createSessionWithProgress()`, the public way to force the otherwise-lazy
-initialization; it reports aggregate download progress (0..1) to the callback
-that drives the progress bar, and resolves once the worker is ready.
+## E2E coverage
 
-## Files
-
-| File                            | Role                                                     |
-| ------------------------------- | -------------------------------------------------------- |
-| `src/lib/model.ts`              | Model constants, worker wiring + disposal, `loadModel()` |
-| `src/lib/model-worker.ts`       | Worker entry point (off the main thread)                 |
-| `src/lib/chat-transport.ts`     | AI SDK `ChatTransport` over local `streamText()`         |
-| `src/lib/webgpu.ts`             | WebGPU capability check                                  |
-| `src/components/ModelSetup.tsx` | Idle/loading screens + WebGPU gate                       |
-| `src/components/ChatPanel.tsx`  | Streaming chat UI                                        |
-
-## Tests
-
-`pnpm test` runs the vitest browser suite. The model and transport are mocked
-(`@/lib/model`, `@/lib/chat-transport`) so tests never touch WebGPU or the
-network; the WebGPU gate is exercised against a stubbed `navigator.gpu`.
-
-## Verifying real inference
-
-Unit tests mock the model, so a full check should also exercise the real one
-once:
-
-```bash
-pnpm build
-pnpm exec vite preview --port 5390 --strictPort
-```
-
-Serve it on a `localhost` origin (WebGPU is only exposed in a secure
-context — `about:blank` and plain non-loopback HTTP report no `navigator.gpu`)
-and use a hardware WebGPU adapter: Playwright's bundled Chromium works
-_headed_ (Metal), while headless needs `--enable-unsafe-webgpu` and then only
-gets the SwiftShader adapter, which lacks `shader-f16` and can't load the
-q4f16 weights. Load the model, and ask a question. A cold profile
-downloads ~760 MB; a warm one skips straight to ready. Inference works signed
-out — the header's auth controls exist only so the app matches the suite.
+This app is excluded from the Playwright examples suite: the q4f16 model
+needs a hardware WebGPU adapter with `shader-f16`, and headless CI only gets
+SwiftShader without it. Unit/browser tests (20) + manual verification cover
+the app instead; see `../e2e/playwright.config.ts` for the rationale.

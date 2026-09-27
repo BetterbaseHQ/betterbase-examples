@@ -14,7 +14,7 @@ Everything here works offline, syncs in real time, and encrypts data before it l
 | [photos](./photos) | Encrypted photo gallery with file sync | [localhost:5383](http://localhost:5383) |
 | [board](./board) | Collaborative board with live updates | [localhost:5384](http://localhost:5384) |
 | [chat](./chat) | Encrypted messaging | [localhost:5385](http://localhost:5385) |
-| [ai-chat](./ai-chat) | Local in-browser LLM chat (WebGPU, no server) | [localhost:5386](http://localhost:5386) |
+| [ai-chat](./ai-chat) | Local in-browser LLM chat with E2EE-synced history | [localhost:5386](http://localhost:5386) |
 | [passwords](./passwords) | Encrypted password vault | [localhost:5387](http://localhost:5387) |
 
 All apps share common UI components via the [`shared`](./shared) package (`@betterbase/examples-shared`).
@@ -30,7 +30,7 @@ Each app is this same app plus one more idea — read them in this order:
 5. [chat](./chat) — realtime: presence, typing, signed edit chains with spoof detection.
 6. [photos](./photos) — blobs: FileStore upload queue, thumbnails, per-account caches, upload-aware sync status.
 7. [passwords](./passwords) — per-record sharing and secret hygiene on a flat single collection.
-8. [ai-chat](./ai-chat) — local inference: a 1.2B LLM runs entirely in the browser over WebGPU (Transformers.js + the AI SDK); no sync, server, or account needed.
+8. [ai-chat](./ai-chat) — local inference: the LFM2.5 Thinking model runs entirely in the browser over WebGPU (Transformers.js + the AI SDK); chats sync end-to-end encrypted like every other app.
 
 ## Hosting all apps (examples image)
 
