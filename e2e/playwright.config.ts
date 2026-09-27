@@ -40,8 +40,10 @@ interface AppDef {
   clientId: string;
 }
 
-// ai-chat is intentionally absent: it runs a 1.2B model on WebGPU and
-// downloads ~760 MB of weights, which the CI browser can't exercise.
+// ai-chat is intentionally absent: it needs a hardware WebGPU adapter with
+// `shader-f16` (its q4f16 model) plus a ~760 MB download. Headless CI falls
+// back to the SwiftShader adapter, which lacks `shader-f16`, so the model
+// can't load there. Covered locally instead (see ai-chat/README.md).
 const appDefs: AppDef[] = [
   { name: "tasks", port: 25391, clientId: env.TASKS_CLIENT_ID },
   { name: "notes", port: 25392, clientId: env.NOTES_CLIENT_ID },

@@ -76,7 +76,11 @@ pnpm build
 pnpm exec vite preview --port 5390 --strictPort
 ```
 
-Open it in Chrome (Playwright's bundled Chromium has no WebGPU — use the
-`chrome` channel), load the model, and ask a question. A cold profile
+Serve it on a `localhost` origin (WebGPU is only exposed in a secure
+context — `about:blank` and plain non-loopback HTTP report no `navigator.gpu`)
+and use a hardware WebGPU adapter: Playwright's bundled Chromium works
+_headed_ (Metal), while headless needs `--enable-unsafe-webgpu` and then only
+gets the SwiftShader adapter, which lacks `shader-f16` and can't load the
+q4f16 weights. Load the model, and ask a question. A cold profile
 downloads ~760 MB; a warm one skips straight to ready. Inference works signed
 out — the header's auth controls exist only so the app matches the suite.

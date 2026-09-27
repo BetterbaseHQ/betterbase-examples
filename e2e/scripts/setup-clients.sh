@@ -40,8 +40,9 @@ DB_PASS="${ACCOUNTS_DB_PASSWORD:-accounts}"
 DB_NAME="${ACCOUNTS_DB_NAME:-accounts}"
 
 # appname:port:scopes (scopes are space-separated; photos needs files)
-# ai-chat is intentionally absent: it runs a 1.2B model on WebGPU and
-# downloads ~760 MB of weights, which the CI browser can't exercise.
+# ai-chat is intentionally absent: it needs a hardware WebGPU adapter with
+# `shader-f16` (its q4f16 model) plus a ~760 MB download. Headless CI falls
+# back to the SwiftShader adapter, which lacks `shader-f16`.
 APPS=(
     "tasks:25391:sync"
     "notes:25392:sync"
