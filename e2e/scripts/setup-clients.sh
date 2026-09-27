@@ -40,6 +40,8 @@ DB_PASS="${ACCOUNTS_DB_PASSWORD:-accounts}"
 DB_NAME="${ACCOUNTS_DB_NAME:-accounts}"
 
 # appname:port:scopes (scopes are space-separated; photos needs files)
+# ai-chat is intentionally absent: it runs a 1.2B model on WebGPU and
+# downloads ~760 MB of weights, which the CI browser can't exercise.
 APPS=(
     "tasks:25391:sync"
     "notes:25392:sync"

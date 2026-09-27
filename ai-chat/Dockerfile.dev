@@ -1,0 +1,21 @@
+FROM node:24.21-alpine
+RUN corepack enable
+WORKDIR /workspace
+
+# Copy the SDK (TypeScript source + pre-built WASM bindings)
+COPY betterbase/js/ ./betterbase/js/
+COPY betterbase/crates/betterbase-wasm/pkg/ ./betterbase/crates/betterbase-wasm/pkg/
+COPY betterbase/crates/betterbase-db-wasm/pkg/ ./betterbase/crates/betterbase-db-wasm/pkg/
+
+# Install SDK dependencies (no build needed — Vite resolves TS source directly)
+RUN cd betterbase/js && pnpm install --frozen-lockfile
+
+COPY betterbase-examples/shared/ ./examples/shared/
+RUN cd examples/shared && pnpm install --frozen-lockfile && pnpm build
+
+COPY betterbase-examples/ai-chat/ ./examples/ai-chat/
+RUN cd examples/ai-chat && pnpm install --frozen-lockfile
+
+WORKDIR /workspace/examples/ai-chat
+EXPOSE 5386
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]

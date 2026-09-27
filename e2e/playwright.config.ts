@@ -40,6 +40,8 @@ interface AppDef {
   clientId: string;
 }
 
+// ai-chat is intentionally absent: it runs a 1.2B model on WebGPU and
+// downloads ~760 MB of weights, which the CI browser can't exercise.
 const appDefs: AppDef[] = [
   { name: "tasks", port: 25391, clientId: env.TASKS_CLIENT_ID },
   { name: "notes", port: 25392, clientId: env.NOTES_CLIENT_ID },

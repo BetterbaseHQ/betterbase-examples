@@ -8,7 +8,7 @@
 # index page at / and is always served.
 set -eu
 
-ALL_APPS="tasks notes photos board chat passwords"
+ALL_APPS="tasks notes photos board chat passwords ai-chat"
 # Accept space- or comma-separated lists.
 EXAMPLES_ENABLED_APPS="$(printf '%s' "${EXAMPLES_ENABLED_APPS:-$ALL_APPS}" | tr ',' ' ')"
 DOMAIN="${EXAMPLES_ACCOUNTS_DOMAIN:-localhost:5377}"
@@ -36,6 +36,7 @@ client_id() {
     board) echo "${BOARD_CLIENT_ID:-}" ;;
     chat) echo "${CHAT_CLIENT_ID:-}" ;;
     passwords) echo "${PASSWORDS_CLIENT_ID:-}" ;;
+    ai-chat) echo "${AI_CHAT_CLIENT_ID:-}" ;;
     *) echo "" ;;
   esac
 }

@@ -1,0 +1,9 @@
+allowBuilds:
+  "@swc/core": true
+  "esbuild": true
+  # Browser-only build: onnxruntime-node (Node backend) and protobufjs's
+  # postinstall are never used, so their build scripts stay blocked.
+  "onnxruntime-node": false
+  "protobufjs": false
+overrides:
+  uuid: ^11.1.1

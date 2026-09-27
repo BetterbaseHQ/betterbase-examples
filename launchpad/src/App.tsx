@@ -44,16 +44,12 @@ const APP_META: Record<string, { name: string; description: string; icon: ReactN
     description: "Encrypted password vault",
     icon: <KeyRound size={24} />,
   },
-};
-
-/** Not built yet — always shown as "coming soon". */
-const COMING_SOON = [
-  {
+  "ai-chat": {
     name: "AI Chat",
-    description: "E2E encrypted AI conversations",
+    description: "Chat with a local model running in the browser",
     icon: <Bot size={24} />,
   },
-];
+};
 
 /** Dev environment: each app runs on its own port at `/`. */
 const DEV_PORTS: Record<string, number> = {
@@ -62,6 +58,7 @@ const DEV_PORTS: Record<string, number> = {
   photos: 5383,
   board: 5384,
   chat: 5385,
+  "ai-chat": 5386,
   passwords: 5387,
 };
 
@@ -154,9 +151,6 @@ export default function App() {
     >
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="lg" maw={900} mx="auto" mt="xl">
         {appCards().map((app) => (
-          <AppCard key={app.name} {...app} />
-        ))}
-        {COMING_SOON.map((app) => (
           <AppCard key={app.name} {...app} />
         ))}
       </SimpleGrid>

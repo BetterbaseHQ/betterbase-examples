@@ -55,6 +55,9 @@ RUN cd examples/chat && pnpm install --frozen-lockfile && VITE_BASE_PATH=/chat/ 
 COPY betterbase-examples/passwords/ ./examples/passwords/
 RUN cd examples/passwords && pnpm install --frozen-lockfile && VITE_BASE_PATH=/passwords/ pnpm build
 
+COPY betterbase-examples/ai-chat/ ./examples/ai-chat/
+RUN cd examples/ai-chat && pnpm install --frozen-lockfile && VITE_BASE_PATH=/ai-chat/ pnpm build
+
 # ==========================================================================
 # Serve stage — static file server with runtime config injection
 # ==========================================================================
@@ -68,6 +71,7 @@ COPY --from=build /workspace/examples/photos/dist /srv/photos
 COPY --from=build /workspace/examples/board/dist /srv/board
 COPY --from=build /workspace/examples/chat/dist /srv/chat
 COPY --from=build /workspace/examples/passwords/dist /srv/passwords
+COPY --from=build /workspace/examples/ai-chat/dist /srv/ai-chat
 
 COPY betterbase-examples/docker/Caddyfile /etc/caddy/Caddyfile
 COPY betterbase-examples/docker/entrypoint.sh /entrypoint.sh

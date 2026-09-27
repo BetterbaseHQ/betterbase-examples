@@ -15,6 +15,7 @@ Everything here works offline, syncs in real time, and encrypts data before it l
 | [board](./board) | Collaborative board with live updates | [localhost:5384](http://localhost:5384) |
 | [chat](./chat) | Encrypted messaging | [localhost:5385](http://localhost:5385) |
 | [passwords](./passwords) | Encrypted password vault | [localhost:5387](http://localhost:5387) |
+| [ai-chat](./ai-chat) | Local in-browser LLM chat (WebGPU, no server) | [localhost:5386](http://localhost:5386) |
 
 All apps share common UI components via the [`shared`](./shared) package (`@betterbase/examples-shared`).
 
@@ -29,6 +30,7 @@ Each app is this same app plus one more idea — read them in this order:
 5. [chat](./chat) — realtime: presence, typing, signed edit chains with spoof detection.
 6. [photos](./photos) — blobs: FileStore upload queue, thumbnails, per-account caches, upload-aware sync status.
 7. [passwords](./passwords) — per-record sharing and secret hygiene on a flat single collection.
+8. [ai-chat](./ai-chat) — local inference: a 1.2B LLM runs entirely in the browser over WebGPU (Transformers.js + the AI SDK); no sync, server, or account needed.
 
 ## Hosting all apps (examples image)
 
