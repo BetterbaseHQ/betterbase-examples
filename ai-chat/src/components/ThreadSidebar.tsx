@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Group,
+  Menu,
   Modal,
   ScrollArea,
   Text,
@@ -11,9 +12,10 @@ import {
   ThemeIcon,
   UnstyledButton,
 } from "@mantine/core";
-import { MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import type { Thread } from "@/lib/db";
 import { UNTITLED } from "@/lib/titles";
+import "./thread-sidebar.css";
 
 export interface ThreadSidebarProps {
   threads: readonly Thread[];
@@ -56,8 +58,8 @@ export function ThreadSidebar({
   };
 
   return (
-    <Box p="xs" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <UnstyledButton onClick={onCreate} mb="xs" px="xs" py={8} aria-label="Start a new chat">
+    <Box p={4} style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <UnstyledButton onClick={onCreate} mb="xs" px={6} py={6} aria-label="Start a new chat">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" radius="md">
             <MessageSquarePlus size={16} />
@@ -80,9 +82,10 @@ export function ThreadSidebar({
               <Group
                 key={thread.id}
                 gap="xs"
-                px="xs"
+                px={6}
                 py={6}
                 wrap="nowrap"
+                className="thread-row"
                 style={{
                   borderRadius: "var(--mantine-radius-sm)",
                   background: selected ? "var(--mantine-color-default-hover)" : undefined,
@@ -99,24 +102,36 @@ export function ThreadSidebar({
                     {thread.lastMessageText || "No messages yet"}
                   </Text>
                 </UnstyledButton>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  aria-label="Rename chat"
-                  onClick={() => startRename(thread)}
-                >
-                  <Pencil size={13} />
-                </ActionIcon>
-                <ActionIcon
-                  variant="subtle"
-                  color="red"
-                  size="sm"
-                  aria-label="Delete chat"
-                  onClick={() => setDeleting(thread)}
-                >
-                  <Trash2 size={13} />
-                </ActionIcon>
+                {/* Rename/delete live behind a hover-revealed menu —
+                    rarely needed, so they never crowd the list. */}
+                <Menu shadow="md" width={160} position="bottom-end" withinPortal>
+                  <Menu.Target>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="sm"
+                      className="thread-row-menu"
+                      aria-label="Chat options"
+                    >
+                      <MoreVertical size={14} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item
+                      leftSection={<Pencil size={13} />}
+                      onClick={() => startRename(thread)}
+                    >
+                      Rename
+                    </Menu.Item>
+                    <Menu.Item
+                      color="red"
+                      leftSection={<Trash2 size={13} />}
+                      onClick={() => setDeleting(thread)}
+                    >
+                      Delete
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
               </Group>
             );
           })

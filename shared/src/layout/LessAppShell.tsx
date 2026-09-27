@@ -93,7 +93,7 @@ export function LessAppShell({
         />
       </AppShell.Header>
 
-      {navbar && <AppShell.Navbar p="md">{navbar}</AppShell.Navbar>}
+      {navbar && <AppShell.Navbar p="xs">{navbar}</AppShell.Navbar>}
 
       <AppShell.Main>
         {banner}

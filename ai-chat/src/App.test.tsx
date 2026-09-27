@@ -242,7 +242,8 @@ describe("AI Chat app", () => {
     await user.keyboard("{Enter}");
     await screen.findByText("Four.");
 
-    await user.click(screen.getByRole("button", { name: /delete chat/i }));
+    await user.click(screen.getByRole("button", { name: /chat options/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     await user.click(await screen.findByRole("button", { name: "Delete" }));
 
     expect(await screen.findByText(/no chats yet/i)).toBeVisible();
@@ -352,7 +353,8 @@ describe("AI Chat app", () => {
     await user.keyboard("{Enter}");
     await screen.findByText("Four.");
 
-    await user.click(screen.getByRole("button", { name: /rename chat/i }));
+    await user.click(screen.getByRole("button", { name: /chat options/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rename" }));
     const modal = await screen.findByRole("dialog");
     const field = within(modal).getByRole("textbox");
     await user.clear(field);
