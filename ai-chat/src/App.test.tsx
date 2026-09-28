@@ -27,7 +27,7 @@ async function wipeAnonymous() {
 
 /**
  * The model and inference boundaries are stubbed: real inference needs
- * WebGPU and a ~760 MB download, which has no place in a unit test. The
+ * WebGPU and a multi-GB download, which has no place in a unit test. The
  * database is real (OPFS-backed, same as production) and wiped between
  * tests. These tests pin the UI lifecycle (gate → load → progress →
  * workspace), the thread/chat flow through the db, and the failure/retry
@@ -64,16 +64,16 @@ vi.mock("@/lib/model", () => ({
       repo: "stub/1.2b",
       dtype: "q4f16",
       label: "LFM2.5 1.2B Instruct",
-      approxSize: "~760 MB",
-      blurb: "Fast and light",
+      approxSize: "~700 MB",
+      blurb: "Fast everyday model — chat, writing, and simple tools",
     },
     {
       id: "2.6b",
       repo: "stub/2.6b",
       dtype: "q4f16",
       label: "LFM2.5 2.6B",
-      approxSize: "~1.5 GB",
-      blurb: "Balanced",
+      approxSize: "~1.6 GB",
+      blurb: "More capable — better for longer tasks and tool use",
     },
   ],
   getModel: (id: string) =>
@@ -91,8 +91,8 @@ vi.mock("@/lib/model", () => ({
           repo: "stub/1.2b",
           dtype: "q4f16",
           label: "LFM2.5 1.2B Instruct",
-          approxSize: "~760 MB",
-          blurb: "Fast and light",
+          approxSize: "~700 MB",
+          blurb: "Fast everyday model — chat, writing, and simple tools",
         },
   selectedModelId: () => "1.2b",
   setSelectedModelId: () => {},

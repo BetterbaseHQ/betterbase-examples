@@ -21,16 +21,16 @@ export const MODELS: ModelInfo[] = [
     repo: "LiquidAI/LFM2.5-1.2B-Instruct-ONNX",
     dtype: "q4f16",
     label: "LFM2.5 1.2B Instruct",
-    approxSize: "~760 MB",
-    blurb: "Fast and light — the everyday default",
+    approxSize: "~700 MB",
+    blurb: "Fast everyday model — chat, writing, and simple tools",
   },
   {
     id: "2.6b",
     repo: "LiquidAI/LFM2.5-2.6B-ONNX",
     dtype: "q4f16",
     label: "LFM2.5 2.6B",
-    approxSize: "~1.5 GB",
-    blurb: "Stronger replies, moderate download",
+    approxSize: "~1.6 GB",
+    blurb: "More capable — better for longer tasks and tool use",
   },
   {
     id: "8b-a1b",
@@ -38,7 +38,7 @@ export const MODELS: ModelInfo[] = [
     dtype: "q4f16",
     label: "LFM2.5 8B A1B",
     approxSize: "~5 GB",
-    blurb: "Flagship quality — needs ~6 GB of GPU memory",
+    blurb: "Fast and capable — best for reasoning and complex tasks",
   },
 ];
 
