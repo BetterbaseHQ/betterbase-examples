@@ -39,7 +39,10 @@ leaves the device** and **data that syncs without a server seeing it**.
 **workspace**.
 
 - **Picker** (`ModelSetup`): a card per model — label, one-liner, download
-  size. Nothing is fetched until the user asks for it.
+  size, and a "Cached" chip when the weights are already on disk. Cached
+  models offer a load (not a download) and a trash action that deletes
+  their weights from the browser cache. Nothing is fetched until the user
+  asks for it.
 - **Loading**: `createChatModel()` builds the provider and `loadModel()` forces
   the otherwise-lazy initialization. The progress bar tracks the weight
   download. A worker that fails before posting anything (script-load failure,

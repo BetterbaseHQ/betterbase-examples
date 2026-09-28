@@ -108,6 +108,22 @@ export function clearModelReady(modelId: string): void {
   }
 }
 
+/**
+ * Delete one model's downloaded weights from the browser cache and clear
+ * its ready flag. Transformers.js stores fetched files in the Cache API
+ * under its default cache name, keyed by the HF URL
+ * (`https://huggingface.co/{repo}/resolve/…`), so the repo scopes exactly
+ * the entries this model owns. A live session is unaffected — its weights
+ * are on the GPU — the next load re-downloads.
+ */
+export async function clearModelCache(info: ModelInfo): Promise<void> {
+  const cache = await caches.open("transformers-cache");
+  const prefix = `https://huggingface.co/${info.repo}/`;
+  const owned = (await cache.keys()).filter((request) => request.url.startsWith(prefix));
+  await Promise.all(owned.map((request) => cache.delete(request)));
+  clearModelReady(info.id);
+}
+
 /** Fraction (0..1) of the model weights downloaded so far. */
 export type ModelProgressCallback = (progress: number) => void;
 

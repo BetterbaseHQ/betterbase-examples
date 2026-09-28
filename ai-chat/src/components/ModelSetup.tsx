@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import {
+  ActionIcon,
   Alert,
+  Badge,
   Box,
   Button,
   Card,
@@ -12,8 +14,9 @@ import {
   Stack,
   Text,
   ThemeIcon,
+  Tooltip,
 } from "@mantine/core";
-import { AlertCircle, Cpu, Download, ShieldCheck, Zap } from "lucide-react";
+import { AlertCircle, Cpu, Download, ShieldCheck, Trash2, Zap } from "lucide-react";
 import { EmptyState } from "@betterbase/examples-shared";
 import type { ModelInfo } from "@/lib/model";
 import { WORKSPACE_HEIGHT } from "@/lib/layout";
@@ -27,6 +30,10 @@ interface ModelSetupProps {
   /** Download progress, 0..1. */
   progress: number;
   error: string | null;
+  /** Ids whose weights are already in the browser cache. */
+  cachedIds: ReadonlySet<string>;
+  /** Delete one model's downloaded weights. */
+  onClearCache: (model: ModelInfo) => void;
   /** Warm load: weights are cached, this is just session setup. */
   warm: boolean;
   onLoad: () => void;
@@ -70,10 +77,13 @@ export function ModelSetup({
   loading,
   progress,
   error,
+  cachedIds,
+  onClearCache,
   warm,
   onLoad,
 }: ModelSetupProps) {
   const selected = models.find((m) => m.id === selectedId) ?? models[0]!;
+  const selectedCached = cachedIds.has(selected.id);
   const percent = Math.round(progress * 100);
 
   return (
@@ -112,14 +122,43 @@ export function ModelSetup({
                 >
                   <Group justify="space-between" wrap="nowrap" gap="xs">
                     <div style={{ minWidth: 0 }}>
-                      <Text fz="sm" fw={600}>
-                        {m.label}
-                      </Text>
+                      <Group gap={6} wrap="nowrap">
+                        <Text fz="sm" fw={600}>
+                          {m.label}
+                        </Text>
+                        {cachedIds.has(m.id) && (
+                          <Badge size="sm" variant="light">
+                            Cached
+                          </Badge>
+                        )}
+                      </Group>
                       <Text fz="xs" c="dimmed" truncate="end">
                         {m.blurb} · {m.approxSize}
                       </Text>
                     </div>
-                    <Radio.Indicator />
+                    <Group gap={4} wrap="nowrap">
+                      {cachedIds.has(m.id) && (
+                        <Tooltip label="Delete downloaded weights">
+                          <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            size="sm"
+                            aria-label={`Delete downloaded ${m.label}`}
+                            disabled={loading}
+                            onClick={(event) => {
+                              // The card is a radio — without this, the same
+                              // click would also select (and auto-load) the
+                              // model whose cache we're deleting.
+                              event.stopPropagation();
+                              onClearCache(m);
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      <Radio.Indicator />
+                    </Group>
                   </Group>
                 </Radio.Card>
               ))}
@@ -129,7 +168,9 @@ export function ModelSetup({
           <List size="sm" spacing="xs">
             <List.Item icon={<Zap size={14} />}>WebGPU-accelerated local inference</List.Item>
             <List.Item icon={<Download size={14} />}>
-              First load downloads {selected.approxSize} of weights, then stays cached
+              {selectedCached
+                ? "Already downloaded — loads straight from your cache"
+                : `First load downloads ${selected.approxSize} of weights, then stays cached`}
             </List.Item>
             <List.Item icon={<ShieldCheck size={14} />}>
               No account and no server required
@@ -151,7 +192,11 @@ export function ModelSetup({
             </Stack>
           ) : (
             <Button onClick={onLoad} leftSection={<Download size={16} />}>
-              {error !== null ? "Retry download" : `Download ${selected.approxSize} model`}
+              {error !== null
+                ? "Retry download"
+                : selectedCached
+                  ? "Load model"
+                  : `Download ${selected.approxSize} model`}
             </Button>
           )}
         </Stack>

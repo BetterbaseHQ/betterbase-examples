@@ -45,6 +45,10 @@ const harness = vi.hoisted(() => ({
   reasoning: "2 plus 2 is 4.",
   ready: { "1.2b": false, "2.6b": false } as Record<string, boolean>,
   selected: "1.2b",
+  /** every selection the app persisted, in order */
+  selectCalls: [] as string[],
+  /** ids whose cache was cleared from the picker */
+  cleared: [] as string[],
 }));
 
 /**
@@ -86,6 +90,7 @@ vi.mock("@/lib/model", () => {
     selectedModelId: () => harness.selected,
     setSelectedModelId: (id: string) => {
       harness.selected = id;
+      harness.selectCalls.push(id);
     },
     isModelReady: (id: string) => harness.ready[id] ?? false,
     markModelReady: (id: string) => {
@@ -93,6 +98,10 @@ vi.mock("@/lib/model", () => {
     },
     clearModelReady: (id: string) => {
       harness.ready[id] = false;
+    },
+    clearModelCache: (info: { id: string }) => {
+      harness.cleared.push(info.id);
+      harness.ready[info.id] = false;
     },
     createChatModel: (info: { id: string }) => {
       harness.created.push(info.id);
@@ -149,7 +158,9 @@ beforeEach(() => {
   harness.dispose.mockReset();
   harness.ready = { "1.2b": false, "2.6b": false };
   harness.selected = "1.2b";
+  harness.selectCalls = [];
   harness.created = [];
+  harness.cleared = [];
 });
 
 afterEach(async () => {
@@ -371,7 +382,9 @@ describe("AI Chat app", () => {
     const firstDispose = harness.dispose;
 
     await user.click(screen.getByRole("button", { name: "Change model" }));
-    expect(await screen.findByRole("button", { name: /download ~700 mb model/i })).toBeVisible();
+    // The 1.2B is already cached, so the picker offers a load, not a download.
+    expect(await screen.findByRole("button", { name: "Load model" })).toBeVisible();
+    expect(screen.getByText("Already downloaded — loads straight from your cache")).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: /LFM2\.5 2\.6B/ }));
     await user.click(screen.getByRole("button", { name: /download ~1\.6 gb model/i }));
@@ -383,6 +396,24 @@ describe("AI Chat app", () => {
     expect(await screen.findByLabelText("Message")).toBeVisible();
     expect(harness.created).toEqual(["1.2b", "2.6b"]);
     expect(firstDispose).toHaveBeenCalled();
+  });
+
+  it("marks cached models in the picker and deletes their weights on demand", async () => {
+    renderWithProviders(<App />);
+    const user = await loadModelThroughUi();
+    await user.click(screen.getByRole("button", { name: "Change model" }));
+
+    // Exactly one Cached badge: the loaded 1.2B, not the 2.6B.
+    expect(screen.getAllByText("Cached")).toHaveLength(1);
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete downloaded LFM2.5 1.2B Instruct" }),
+    );
+    await waitFor(() => expect(harness.cleared).toEqual(["1.2b"]));
+
+    // Chip gone, and the pitch is honest again: this is a download.
+    expect(screen.queryByText("Cached")).toBeNull();
+    expect(screen.getByRole("button", { name: /download ~700 mb model/i })).toBeVisible();
   });
 
   it("shows the real error when generation fails", async () => {
@@ -435,8 +466,9 @@ describe("AI Chat app", () => {
     harness.ready["1.2b"] = true;
     renderWithProviders(<App />);
 
-    // The consent button never appears; the load starts on its own.
-    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
+    // The consent button never appears; the load starts on its own. The
+    // cached card's delete action doesn't count as a download pitch.
+    expect(screen.queryByRole("button", { name: /download (~|model)/i })).toBeNull();
     expect(await screen.findByText(/loading model/i)).toBeVisible();
 
     await act(async () => {

@@ -9,6 +9,7 @@ import { ChatThread } from "@/components/ChatThread";
 import { ModelSetup, WebGpuRequired } from "@/components/ModelSetup";
 import {
   MODELS,
+  clearModelCache,
   clearModelReady,
   createChatModel,
   getModel,
@@ -64,6 +65,20 @@ function ModelGate({
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Seeded at mount (the gate mounts fresh for every picker visit) so the
+  // cached chips and warm copy stay truthful while models are cleared here.
+  const [cachedIds, setCachedIds] = useState(
+    () => new Set(MODELS.filter((m) => isModelReady(m.id)).map((m) => m.id)),
+  );
+
+  const clearCache = useCallback(async (model: ModelInfo) => {
+    await clearModelCache(model);
+    setCachedIds((previous) => {
+      const next = new Set(previous);
+      next.delete(model.id);
+      return next;
+    });
+  }, []);
 
   const startLoad = useCallback(async () => {
     // A previous attempt may have left a worker (and its partial download)
@@ -125,9 +140,11 @@ function ModelGate({
       loading={loading}
       progress={progress}
       error={error}
+      cachedIds={cachedIds}
+      onClearCache={clearCache}
       // A failed warm load usually means the cache was evicted — the retry
       // is a full download again, so drop the warm copy once an error shows.
-      warm={isModelReady(info.id) && error === null}
+      warm={cachedIds.has(info.id) && error === null}
       onLoad={startLoad}
     />
   );

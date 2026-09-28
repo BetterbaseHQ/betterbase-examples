@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   MODELS,
+  clearModelCache,
   clearModelReady,
   createChatModel,
   getModel,
@@ -66,6 +67,30 @@ describe("per-model ready flags", () => {
     expect(isModelReady("1.2b")).toBe(false);
     clearModelReady("8b-a1b");
     expect(isModelReady("8b-a1b")).toBe(false);
+  });
+});
+
+describe("clearModelCache", () => {
+  afterEach(async () => {
+    localStorage.clear();
+    await caches.delete("transformers-cache");
+  });
+
+  it("deletes only that model's weights and ready flag", async () => {
+    const cache = await caches.open("transformers-cache");
+    const own =
+      "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-ONNX/resolve/main/onnx/model_q4f16.onnx";
+    const other =
+      "https://huggingface.co/nchapman/LFM2.5-8B-A1B-ONNX-q4f16-sym-webgpu/resolve/main/onnx/model_q4f16.onnx";
+    await cache.put(own, new Response("weights"));
+    await cache.put(other, new Response("weights"));
+    markModelReady("1.2b");
+
+    await clearModelCache(MODELS[0]!);
+
+    expect(await cache.match(own)).toBeUndefined();
+    expect(await cache.match(other)).toBeDefined();
+    expect(isModelReady("1.2b")).toBe(false);
   });
 });
 
