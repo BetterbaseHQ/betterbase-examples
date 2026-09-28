@@ -10,12 +10,12 @@ import type { TransformersJSLanguageModel } from "@browser-ai/transformers-js";
 import { cleanGeneratedTitle, fallbackTitle, titlePrompt } from "./titles.js";
 
 /**
- * The thinking model emits its reasoning inside `<think>…</think>` before
- * the answer. The AI SDK's reasoning middleware parses those tags out of
- * the stream, so reasoning arrives as separate `reasoning-delta` chunks
- * and never leaks into the answer text.
+ * All current models are non-thinking, but the middleware still guards the
+ * output: if a stray `<think>` block ever leaks into a reply (training
+ * quirk), it's parsed out into a separate reasoning part instead of
+ * polluting the answer text.
  */
-export function wrapThinkingModel(model: TransformersJSLanguageModel): LanguageModel {
+export function wrapModel(model: TransformersJSLanguageModel): LanguageModel {
   return wrapLanguageModel({
     model,
     middleware: extractReasoningMiddleware({ tagName: "think" }),

@@ -58,14 +58,50 @@ function stubWebGpu(available: boolean) {
 }
 
 vi.mock("@/lib/model", () => ({
-  MODEL_LABEL: "LFM2.5 1.2B Thinking",
-  MODEL_APPROX_LABEL: "~760 MB",
-  isModelReady: () => harness.modelReady,
-  markModelReady: () => {
-    harness.modelReady = true;
+  MODELS: [
+    {
+      id: "1.2b",
+      repo: "stub/1.2b",
+      dtype: "q4f16",
+      label: "LFM2.5 1.2B Instruct",
+      approxSize: "~760 MB",
+      blurb: "Fast and light",
+    },
+    {
+      id: "2.6b",
+      repo: "stub/2.6b",
+      dtype: "q4f16",
+      label: "LFM2.5 2.6B",
+      approxSize: "~1.5 GB",
+      blurb: "Balanced",
+    },
+  ],
+  getModel: (id: string) =>
+    id === "2.6b"
+      ? {
+          id: "2.6b",
+          repo: "stub/2.6b",
+          dtype: "q4f16",
+          label: "LFM2.5 2.6B",
+          approxSize: "~1.5 GB",
+          blurb: "Balanced",
+        }
+      : {
+          id: "1.2b",
+          repo: "stub/1.2b",
+          dtype: "q4f16",
+          label: "LFM2.5 1.2B Instruct",
+          approxSize: "~760 MB",
+          blurb: "Fast and light",
+        },
+  selectedModelId: () => "1.2b",
+  setSelectedModelId: () => {},
+  isModelReady: (id: string) => (id === "1.2b" ? harness.modelReady : false),
+  markModelReady: (id: string) => {
+    if (id === "1.2b") harness.modelReady = true;
   },
-  clearModelReady: () => {
-    harness.modelReady = false;
+  clearModelReady: (id: string) => {
+    if (id === "1.2b") harness.modelReady = false;
   },
   createChatModel: () => {
     const dispose = vi.fn();

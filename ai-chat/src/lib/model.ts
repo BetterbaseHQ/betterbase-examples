@@ -1,45 +1,99 @@
 import { transformersJS, type TransformersJSLanguageModel } from "@browser-ai/transformers-js";
 
 /**
- * Local, in-browser model — no inference server involved.
- *
- * LFM2.5 Thinking is Liquid AI's reasoning variant: it works through the
- * problem inside `<think>…</think>` before answering. The ONNX export is
- * what Transformers.js runs on WebGPU; `q4f16` is the recommended
- * quantization for the browser (~760 MB of weights) — it downloads once and
- * is then served from the browser cache.
+ * The downloadable models. All three ship WebGPU `q4f16` ONNX exports from
+ * LiquidAI; sizes are the q4f16 shard totals (verified against the HF repos).
  */
-export const MODEL_ID = "LiquidAI/LFM2.5-1.2B-Thinking-ONNX";
-export const MODEL_LABEL = "LFM2.5 1.2B Thinking";
-export const MODEL_DTYPE = "q4f16";
-export const MODEL_APPROX_LABEL = "~760 MB";
+export interface ModelInfo {
+  /** Short stable key — localStorage and prop plumbing use this, not the repo. */
+  id: string;
+  repo: string;
+  /** WebGPU-friendly quantization; every entry ships this exact export. */
+  dtype: "q4f16";
+  label: string;
+  approxSize: string;
+  blurb: string;
+}
+
+export const MODELS: ModelInfo[] = [
+  {
+    id: "1.2b",
+    repo: "LiquidAI/LFM2.5-1.2B-Instruct-ONNX",
+    dtype: "q4f16",
+    label: "LFM2.5 1.2B Instruct",
+    approxSize: "~760 MB",
+    blurb: "Fast and light — the everyday default",
+  },
+  {
+    id: "2.6b",
+    repo: "LiquidAI/LFM2.5-2.6B-ONNX",
+    dtype: "q4f16",
+    label: "LFM2.5 2.6B",
+    approxSize: "~1.5 GB",
+    blurb: "Stronger replies, moderate download",
+  },
+  {
+    id: "8b-a1b",
+    repo: "LiquidAI/LFM2.5-8B-A1B-ONNX",
+    dtype: "q4f16",
+    label: "LFM2.5 8B A1B",
+    approxSize: "~5 GB",
+    blurb: "Flagship quality — needs ~6 GB of GPU memory",
+  },
+];
+
+export const DEFAULT_MODEL_ID = "1.2b";
+
+export function getModel(id: string): ModelInfo {
+  return MODELS.find((m) => m.id === id) ?? MODELS[0]!;
+}
+
+const SELECTED_KEY = "ai-chat:model";
+const READY_PREFIX = "ai-chat:model-ready:";
+
+/** The model the user last picked (or the default). Persisted. */
+export function selectedModelId(): string {
+  try {
+    const id = localStorage.getItem(SELECTED_KEY);
+    if (id !== null && MODELS.some((m) => m.id === id)) return id;
+  } catch {
+    /* storage unavailable (private mode) — fall through to the default */
+  }
+  return DEFAULT_MODEL_ID;
+}
+
+export function setSelectedModelId(id: string): void {
+  try {
+    localStorage.setItem(SELECTED_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
- * Remember that the weights have been downloaded once, so returning users
- * skip the download pitch and go straight to (fast, cache-served) loading.
- * Cleared if a later load fails — the cache may have been evicted.
+ * Per-model "weights are in the browser cache" flag. The old single-model
+ * key (`ai-chat:model-ready`) referred to the retired Thinking repo and is
+ * deliberately not migrated — those weights are no longer offered.
  */
-const MODEL_READY_KEY = "ai-chat:model-ready";
-
-export function isModelReady(): boolean {
+export function isModelReady(modelId: string): boolean {
   try {
-    return localStorage.getItem(MODEL_READY_KEY) === "1";
+    return localStorage.getItem(READY_PREFIX + modelId) === "1";
   } catch {
     return false;
   }
 }
 
-export function markModelReady(): void {
+export function markModelReady(modelId: string): void {
   try {
-    localStorage.setItem(MODEL_READY_KEY, "1");
+    localStorage.setItem(READY_PREFIX + modelId, "1");
   } catch {
-    /* storage unavailable (private mode) — worst case they see the pitch again */
+    /* storage unavailable — worst case they see the download pitch again */
   }
 }
 
-export function clearModelReady(): void {
+export function clearModelReady(modelId: string): void {
   try {
-    localStorage.removeItem(MODEL_READY_KEY);
+    localStorage.removeItem(READY_PREFIX + modelId);
   } catch {
     /* ignore */
   }
@@ -65,14 +119,17 @@ export interface ChatModelHandle {
  * settles on worker *messages*, so without this bridge a worker that never
  * starts would hang the load forever.
  */
-export function createChatModel(onWorkerError?: (reason: unknown) => void): ChatModelHandle {
+export function createChatModel(
+  info: ModelInfo,
+  onWorkerError?: (reason: unknown) => void,
+): ChatModelHandle {
   const worker = new Worker(new URL("./model-worker.ts", import.meta.url), { type: "module" });
   worker.addEventListener("error", (event) =>
     onWorkerError?.(event.error ?? new Error(event.message || "Worker failed to start")),
   );
-  const model = transformersJS(MODEL_ID, {
+  const model = transformersJS(info.repo, {
     device: "webgpu",
-    dtype: MODEL_DTYPE,
+    dtype: info.dtype,
     worker,
   });
   return { model, dispose: () => worker.terminate() };

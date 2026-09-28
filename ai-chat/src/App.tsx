@@ -8,12 +8,17 @@ import { ThreadSidebar } from "@/components/ThreadSidebar";
 import { ChatThread } from "@/components/ChatThread";
 import { ModelSetup, WebGpuRequired } from "@/components/ModelSetup";
 import {
+  MODELS,
   clearModelReady,
   createChatModel,
+  getModel,
   isModelReady,
   loadModel,
   markModelReady,
+  selectedModelId,
+  setSelectedModelId,
   type ChatModelHandle,
+  type ModelInfo,
 } from "@/lib/model";
 import { isWebGpuAvailable } from "@/lib/webgpu";
 import {
@@ -25,7 +30,7 @@ import {
   openDatabaseForScope,
   threads,
 } from "@/lib/db";
-import { useAiChat, useThinkingModel } from "@/lib/use-ai-chat";
+import { useAiChat, useWrappedModel } from "@/lib/use-ai-chat";
 
 const createFilesWorker = () =>
   new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
@@ -33,22 +38,27 @@ const createFilesWorker = () =>
   });
 
 /**
- * Model lifecycle: idle (explain + load) → loading (progress) → ready (chat).
- * The model loads once per tab and stays warm across thread and account
- * switches — only the chat UI re-mounts. The handle's lifetime is owned by
- * `App` (via `onReady`): disposing here on unmount would terminate the
- * inference worker the moment the gate is replaced by the workspace.
+ * Model lifecycle: idle (pick + explain + load) → loading (progress) →
+ * ready (chat). The model loads once per tab and stays warm across thread
+ * and account switches — only the chat UI re-mounts. The handle's lifetime
+ * is owned by `App` (via `onReady`): disposing here on unmount would
+ * terminate the inference worker the moment the gate is replaced by the
+ * workspace.
  *
- * Once the weights have been downloaded (flag in localStorage), the load
- * starts automatically — a warm load is quick and needs no consent, so
- * returning users never see the download pitch again.
+ * When the picked model's weights are already cached (per-model flag in
+ * localStorage), the load starts automatically — a warm load is quick and
+ * needs no consent, so returning users never see the download pitch again.
  */
 function ModelGate({
-  onReady,
+  info,
   autoStart,
+  onReady,
+  onSelect,
 }: {
-  onReady: (model: TransformersJSLanguageModel, handle: ChatModelHandle) => void;
+  info: ModelInfo;
   autoStart: boolean;
+  onReady: (model: TransformersJSLanguageModel, handle: ChatModelHandle) => void;
+  onSelect: (id: string) => void;
 }) {
   const handleRef = useRef<ChatModelHandle | null>(null);
   const [progress, setProgress] = useState(0);
@@ -71,37 +81,45 @@ function ModelGate({
       const workerFailed = new Promise<never>((_, reject) => {
         rejectOnWorkerError = reject;
       });
-      const handle = createChatModel((reason) => rejectOnWorkerError?.(reason));
+      const handle = createChatModel(info, (reason) => rejectOnWorkerError?.(reason));
       handleRef.current = handle;
       await Promise.race([loadModel(handle.model, setProgress), workerFailed]);
-      markModelReady();
+      markModelReady(info.id);
       onReady(handle.model, handle);
     } catch (err) {
-      clearModelReady();
+      clearModelReady(info.id);
       handleRef.current?.dispose();
       handleRef.current = null;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, [onReady]);
+  }, [info, onReady]);
 
-  // Jump straight into a warm load; the first-ever load keeps its explicit
-  // download button (a 760 MB fetch deserves consent). Runs before the
-  // WebGPU check so the flag can't be consumed by a gate that won't render;
-  // the guard keeps a WebGPU-less browser from spawning a doomed worker.
-  // In an effect so a discarded render can't leak a started download.
+  // Picking a different model resets any attempt; the auto-start guard
+  // re-arms when `autoStart` clears so a later re-selection can auto-run.
   const startedRef = useRef(false);
   useEffect(() => {
-    if (autoStart && !startedRef.current && isWebGpuAvailable()) {
-      startedRef.current = true;
-      void startLoad();
-    }
+    setError(null);
+    setProgress(0);
+    startedRef.current = false;
+  }, [info.id]);
+
+  // Jump straight into a warm load; the first-ever load keeps its explicit
+  // download button (a multi-GB fetch deserves consent). The guard keeps a
+  // WebGPU-less browser from spawning a doomed worker.
+  useEffect(() => {
+    if (!autoStart || startedRef.current || !isWebGpuAvailable()) return;
+    startedRef.current = true;
+    void startLoad();
   }, [autoStart, startLoad]);
 
   if (!isWebGpuAvailable()) return <WebGpuRequired />;
   return (
     <ModelSetup
+      models={MODELS}
+      selectedId={info.id}
+      onSelect={onSelect}
       loading={loading}
       progress={progress}
       error={error}
@@ -135,13 +153,17 @@ function SyncBanner() {
  */
 function AiChatWorkspace({
   model,
+  modelLabel,
   signedIn,
+  onChangeModel,
 }: {
   model: TransformersJSLanguageModel;
+  modelLabel: string;
   signedIn: boolean;
+  onChangeModel: () => void;
 }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const wrappedModel = useThinkingModel(model);
+  const wrappedModel = useWrappedModel(model);
 
   // Null means the persistent "New chat" draft is selected — the app always
   // opens there, and nothing is created in the database until the first
@@ -203,6 +225,8 @@ function AiChatWorkspace({
           onNewChat={() => setActiveThreadId(null)}
           onRename={(id, title) => void chat.renameThread(id, title)}
           onDelete={(id) => void deleteThread(id)}
+          modelLabel={modelLabel}
+          onChangeModel={onChangeModel}
         />
       }
       navbarWidth={280}
@@ -220,6 +244,8 @@ function AiChatWorkspace({
 }
 
 export default function App() {
+  const [modelId, setModelId] = useState(selectedModelId);
+  const [autoStart, setAutoStart] = useState(() => isModelReady(selectedModelId()));
   const [model, setModel] = useState<TransformersJSLanguageModel | null>(null);
   const handleRef = useRef<ChatModelHandle | null>(null);
 
@@ -227,15 +253,31 @@ export default function App() {
   // switches and is terminated only when the app unmounts.
   useEffect(() => () => handleRef.current?.dispose(), []);
 
+  const handleReady = useCallback((m: TransformersJSLanguageModel, handle: ChatModelHandle) => {
+    handleRef.current = handle;
+    setModel(m);
+  }, []);
+
+  const selectModel = useCallback((id: string) => {
+    setSelectedModelId(id);
+    setModelId(id);
+    setAutoStart(isModelReady(id));
+  }, []);
+
+  // Back to the picker; autoStart stays off so the currently-loaded model
+  // doesn't immediately re-load — the user asked to switch.
+  const changeModel = useCallback(() => {
+    handleRef.current?.dispose();
+    handleRef.current = null;
+    setModel(null);
+    setAutoStart(false);
+  }, []);
+
+  const info = getModel(modelId);
+
   if (model === null) {
     return (
-      <ModelGate
-        autoStart={isModelReady()}
-        onReady={(m, handle) => {
-          handleRef.current = handle;
-          setModel(m);
-        }}
-      />
+      <ModelGate info={info} autoStart={autoStart} onReady={handleReady} onSelect={selectModel} />
     );
   }
 
@@ -248,9 +290,23 @@ export default function App() {
       getDb={() => db}
       createFilesWorker={createFilesWorker}
       getCurrentScopeDbName={currentScopeDbName}
-      local={<AiChatWorkspace model={model} signedIn={false} />}
+      local={
+        <AiChatWorkspace
+          model={model}
+          modelLabel={info.label}
+          signedIn={false}
+          onChangeModel={changeModel}
+        />
+      }
     >
-      {() => <AiChatWorkspace model={model} signedIn />}
+      {() => (
+        <AiChatWorkspace
+          model={model}
+          modelLabel={info.label}
+          signedIn
+          onChangeModel={changeModel}
+        />
+      )}
     </ScopedAppTree>
   );
 }

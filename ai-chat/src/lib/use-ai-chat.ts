@@ -3,6 +3,7 @@ import { deleteTree } from "betterbase/sync";
 import { useQuery, useDatabase } from "betterbase/db/react";
 import type { ModelMessage } from "ai";
 import type { LanguageModel } from "ai";
+import type { TransformersJSLanguageModel } from "@browser-ai/transformers-js";
 import {
   threads,
   messages,
@@ -13,7 +14,7 @@ import {
   generateThreadTitle,
   isAbortError,
   streamReply,
-  wrapThinkingModel,
+  wrapModel,
   type ReplyState,
 } from "./chat-service";
 import { UNTITLED, fallbackTitle } from "./titles";
@@ -370,6 +371,6 @@ export function useAiChat(model: LanguageModel, activeThreadId: string | null): 
 }
 
 /** Wrap once per model instance (the reasoning middleware is stateless). */
-export function useThinkingModel(raw: Parameters<typeof wrapThinkingModel>[0]): LanguageModel {
-  return useMemo(() => wrapThinkingModel(raw), [raw]);
+export function useWrappedModel(raw: TransformersJSLanguageModel): LanguageModel {
+  return useMemo(() => wrapModel(raw), [raw]);
 }

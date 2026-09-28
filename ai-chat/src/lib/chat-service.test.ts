@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MockLanguageModelV4, convertArrayToReadableStream } from "ai/test";
 import type { TransformersJSLanguageModel } from "@browser-ai/transformers-js";
-import { generateThreadTitle, streamReply, wrapThinkingModel } from "./chat-service";
+import { generateThreadTitle, streamReply, wrapModel } from "./chat-service";
 
 /** A mock raw model whose generate output is the given text. */
 function mockModel(text: string): TransformersJSLanguageModel {
@@ -23,14 +23,12 @@ function mockModel(text: string): TransformersJSLanguageModel {
 
 describe("generateThreadTitle", () => {
   it("strips the thinking block and keeps the named title", async () => {
-    const model = wrapThinkingModel(
-      mockModel("<think>they talked about addition</think>Math Question"),
-    );
+    const model = wrapModel(mockModel("<think>they talked about addition</think>Math Question"));
     expect(await generateThreadTitle(model, "What is 2 + 2?", "Four.")).toBe("Math Question");
   });
 
   it("uses the raw text when the model answers without thinking", async () => {
-    const model = wrapThinkingModel(mockModel("Https Explained"));
+    const model = wrapModel(mockModel("Https Explained"));
     expect(await generateThreadTitle(model, "explain https", "TLS encrypts…")).toBe(
       "Https Explained",
     );
@@ -42,12 +40,12 @@ describe("generateThreadTitle", () => {
         throw new Error("worker exploded");
       },
     });
-    const model = wrapThinkingModel(throwing as unknown as TransformersJSLanguageModel);
+    const model = wrapModel(throwing as unknown as TransformersJSLanguageModel);
     expect(await generateThreadTitle(model, "What is 2 + 2?", "Four.")).toBe("What is 2 + 2?");
   });
 
   it("falls back when the model produces nothing usable", async () => {
-    const model = wrapThinkingModel(mockModel("<think>only thinking, no answer</think>"));
+    const model = wrapModel(mockModel("<think>only thinking, no answer</think>"));
     expect(await generateThreadTitle(model, "What is 2 + 2?", "Four.")).toBe("What is 2 + 2?");
   });
 });

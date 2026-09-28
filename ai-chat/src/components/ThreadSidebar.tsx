@@ -10,9 +10,10 @@ import {
   Text,
   Textarea,
   ThemeIcon,
+  Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { MoreVertical, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, MessageSquarePlus, Pencil, Repeat, Trash2 } from "lucide-react";
 import type { Thread } from "@/lib/db";
 import { previewText, UNTITLED } from "@/lib/titles";
 import "./thread-sidebar.css";
@@ -27,6 +28,10 @@ export interface ThreadSidebarProps {
   onNewChat: () => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
+  /** Loaded model's display name, pinned to the footer. */
+  modelLabel: string;
+  /** Open the model picker (disposes the loaded model). */
+  onChangeModel: () => void;
 }
 
 /**
@@ -43,6 +48,8 @@ export function ThreadSidebar({
   onNewChat,
   onRename,
   onDelete,
+  modelLabel,
+  onChangeModel,
 }: ThreadSidebarProps) {
   const [renaming, setRenaming] = useState<Thread | null>(null);
   const [deleting, setDeleting] = useState<Thread | null>(null);
@@ -155,6 +162,31 @@ export function ThreadSidebar({
           })
         )}
       </ScrollArea>
+
+      {/* Loaded model + the way back to the picker. */}
+      <Group
+        justify="space-between"
+        wrap="nowrap"
+        gap="xs"
+        px={8}
+        pt={4}
+        style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}
+      >
+        <Text fz="xs" c="dimmed" truncate="end">
+          {modelLabel}
+        </Text>
+        <Tooltip label="Change model">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            aria-label="Change model"
+            onClick={onChangeModel}
+          >
+            <Repeat size={14} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
 
       <Modal
         opened={renaming !== null}
