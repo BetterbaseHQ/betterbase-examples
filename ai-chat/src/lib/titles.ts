@@ -31,12 +31,18 @@ const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
  * Normalize a model-generated title: strip quoting/newlines, collapse to one
  * line, cap length. Returns null if nothing usable remains (caller falls
  * back to truncation).
+ *
+ * Trim BEFORE taking the first line: the model answers the `Title:` prompt
+ * with a leading newline (`"\n\nRainbow Explanation"`), and splitting first
+ * would take the empty line and discard every generated title.
  */
 export function cleanGeneratedTitle(raw: string): string | null {
   const cleaned = raw
-    .replace(QUOTES, "")
+    .trim()
     .split("\n", 1)[0]!
     .replace(/\s+/g, " ")
+    .trim()
+    .replace(QUOTES, "")
     .trim()
     .replace(/[.!?:;,]+$/, "")
     .trim();

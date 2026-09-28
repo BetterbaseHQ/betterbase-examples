@@ -29,6 +29,12 @@ describe("cleanGeneratedTitle", () => {
     expect(cleanGeneratedTitle("Two\nlines")).toBe("Two");
   });
 
+  it("keeps the title when the model answers with a leading newline", () => {
+    // Observed LFM2.5 output for the `Title:` prompt — the first line is
+    // empty, so the first usable line only appears after trimming.
+    expect(cleanGeneratedTitle("\n\nRainbow Explanation")).toBe("Rainbow Explanation");
+  });
+
   it("caps the length", () => {
     const cleaned = cleanGeneratedTitle("word ".repeat(30));
     expect(cleaned).not.toBeNull();
