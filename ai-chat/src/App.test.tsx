@@ -384,7 +384,7 @@ describe("AI Chat app", () => {
     await user.click(screen.getByRole("button", { name: "Change model" }));
     // The 1.2B is already cached, so the picker offers a load, not a download.
     expect(await screen.findByRole("button", { name: "Load model" })).toBeVisible();
-    expect(screen.getByText("Already downloaded — loads straight from your cache")).toBeVisible();
+    expect(screen.getByText("Already on your device — loads without downloading")).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: /LFM2\.5 2\.6B/ }));
     await user.click(screen.getByRole("button", { name: /download ~1\.6 gb model/i }));
@@ -403,8 +403,8 @@ describe("AI Chat app", () => {
     const user = await loadModelThroughUi();
     await user.click(screen.getByRole("button", { name: "Change model" }));
 
-    // Exactly one Cached badge: the loaded 1.2B, not the 2.6B.
-    expect(screen.getAllByText("Cached")).toHaveLength(1);
+    // Exactly one Downloaded badge: the loaded 1.2B, not the 2.6B.
+    expect(screen.getAllByText("Downloaded")).toHaveLength(1);
 
     await user.click(
       screen.getByRole("button", { name: "Delete downloaded LFM2.5 1.2B Instruct" }),
@@ -412,7 +412,7 @@ describe("AI Chat app", () => {
     await waitFor(() => expect(harness.cleared).toEqual(["1.2b"]));
 
     // Chip gone, and the pitch is honest again: this is a download.
-    expect(screen.queryByText("Cached")).toBeNull();
+    expect(screen.queryByText("Downloaded")).toBeNull();
     expect(screen.getByRole("button", { name: /download ~700 mb model/i })).toBeVisible();
   });
 

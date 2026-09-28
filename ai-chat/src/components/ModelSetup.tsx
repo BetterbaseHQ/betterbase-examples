@@ -128,7 +128,7 @@ export function ModelSetup({
                         </Text>
                         {cachedIds.has(m.id) && (
                           <Badge size="sm" variant="light">
-                            Cached
+                            Downloaded
                           </Badge>
                         )}
                       </Group>
@@ -169,8 +169,8 @@ export function ModelSetup({
             <List.Item icon={<Zap size={14} />}>WebGPU-accelerated local inference</List.Item>
             <List.Item icon={<Download size={14} />}>
               {selectedCached
-                ? "Already downloaded — loads straight from your cache"
-                : `First load downloads ${selected.approxSize} of weights, then stays cached`}
+                ? "Already on your device — loads without downloading"
+                : `First load downloads ${selected.approxSize} of weights, then stays on your device`}
             </List.Item>
             <List.Item icon={<ShieldCheck size={14} />}>
               No account and no server required

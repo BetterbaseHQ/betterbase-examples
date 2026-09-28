@@ -39,7 +39,7 @@ leaves the device** and **data that syncs without a server seeing it**.
 **workspace**.
 
 - **Picker** (`ModelSetup`): a card per model — label, one-liner, download
-  size, and a "Cached" chip when the weights are already on disk. Cached
+  size, and a "Downloaded" chip when the weights are already on disk. Downloaded
   models offer a load (not a download) and a trash action that deletes
   their weights from the browser cache. Nothing is fetched until the user
   asks for it.
