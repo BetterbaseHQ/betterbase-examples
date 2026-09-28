@@ -33,8 +33,10 @@ export const MODELS: ModelInfo[] = [
     blurb: "More capable — better for longer tasks and tool use",
   },
   {
+    // Re-sharded packaging of the official q4f16 export: upstream ships
+    // 2.15 GB shards that V8 cannot allocate as ArrayBuffers.
     id: "8b-a1b",
-    repo: "LiquidAI/LFM2.5-8B-A1B-ONNX",
+    repo: "nchapman/LFM2.5-8B-A1B-ONNX-q4f16-sharded",
     dtype: "q4f16",
     label: "LFM2.5 8B A1B",
     approxSize: "~5 GB",
