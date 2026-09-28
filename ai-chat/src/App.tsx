@@ -154,16 +154,18 @@ function SyncBanner() {
 function AiChatWorkspace({
   model,
   modelLabel,
+  prefilledThink,
   signedIn,
   onChangeModel,
 }: {
   model: TransformersJSLanguageModel;
   modelLabel: string;
+  prefilledThink: boolean;
   signedIn: boolean;
   onChangeModel: () => void;
 }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const wrappedModel = useWrappedModel(model);
+  const wrappedModel = useWrappedModel(model, prefilledThink);
 
   // Null means the persistent "New chat" draft is selected — the app always
   // opens there, and nothing is created in the database until the first
@@ -294,6 +296,7 @@ export default function App() {
         <AiChatWorkspace
           model={model}
           modelLabel={info.label}
+          prefilledThink={info.prefilledThink ?? false}
           signedIn={false}
           onChangeModel={changeModel}
         />
@@ -303,6 +306,7 @@ export default function App() {
         <AiChatWorkspace
           model={model}
           modelLabel={info.label}
+          prefilledThink={info.prefilledThink ?? false}
           signedIn
           onChangeModel={changeModel}
         />

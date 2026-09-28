@@ -371,6 +371,9 @@ export function useAiChat(model: LanguageModel, activeThreadId: string | null): 
 }
 
 /** Wrap once per model instance (the reasoning middleware is stateless). */
-export function useWrappedModel(raw: TransformersJSLanguageModel): LanguageModel {
-  return useMemo(() => wrapModel(raw), [raw]);
+export function useWrappedModel(
+  raw: TransformersJSLanguageModel,
+  prefilledThink = false,
+): LanguageModel {
+  return useMemo(() => wrapModel(raw, prefilledThink), [raw, prefilledThink]);
 }

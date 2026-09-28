@@ -10,15 +10,22 @@ import type { TransformersJSLanguageModel } from "@browser-ai/transformers-js";
 import { cleanGeneratedTitle, fallbackTitle, titlePrompt } from "./titles.js";
 
 /**
- * All current models are non-thinking, but the middleware still guards the
- * output: if a stray `<think>` block ever leaks into a reply (training
- * quirk), it's parsed out into a separate reasoning part instead of
- * polluting the answer text.
+ * Parse `<think>` blocks out of the output into a separate reasoning part.
+ * For models whose chat template prefills `<think>` (see
+ * `ModelInfo.prefilledThink`), the output starts inside reasoning and only
+ * ever contains the closing tag — `startWithReasoning` handles that form;
+ * for plain models the default still guards against stray think blocks.
  */
-export function wrapModel(model: TransformersJSLanguageModel): LanguageModel {
+export function wrapModel(
+  model: TransformersJSLanguageModel,
+  prefilledThink = false,
+): LanguageModel {
   return wrapLanguageModel({
     model,
-    middleware: extractReasoningMiddleware({ tagName: "think" }),
+    middleware: extractReasoningMiddleware({
+      tagName: "think",
+      startWithReasoning: prefilledThink,
+    }),
   });
 }
 

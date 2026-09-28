@@ -13,6 +13,11 @@ export interface ModelInfo {
   label: string;
   approxSize: string;
   blurb: string;
+  /**
+   * True when the chat template prefills `<think>` before generation, so the
+   * model's output starts inside reasoning and only ever emits `</think>`.
+   */
+  prefilledThink?: boolean;
 }
 
 export const MODELS: ModelInfo[] = [
@@ -31,6 +36,7 @@ export const MODELS: ModelInfo[] = [
     label: "LFM2.5 2.6B",
     approxSize: "~1.6 GB",
     blurb: "More capable — better for longer tasks and tool use",
+    prefilledThink: true,
   },
   {
     // Symmetric int4 (no zero_points) re-quantization: ORT-web's WebGPU QMoE
