@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Text } from "@mantine/core";
+import { Text } from "@mantine/core";
 import { Bot } from "lucide-react";
 import type { TransformersJSLanguageModel } from "@browser-ai/transformers-js";
-import { EmptyState, LessAppShell, ScopedAppTree, useAuth } from "@betterbase/examples-shared";
+import { LessAppShell, ScopedAppTree, useAuth } from "@betterbase/examples-shared";
 import { useConnectionStatus, useSync } from "betterbase/sync/react";
 import { ThreadSidebar } from "@/components/ThreadSidebar";
 import { ChatThread } from "@/components/ChatThread";
@@ -16,7 +16,6 @@ import {
   type ChatModelHandle,
 } from "@/lib/model";
 import { isWebGpuAvailable } from "@/lib/webgpu";
-import { WORKSPACE_HEIGHT } from "@/lib/layout";
 import {
   DB_NAME,
   currentScopeDbName,
@@ -27,7 +26,6 @@ import {
   threads,
 } from "@/lib/db";
 import { useAiChat, useThinkingModel } from "@/lib/use-ai-chat";
-import { UNTITLED } from "@/lib/titles";
 
 const createFilesWorker = () =>
   new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
@@ -145,34 +143,44 @@ function AiChatWorkspace({
   const { isAuthenticated, handle, login, logout } = useAuth();
   const wrappedModel = useThinkingModel(model);
 
+  // Null means the persistent "New chat" draft is selected — the app always
+  // opens there, and nothing is created in the database until the first
+  // send names the thread (see `startChat`).
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const chat = useAiChat(wrappedModel, activeThreadId);
 
-  // Select the newest thread once the first query emission lands.
-  useEffect(() => {
-    if (activeThreadId === null && chat.threads.length > 0) {
-      setActiveThreadId(chat.threads[0]!.id);
-    }
-  }, [activeThreadId, chat.threads]);
+  // The db query emits after `startChat` resolves, so a just-selected id
+  // is briefly absent from `chat.threads` — grace-period it until the
+  // query confirms, then treat any truly-gone id as the draft.
+  const pendingSelectRef = useRef<string | null>(null);
 
-  // Keep the selection valid when threads disappear (delete / sync).
+  // Keep the selection valid when threads disappear (delete / sync); a
+  // dangling id falls back to the New chat draft — always a safe landing.
   useEffect(() => {
-    if (activeThreadId !== null && chat.activeThread === null && chat.threads.length > 0) {
-      setActiveThreadId(chat.threads[0]!.id);
-    }
-  }, [activeThreadId, chat.activeThread, chat.threads]);
-
-  const createThread = useCallback(async () => {
-    // Anchor to the current empty chat instead of stacking another
-    // "New chat" entry in the sidebar on every click. `activeMessages`
-    // is query-fed, so a click racing a just-sent message may see it as
-    // still empty — an accepted staleness window for the common path.
-    const active = chat.activeThread;
-    if (active && active.title === UNTITLED && chat.activeMessages.length === 0) {
+    if (chat.activeThread?.id === activeThreadId) {
+      pendingSelectRef.current = null;
       return;
     }
-    setActiveThreadId(await chat.createThread());
-  }, [chat]);
+    if (
+      activeThreadId !== null &&
+      chat.activeThread === null &&
+      pendingSelectRef.current !== activeThreadId
+    ) {
+      setActiveThreadId(null);
+    }
+  }, [activeThreadId, chat.activeThread]);
+
+  const startNewChat = useCallback(
+    async (text: string) => {
+      const id = await chat.startChat(text);
+      if (id !== "") {
+        pendingSelectRef.current = id;
+        setActiveThreadId(id);
+      }
+      return id;
+    },
+    [chat],
+  );
 
   const deleteThread = useCallback(
     async (id: string) => {
@@ -192,7 +200,7 @@ function AiChatWorkspace({
           selectedId={activeThreadId}
           loaded={chat.threadsLoaded}
           onSelect={setActiveThreadId}
-          onCreate={() => void createThread()}
+          onNewChat={() => setActiveThreadId(null)}
           onRename={(id, title) => void chat.renameThread(id, title)}
           onDelete={(id) => void deleteThread(id)}
         />
@@ -206,25 +214,7 @@ function AiChatWorkspace({
       padding={0}
     >
       {signedIn && <SyncBanner />}
-      {activeThreadId !== null && chat.activeThread !== null ? (
-        <ChatThread chat={chat} threadId={activeThreadId} />
-      ) : chat.threadsLoaded && chat.threads.length === 0 ? (
-        <EmptyState
-          icon={<Bot size={32} />}
-          title="No chats yet"
-          description={
-            signedIn
-              ? "Start a chat — it syncs end-to-end encrypted to your other devices."
-              : "Start a chat — it stays on this device until you sign in."
-          }
-        />
-      ) : (
-        <Box style={{ height: WORKSPACE_HEIGHT, display: "grid", placeItems: "center" }}>
-          <Text size="sm" c="dimmed">
-            Select a chat or start a new one.
-          </Text>
-        </Box>
-      )}
+      <ChatThread chat={chat} onDraftStart={startNewChat} />
     </LessAppShell>
   );
 }

@@ -22,14 +22,18 @@ function toThreadMessage(m: Message): ThreadMessageLike {
  * Bridge the betterbase-backed chat state into assistant-ui. The database
  * stays the source of truth: messages map in as an external store and
  * `onNew`/`onCancel` run the local model.
+ *
+ * Sends target the thread currently in `chat.activeThread` — resolved at
+ * call time, so a send racing the draft→thread transition lands in the
+ * freshly created thread, and a send on a dangling (sync-deleted) id
+ * falls back to the draft path instead of orphaning records.
  */
-export function useAiChatRuntime(chat: AiChat, activeThreadId: string | null) {
+export function useAiChatRuntime(chat: AiChat, onDraftStart: (text: string) => Promise<string>) {
   return useExternalStoreRuntime({
     isRunning: chat.isRunning,
     messages: chat.activeMessages.map(toThreadMessage),
     convertMessage: (m: ThreadMessageLike) => m,
     onNew: async (message) => {
-      if (activeThreadId === null) return;
       const text =
         typeof message.content === "string"
           ? message.content
@@ -37,7 +41,12 @@ export function useAiChatRuntime(chat: AiChat, activeThreadId: string | null) {
               .filter((p) => p.type === "text")
               .map((p) => (p as { type: "text"; text: string }).text)
               .join("");
-      await chat.sendMessage(activeThreadId, text);
+      const target = chat.activeThread?.id ?? null;
+      if (target === null) {
+        await onDraftStart(text);
+        return;
+      }
+      await chat.sendMessage(target, text);
     },
     onCancel: async () => {
       chat.stop();

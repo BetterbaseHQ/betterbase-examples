@@ -16,7 +16,7 @@ import {
   wrapThinkingModel,
   type ReplyState,
 } from "./chat-service";
-import { UNTITLED } from "./titles";
+import { UNTITLED, fallbackTitle } from "./titles";
 
 /** Minimum ms between db writes while streaming tokens into a message. */
 const STREAM_WRITE_INTERVAL_MS = 120;
@@ -32,7 +32,13 @@ export interface AiChat {
   isRunning: boolean;
   /** Last error for surfacing in the UI (null while healthy). */
   error: string | null;
-  createThread: () => Promise<string>;
+  /**
+   * Draft flow: create the thread titled with the truncated opening
+   * message and kick off the first exchange (not awaited — failures
+   * surface through `error`). Returns the new thread id, or "" when the
+   * text is empty and no thread was created.
+   */
+  startChat: (text: string) => Promise<string>;
   deleteThread: (id: string) => Promise<void>;
   renameThread: (id: string, title: string) => Promise<void>;
   sendMessage: (threadId: string, text: string) => Promise<void>;
@@ -125,16 +131,6 @@ export function useAiChat(model: LanguageModel, activeThreadId: string | null): 
     [d, fail],
   );
 
-  const createThread = useCallback(async () => {
-    const now = Date.now();
-    const record = await d.put(threads, {
-      title: UNTITLED,
-      lastMessageText: "",
-      lastMessageAt: now,
-    });
-    return record.id;
-  }, [d]);
-
   const deleteThread = useCallback(
     async (id: string) => {
       abortRef.current?.abort();
@@ -203,11 +199,16 @@ export function useAiChat(model: LanguageModel, activeThreadId: string | null): 
       });
 
       if (firstUserText !== null) {
+        const provisional = fallbackTitle(firstUserText);
         void (async () => {
           try {
             const title = await generateThreadTitle(model, firstUserText, replyText);
             const t = await d.get(threads, threadId);
-            if (t && t.title === UNTITLED) await patchThread(threadId, { title });
+            // Replace only the titles we set ourselves (placeholder or
+            // provisional) — never a title the user chose meanwhile.
+            if (t && (t.title === UNTITLED || t.title === provisional)) {
+              await patchThread(threadId, { title });
+            }
           } catch {
             /* thread deleted while naming it */
           }
@@ -244,12 +245,42 @@ export function useAiChat(model: LanguageModel, activeThreadId: string | null): 
 
         const thread = allThreads.find((t) => t.id === threadId);
         const isFirstExchange = prior.length === 0 || thread?.title === UNTITLED;
+        // Legacy untitled threads (created by older builds) get the same
+        // provisional title as draft-born threads.
+        if (isFirstExchange && thread?.title === UNTITLED) {
+          await patchThread(threadId, { title: fallbackTitle(trimmed) });
+        }
         await runAssistantReply(threadId, history, assistant, isFirstExchange ? trimmed : null);
       } catch (err) {
         fail(err);
       }
     },
     [d, msgResult, allThreads, runAssistantReply, fail],
+  );
+
+  /**
+   * Draft flow: nothing exists until the first send. The thread is born
+   * titled with the truncated opening message (the sidebar shows it
+   * immediately); the model replaces that provisional title after the
+   * reply completes — see the naming block in `runAssistantReply`.
+   *
+   * Returns without awaiting the exchange: the caller selects the thread
+   * right away so messages and the Stop control appear while the model
+   * runs. Streaming failures surface through `error`.
+   */
+  const startChat = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (trimmed === "") return "";
+      const record = await d.put(threads, {
+        title: fallbackTitle(trimmed),
+        lastMessageText: "",
+        lastMessageAt: Date.now(),
+      });
+      void sendMessage(record.id, trimmed);
+      return record.id;
+    },
+    [d, sendMessage],
   );
 
   const regenerate = useCallback(
@@ -328,7 +359,7 @@ export function useAiChat(model: LanguageModel, activeThreadId: string | null): 
     activeThread,
     isRunning: runningThreadId !== null && runningThreadId === activeThreadId,
     error,
-    createThread,
+    startChat,
     deleteThread,
     renameThread,
     sendMessage,

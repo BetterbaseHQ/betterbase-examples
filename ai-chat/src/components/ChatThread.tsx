@@ -56,7 +56,8 @@ const SUGGESTIONS = [
 
 interface ChatThreadProps {
   chat: AiChat;
-  threadId: string;
+  /** First send from the New chat draft: creates the thread (returns its id). */
+  onDraftStart: (text: string) => Promise<string>;
 }
 
 /**
@@ -67,8 +68,8 @@ interface ChatThreadProps {
  * by the AI SDK's reasoning middleware) collapses behind a "Show thinking"
  * toggle.
  */
-export function ChatThread({ chat, threadId }: ChatThreadProps) {
-  const runtime = useAiChatRuntime(chat, threadId);
+export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
+  const runtime = useAiChatRuntime(chat, onDraftStart);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [showJump, setShowJump] = useState(false);
 

@@ -151,8 +151,109 @@ describe("AI Chat app", () => {
       harness.progress?.(1);
       harness.resolveLoad?.();
     });
-    // Signed-out empty state: chats live in the local database.
-    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+    // The workspace opens on the New chat draft (chats live in the db).
+    expect(await screen.findByText(/how can i help you today\?/i)).toBeVisible();
+  });
+
+  it("opens on the New chat draft and creates the thread on first send", async () => {
+    // Gate title generation so the provisional (truncated) title can be
+    // observed before the model's title replaces it.
+    const { generateThreadTitle } = await import("@/lib/chat-service");
+    let releaseTitle: () => void = () => undefined;
+    const titleGated = new Promise<void>((resolve) => {
+      releaseTitle = resolve;
+    });
+    vi.mocked(generateThreadTitle).mockImplementationOnce(async () => {
+      await titleGated;
+      return "Math Question";
+    });
+
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    // The app opens on the persistent New chat item, not on a thread.
+    const newChat = screen.getByRole("button", { name: "Start a new chat" });
+    expect(newChat).toHaveAttribute("aria-current", "true");
+    expect(await screen.findByText(/how can i help you today\?/i)).toBeVisible();
+
+    const user = userEvent.setup();
+    try {
+      // First send from the draft: the thread comes into existence titled
+      // with the truncated opening message.
+      await user.type(await screen.findByLabelText("Message"), "What is 2 + 2?");
+      await user.keyboard("{Enter}");
+      await screen.findByText("Four.");
+
+      const nav = screen.getByRole("navigation");
+      expect(await within(nav).findByText("What is 2 + 2?")).toBeVisible();
+      expect(within(nav).getByRole("button", { name: "Start a new chat" })).not.toHaveAttribute(
+        "aria-current",
+      );
+      expect(await within(nav).findByText("Four.")).toBeVisible();
+
+      // Only when the model names the thread does the title swap.
+      releaseTitle();
+      expect(await within(nav).findByText("Math Question")).toBeVisible();
+      expect(within(nav).queryByText("What is 2 + 2?")).toBeNull();
+
+      // A second send continues the same thread — the draft is gone.
+      await user.type(await screen.findByLabelText("Message"), "and 3 + 3?");
+      await user.keyboard("{Enter}");
+      await waitFor(() =>
+        expect(within(screen.getByRole("log")).getAllByText("Four.")).toHaveLength(2),
+      );
+    } finally {
+      // Never leave the gated title implementation for the next test.
+      releaseTitle();
+    }
+
+    // Exactly one thread exists, and selecting New chat again created no
+    // further threads.
+    await user.click(screen.getByRole("button", { name: "Start a new chat" }));
+    await screen.findByText(/how can i help you today\?/i);
+    const all = await (db as unknown as Wipeable).query(threads as never, {});
+    expect(all.records).toHaveLength(1);
+  });
+
+  it("shows the draft send immediately: message, stop control, provisional title", async () => {
+    // Gate the stream so the in-flight state can be observed — this pins
+    // that selecting the thread does not wait for the reply to finish.
+    const { streamReply } = await import("@/lib/chat-service");
+    let releaseStream: () => void = () => undefined;
+    const streamGated = new Promise<void>((resolve) => {
+      releaseStream = resolve;
+    });
+    vi.mocked(streamReply).mockImplementationOnce(async (_model, _history, options) => {
+      options.onUpdate({ reasoning: "", text: "" });
+      await streamGated;
+      options.onUpdate({ reasoning: harness.reasoning, text: harness.reply });
+      return { state: { reasoning: harness.reasoning, text: harness.reply }, error: null };
+    });
+
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Message"), "What is 2 + 2?");
+    await user.keyboard("{Enter}");
+
+    // While the model runs: the send is visible, cancellable, and the
+    // thread exists with its provisional title. Re-query inside waitFor:
+    // db-driven re-renders detach nodes between query and assertion.
+    await waitFor(() => {
+      expect(within(screen.getByRole("log")).getByText("What is 2 + 2?")).toBeVisible();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /stop generating/i })).toBeVisible();
+    });
+    await waitFor(() => {
+      expect(within(screen.getByRole("navigation")).getByText("What is 2 + 2?")).toBeVisible();
+    });
+
+    releaseStream();
+    await waitFor(() => {
+      expect(within(screen.getByRole("log")).getByText("Four.")).toBeVisible();
+    });
   });
 
   it("runs a full exchange: send, stream, reason, and title the thread", async () => {
@@ -246,7 +347,14 @@ describe("AI Chat app", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     await user.click(await screen.findByRole("button", { name: "Delete" }));
 
-    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+    // Deleting the active thread lands back on the New chat draft.
+    expect(await screen.findByText(/how can i help you today\?/i)).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Start a new chat" })).toHaveAttribute(
+        "aria-current",
+        "true",
+      ),
+    );
     // The cascade is real: the thread's message records must be gone too,
     // not just the thread (orphaned messages would keep syncing forever).
     const remaining = await (db as unknown as Wipeable).query(messages as never, {});
@@ -265,7 +373,7 @@ describe("AI Chat app", () => {
       harness.progress?.(1);
       harness.resolveLoad?.();
     });
-    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+    expect(await screen.findByText(/how can i help you today\?/i)).toBeVisible();
   });
 
   it("clears the auto-load flag when the warm load fails and offers retry", async () => {
@@ -297,7 +405,7 @@ describe("AI Chat app", () => {
       harness.progress?.(1);
       harness.resolveLoad?.();
     });
-    expect(await screen.findByText(/no chats yet/i)).toBeVisible();
+    expect(await screen.findByText(/how can i help you today\?/i)).toBeVisible();
   });
 
   it("sends a suggestion chip straight into the chat", async () => {
@@ -316,31 +424,6 @@ describe("AI Chat app", () => {
       expect(within(log).getByText(/HTTPS keeps traffic private/)).toBeVisible();
       expect(within(log).getByText("Four.")).toBeVisible();
     });
-  });
-
-  it("anchors new-chat clicks to the current empty thread", async () => {
-    renderWithProviders(<App />);
-    await loadModelThroughUi();
-
-    const user = userEvent.setup();
-    const newChat = () => screen.findByRole("button", { name: "Start a new chat" });
-    await user.click(await newChat());
-    await user.type(await screen.findByLabelText("Message"), "hi");
-    await user.keyboard("{Enter}");
-    await screen.findByText("Four.");
-    await screen.findByText("Math Question"); // first thread got its title
-
-    // A fresh empty thread, then another click while it's still empty:
-    // the second click must anchor, not stack another untitled entry.
-    await user.click(await newChat());
-    await screen.findByText(/how can i help you today\?/i);
-    // Sidebar lists the untitled thread (its "New chat" item + the header
-    // button make two matches; the button alone is one).
-    expect((await screen.findAllByText("New chat")).length).toBe(2);
-    await user.click(await newChat());
-
-    const all = await (db as unknown as Wipeable).query(threads as never, {});
-    expect(all.records).toHaveLength(2);
   });
 
   it("renames a thread from the sidebar", async () => {

@@ -19,24 +19,28 @@ import "./thread-sidebar.css";
 
 export interface ThreadSidebarProps {
   threads: readonly Thread[];
+  /** Active thread id; null when the New chat draft is selected. */
   selectedId: string | null;
   loaded: boolean;
   onSelect: (id: string) => void;
-  onCreate: () => void;
+  /** Select the persistent New chat draft (creates nothing). */
+  onNewChat: () => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
 }
 
 /**
- * Thread list for the app navbar: newest first (the query sorts on
- * lastMessageAt), with rename and delete per thread.
+ * Thread list for the app navbar: a persistent New chat item on top (the
+ * draft — the app opens here), then threads newest first (the query sorts
+ * on lastMessageAt), with rename and delete per thread behind a hover
+ * menu.
  */
 export function ThreadSidebar({
   threads,
   selectedId,
   loaded,
   onSelect,
-  onCreate,
+  onNewChat,
   onRename,
   onDelete,
 }: ThreadSidebarProps) {
@@ -59,7 +63,20 @@ export function ThreadSidebar({
 
   return (
     <Box p={4} style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <UnstyledButton onClick={onCreate} mb="xs" px={6} py={6} aria-label="Start a new chat">
+      {/* The New chat draft — always present, highlighted while active. */}
+      <UnstyledButton
+        onClick={onNewChat}
+        mb="xs"
+        px={6}
+        py={6}
+        w="100%"
+        aria-label="Start a new chat"
+        aria-current={selectedId === null ? true : undefined}
+        style={{
+          borderRadius: "var(--mantine-radius-sm)",
+          background: selectedId === null ? "var(--mantine-color-default-hover)" : undefined,
+        }}
+      >
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" radius="md">
             <MessageSquarePlus size={16} />
@@ -93,6 +110,7 @@ export function ThreadSidebar({
               >
                 <UnstyledButton
                   onClick={() => onSelect(thread.id)}
+                  aria-current={selected ? true : undefined}
                   style={{ flex: 1, minWidth: 0 }}
                 >
                   <Text fz="sm" truncate="end">
