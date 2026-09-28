@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanGeneratedTitle, fallbackTitle, titlePrompt, UNTITLED } from "./titles";
+import { cleanGeneratedTitle, fallbackTitle, previewText, titlePrompt, UNTITLED } from "./titles";
 
 describe("fallbackTitle", () => {
   it("uses the first line of the message", () => {
@@ -44,6 +44,67 @@ describe("cleanGeneratedTitle", () => {
   it("returns null when nothing usable remains", () => {
     expect(cleanGeneratedTitle('""')).toBeNull();
     expect(cleanGeneratedTitle("  \n ")).toBeNull();
+  });
+});
+
+describe("previewText", () => {
+  it("strips the markdown structures the model emits", () => {
+    const reply = [
+      "# Markdown Mastery",
+      "",
+      "Here's a polished example:",
+      "",
+      "```markdown",
+      "## Section Title",
+      "- Item 1",
+      "- Item 2",
+      "```",
+      "",
+      "| Column A | Column B |",
+      "|---------|---------|",
+      "| Data 1   | Value    |",
+    ].join("\n");
+    expect(previewText(reply)).toBe(
+      "Markdown Mastery Here's a polished example: Column A Column B Data 1 Value",
+    );
+  });
+
+  it("keeps link and image text without the syntax", () => {
+    expect(previewText("See [the docs](https://example.com) and ![logo](x.png).")).toBe(
+      "See the docs and logo.",
+    );
+  });
+
+  it("unwraps emphasis and inline code", () => {
+    expect(previewText("**Bold** and *italic* and `code` and ~~gone~~")).toBe(
+      "Bold and italic and code and gone",
+    );
+  });
+
+  it("drops fenced code blocks whole, including their content", () => {
+    expect(previewText("Before:\n```bash\nnpm install\n```\nAfter.")).toBe("Before: After.");
+  });
+
+  it("drops an unterminated code fence and everything after it", () => {
+    // A reply the user stopped mid-stream can end inside a fence.
+    expect(previewText("Short answer:\n```js\nconst x = 1;")).toBe("Short answer:");
+  });
+
+  it("leaves plain text unchanged", () => {
+    expect(previewText("Just a normal sentence.")).toBe("Just a normal sentence.");
+  });
+
+  it("returns empty for empty and whitespace-only input", () => {
+    expect(previewText("")).toBe("");
+    expect(previewText("  \n\t ")).toBe("");
+  });
+
+  it("strips emphasis inside headings", () => {
+    expect(previewText("# **Bold** and *ital*")).toBe("Bold and ital");
+  });
+
+  it("leaves intraword underscores alone", () => {
+    expect(previewText("snake_case_var stays")).toBe("snake_case_var stays");
   });
 });
 

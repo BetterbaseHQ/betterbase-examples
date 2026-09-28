@@ -14,7 +14,7 @@ import {
 } from "@mantine/core";
 import { MoreVertical, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import type { Thread } from "@/lib/db";
-import { UNTITLED } from "@/lib/titles";
+import { previewText, UNTITLED } from "@/lib/titles";
 import "./thread-sidebar.css";
 
 export interface ThreadSidebarProps {
@@ -117,7 +117,7 @@ export function ThreadSidebar({
                     {thread.title === UNTITLED ? "New chat" : thread.title}
                   </Text>
                   <Text fz="xs" c="dimmed" truncate="end">
-                    {thread.lastMessageText || "No messages yet"}
+                    {previewText(thread.lastMessageText) || "No messages yet"}
                   </Text>
                 </UnstyledButton>
                 {/* Rename/delete live behind a hover-revealed menu —
