@@ -8,10 +8,10 @@ import {
   List,
   Progress,
   Radio,
+  RadioGroup,
   Stack,
   Text,
   ThemeIcon,
-  UnstyledButton,
 } from "@mantine/core";
 import { AlertCircle, Cpu, Download, ShieldCheck, Zap } from "lucide-react";
 import { EmptyState } from "@betterbase/examples-shared";
@@ -93,40 +93,38 @@ export function ModelSetup({
             </div>
           </Group>
 
-          <Stack gap={6}>
-            {models.map((m) => (
-              <UnstyledButton
-                key={m.id}
-                onClick={() => onSelect(m.id)}
-                disabled={loading}
-                aria-pressed={m.id === selected.id}
-                px={12}
-                py={8}
-                style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: `1px solid ${
-                    m.id === selected.id
-                      ? "var(--mantine-color-indigo-6)"
-                      : "var(--mantine-color-default-border)"
-                  }`,
-                  background:
-                    m.id === selected.id ? "var(--mantine-color-default-hover)" : undefined,
-                }}
-              >
-                <Group justify="space-between" wrap="nowrap" gap="xs">
-                  <div style={{ minWidth: 0 }}>
-                    <Text fz="sm" fw={600}>
-                      {m.label}
-                    </Text>
-                    <Text fz="xs" c="dimmed" truncate="end">
-                      {m.blurb} · {m.approxSize}
-                    </Text>
-                  </div>
-                  <Radio checked={m.id === selected.id} readOnly tabIndex={-1} />
-                </Group>
-              </UnstyledButton>
-            ))}
-          </Stack>
+          <RadioGroup value={selected.id} onChange={(id) => onSelect(id)} aria-label="Model">
+            <Stack gap={6}>
+              {models.map((m) => (
+                <Radio.Card
+                  key={m.id}
+                  value={m.id}
+                  disabled={loading}
+                  px={12}
+                  py={8}
+                  styles={{
+                    card: {
+                      "&[data-checked]": {
+                        background: "var(--mantine-color-default-hover)",
+                      },
+                    },
+                  }}
+                >
+                  <Group justify="space-between" wrap="nowrap" gap="xs">
+                    <div style={{ minWidth: 0 }}>
+                      <Text fz="sm" fw={600}>
+                        {m.label}
+                      </Text>
+                      <Text fz="xs" c="dimmed" truncate="end">
+                        {m.blurb} · {m.approxSize}
+                      </Text>
+                    </div>
+                    <Radio.Indicator />
+                  </Group>
+                </Radio.Card>
+              ))}
+            </Stack>
+          </RadioGroup>
 
           <List size="sm" spacing="xs">
             <List.Item icon={<Zap size={14} />}>WebGPU-accelerated local inference</List.Item>

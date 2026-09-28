@@ -13,7 +13,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { MoreVertical, MessageSquarePlus, Pencil, Repeat, Trash2 } from "lucide-react";
+import { ArrowLeftRight, MoreVertical, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import type { Thread } from "@/lib/db";
 import { previewText, UNTITLED } from "@/lib/titles";
 import "./thread-sidebar.css";
@@ -183,7 +183,7 @@ export function ThreadSidebar({
             aria-label="Change model"
             onClick={onChangeModel}
           >
-            <Repeat size={14} />
+            <ArrowLeftRight size={14} />
           </ActionIcon>
         </Tooltip>
       </Group>

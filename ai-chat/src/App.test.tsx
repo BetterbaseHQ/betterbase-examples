@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { ModelInfo } from "@/lib/model";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@betterbase/examples-shared/test";
@@ -38,9 +39,12 @@ const harness = vi.hoisted(() => ({
   resolveLoad: null as null | (() => void),
   rejectLoad: null as null | ((error: Error) => void),
   dispose: vi.fn(),
+  /** ids handed to createChatModel, in order */
+  created: [] as string[],
   reply: "Four.",
   reasoning: "2 plus 2 is 4.",
-  modelReady: false,
+  ready: { "1.2b": false, "2.6b": false } as Record<string, boolean>,
+  selected: "1.2b",
 }));
 
 /**
@@ -57,8 +61,8 @@ function stubWebGpu(available: boolean) {
   });
 }
 
-vi.mock("@/lib/model", () => ({
-  MODELS: [
+vi.mock("@/lib/model", () => {
+  const MODELS: ModelInfo[] = [
     {
       id: "1.2b",
       repo: "stub/1.2b",
@@ -75,47 +79,36 @@ vi.mock("@/lib/model", () => ({
       approxSize: "~1.6 GB",
       blurb: "More capable — better for longer tasks and tool use",
     },
-  ],
-  getModel: (id: string) =>
-    id === "2.6b"
-      ? {
-          id: "2.6b",
-          repo: "stub/2.6b",
-          dtype: "q4f16",
-          label: "LFM2.5 2.6B",
-          approxSize: "~1.5 GB",
-          blurb: "Balanced",
-        }
-      : {
-          id: "1.2b",
-          repo: "stub/1.2b",
-          dtype: "q4f16",
-          label: "LFM2.5 1.2B Instruct",
-          approxSize: "~700 MB",
-          blurb: "Fast everyday model — chat, writing, and simple tools",
-        },
-  selectedModelId: () => "1.2b",
-  setSelectedModelId: () => {},
-  isModelReady: (id: string) => (id === "1.2b" ? harness.modelReady : false),
-  markModelReady: (id: string) => {
-    if (id === "1.2b") harness.modelReady = true;
-  },
-  clearModelReady: (id: string) => {
-    if (id === "1.2b") harness.modelReady = false;
-  },
-  createChatModel: () => {
-    const dispose = vi.fn();
-    harness.dispose = dispose;
-    return { model: { modelId: "stub-model" }, dispose };
-  },
-  loadModel: (_model: unknown, onProgress?: (progress: number) => void) => {
-    harness.progress = onProgress ?? null;
-    return new Promise<void>((resolve, reject) => {
-      harness.resolveLoad = resolve;
-      harness.rejectLoad = reject;
-    });
-  },
-}));
+  ];
+  return {
+    MODELS,
+    getModel: (id: string) => MODELS.find((m) => m.id === id) ?? MODELS[0]!,
+    selectedModelId: () => harness.selected,
+    setSelectedModelId: (id: string) => {
+      harness.selected = id;
+    },
+    isModelReady: (id: string) => harness.ready[id] ?? false,
+    markModelReady: (id: string) => {
+      harness.ready[id] = true;
+    },
+    clearModelReady: (id: string) => {
+      harness.ready[id] = false;
+    },
+    createChatModel: (info: { id: string }) => {
+      harness.created.push(info.id);
+      const dispose = vi.fn();
+      harness.dispose = dispose;
+      return { model: { modelId: "stub-model" }, dispose };
+    },
+    loadModel: (_model: unknown, onProgress?: (progress: number) => void) => {
+      harness.progress = onProgress ?? null;
+      return new Promise<void>((resolve, reject) => {
+        harness.resolveLoad = resolve;
+        harness.rejectLoad = reject;
+      });
+    },
+  };
+});
 
 vi.mock("@/lib/chat-service", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/chat-service")>();
@@ -154,7 +147,9 @@ beforeEach(() => {
   harness.resolveLoad = null;
   harness.rejectLoad = null;
   harness.dispose.mockReset();
-  harness.modelReady = false;
+  harness.ready = { "1.2b": false, "2.6b": false };
+  harness.selected = "1.2b";
+  harness.created = [];
 });
 
 afterEach(async () => {
@@ -351,6 +346,45 @@ describe("AI Chat app", () => {
     expect(screen.getByText(/downloading model weights/i)).toBeVisible();
   });
 
+  it("switches models from the picker and loads the pick", async () => {
+    renderWithProviders(<App />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("radio", { name: /LFM2\.5 2\.6B/ }));
+    expect(screen.getByRole("button", { name: /download ~1\.6 gb model/i })).toBeVisible();
+    expect(harness.selected).toBe("2.6b");
+
+    await user.click(screen.getByRole("button", { name: /download ~1\.6 gb model/i }));
+    await act(async () => {
+      harness.progress?.(1);
+      harness.resolveLoad?.();
+    });
+
+    expect(await screen.findByLabelText("Message")).toBeVisible();
+    expect(harness.created).toEqual(["2.6b"]);
+  });
+
+  it("returns to the picker via Change model and loads a different model", async () => {
+    renderWithProviders(<App />);
+    const user = await loadModelThroughUi();
+    expect(harness.created).toEqual(["1.2b"]);
+    const firstDispose = harness.dispose;
+
+    await user.click(screen.getByRole("button", { name: "Change model" }));
+    expect(await screen.findByRole("button", { name: /download ~700 mb model/i })).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: /LFM2\.5 2\.6B/ }));
+    await user.click(screen.getByRole("button", { name: /download ~1\.6 gb model/i }));
+    await act(async () => {
+      harness.progress?.(1);
+      harness.resolveLoad?.();
+    });
+
+    expect(await screen.findByLabelText("Message")).toBeVisible();
+    expect(harness.created).toEqual(["1.2b", "2.6b"]);
+    expect(firstDispose).toHaveBeenCalled();
+  });
+
   it("shows the real error when generation fails", async () => {
     const { streamReply } = await import("@/lib/chat-service");
     vi.mocked(streamReply).mockResolvedValueOnce({
@@ -398,7 +432,7 @@ describe("AI Chat app", () => {
   });
 
   it("auto-loads the model for returning users without the download pitch", async () => {
-    harness.modelReady = true;
+    harness.ready["1.2b"] = true;
     renderWithProviders(<App />);
 
     // The consent button never appears; the load starts on its own.
@@ -413,7 +447,7 @@ describe("AI Chat app", () => {
   });
 
   it("clears the auto-load flag when the warm load fails and offers retry", async () => {
-    harness.modelReady = true;
+    harness.ready["1.2b"] = true;
     renderWithProviders(<App />);
 
     await act(async () => {
@@ -423,11 +457,11 @@ describe("AI Chat app", () => {
     expect(await screen.findByText(/couldn't load the model/i)).toBeVisible();
     expect(screen.getByText("warm boot failed")).toBeVisible();
     expect(screen.getByRole("button", { name: /retry download/i })).toBeVisible();
-    expect(harness.modelReady).toBe(false);
+    expect(harness.ready["1.2b"]).toBe(false);
   });
 
   it("recovers to the workspace when the retried warm load succeeds", async () => {
-    harness.modelReady = true;
+    harness.ready["1.2b"] = true;
     renderWithProviders(<App />);
 
     await act(async () => {

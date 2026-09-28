@@ -98,6 +98,8 @@ function ModelGate({
 
   // Picking a different model resets any attempt; the auto-start guard
   // re-arms when `autoStart` clears so a later re-selection can auto-run.
+  // This effect must stay ABOVE the auto-start effect: both run when `info.id`
+  // changes, and the guard has to be re-armed before the auto-start check.
   const startedRef = useRef(false);
   useEffect(() => {
     setError(null);
@@ -125,7 +127,7 @@ function ModelGate({
       error={error}
       // A failed warm load usually means the cache was evicted — the retry
       // is a full download again, so drop the warm copy once an error shows.
-      warm={autoStart && error === null}
+      warm={isModelReady(info.id) && error === null}
       onLoad={startLoad}
     />
   );

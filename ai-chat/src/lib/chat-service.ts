@@ -30,12 +30,12 @@ export function wrapModel(
 }
 
 /**
- * System prompt — deliberately minimal. LFM2.5-Thinking is trained to
- * reason inside <think> tags and answer afterwards, and it formats answers
- * in Markdown on its own; the model card's own examples pass either no
- * system message or the canonical one below. Richer instructions steer the
- * 1.2B model into misreading them (observed: inventing "put your final
- * answer in a box" rules and emitting \boxed{…} like a math benchmark).
+ * System prompt — deliberately minimal. The thinking models in the registry
+ * (2.6B) reason inside <think> tags and answer afterwards, and they format
+ * answers in Markdown on their own; the model card's own examples pass
+ * either no system message or the canonical one below. Richer instructions
+ * steer these models into misreading them (observed: inventing "put your
+ * final answer in a box" rules and emitting \boxed{…} like a math benchmark).
  */
 const CHAT_SYSTEM = [
   "You are a helpful assistant trained by Liquid AI,",
