@@ -30,7 +30,7 @@ describe("model registry", () => {
   it("sources official exports except the 8B, which uses the browser-loadable re-shard", () => {
     expect(getModel("1.2b").repo).toBe("LiquidAI/LFM2.5-1.2B-Instruct-ONNX");
     expect(getModel("2.6b").repo).toBe("LiquidAI/LFM2.5-2.6B-ONNX");
-    expect(getModel("8b-a1b").repo).toBe("nchapman/LFM2.5-8B-A1B-ONNX-q4f16-sharded");
+    expect(getModel("8b-a1b").repo).toBe("nchapman/LFM2.5-8B-A1B-ONNX-q4f16-sym-webgpu");
   });
 
   it("falls back to the default for unknown ids", () => {

@@ -33,10 +33,11 @@ export const MODELS: ModelInfo[] = [
     blurb: "More capable — better for longer tasks and tool use",
   },
   {
-    // Re-sharded packaging of the official q4f16 export: upstream ships
-    // 2.15 GB shards that V8 cannot allocate as ArrayBuffers.
+    // Symmetric int4 (no zero_points) re-quantization: ORT-web's WebGPU QMoE
+    // kernel rejects zero_points, so LiquidAI's official export cannot run in
+    // the browser. Shards are ≤0.43 GB (V8 cannot allocate ≥2 GB buffers).
     id: "8b-a1b",
-    repo: "nchapman/LFM2.5-8B-A1B-ONNX-q4f16-sharded",
+    repo: "nchapman/LFM2.5-8B-A1B-ONNX-q4f16-sym-webgpu",
     dtype: "q4f16",
     label: "LFM2.5 8B A1B",
     approxSize: "~5 GB",
