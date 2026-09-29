@@ -35,7 +35,7 @@ const SDK_WASM_SRC = "betterbase(?:_db)?_wasm_bg-[A-Za-z0-9_-]+\\.wasm";
  * rewrite from mangling full URLs whose scheme isn't in the prefix class
  * (e.g. a future CDN base like https://cdn.example.com/assets/…).
  */
-const REF_RE = new RegExp(`(["'\`(=\\s])((?:[A-Za-z0-9_.~/-]+/)?assets/(${SDK_WASM_SRC}))`, "g");
+const REF_RE = new RegExp(`(["'\`(=\\s])((?:[A-Za-z0-9_.~/-]*/)?assets/(${SDK_WASM_SRC}))`, "g");
 
 function isSdkWasmAsset(fileName: string): boolean {
   return new RegExp(`^assets/${SDK_WASM_SRC}$`).test(fileName);
