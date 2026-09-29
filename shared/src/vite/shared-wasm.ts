@@ -44,6 +44,7 @@ function isSdkWasmAsset(fileName: string): boolean {
 export function sdkSharedWasm(): Plugin {
   const sharedDir = env.SDK_WASM_SHARED_DIR;
   const publicPath = (env.SDK_WASM_PUBLIC_PATH || "/sdk").replace(/\/$/, "");
+  let rewritten = 0;
   return {
     name: "betterbase:shared-sdk-wasm",
     apply: "build",
@@ -52,10 +53,11 @@ export function sdkSharedWasm(): Plugin {
           // Rewrite URL references (plain constants and new URL(...) forms
           // alike) to the shared origin-level path. Works under any base.
           renderChunk(code) {
-            return {
-              code: code.replace(REF_RE, `$1${publicPath}/$3`),
-              map: null,
-            };
+            const out = code.replace(REF_RE, (_m, boundary, _orig, name) => {
+              rewritten++;
+              return `${boundary}${publicPath}/${name}`;
+            });
+            return { code: out, map: null };
           },
           generateBundle(_, bundle) {
             const chunks = Object.values(bundle).flatMap((c) =>
@@ -83,8 +85,14 @@ export function sdkSharedWasm(): Plugin {
               // The blob now lives at the shared path — drop the per-app copy.
               delete bundle[fileName];
             }
-            if (found === 0) {
-              this.warn("sdkSharedWasm: no SDK wasm assets found — dedup inactive this build.");
+            if (found === 0 && rewritten > 0) {
+              // Refs were rewritten but no asset was found and hoisted —
+              // those URLs now point only at the shared dir, so a stale
+              // blob there would 404. Multi-environment builds (e.g. an
+              // inference worker with no SDK code) stay silent.
+              this.warn(
+                "sdkSharedWasm: SDK wasm referenced but no matching asset found in this bundle — /sdk refs rely on the shared dir.",
+              );
             }
           },
         }
