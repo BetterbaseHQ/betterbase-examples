@@ -16,6 +16,10 @@
     "./test": {
       "import": "./src/test/index.ts",
       "types": "./src/test/index.ts"
+    },
+    "./vite": {
+      "import": "./src/vite/shared-wasm.ts",
+      "types": "./src/vite/shared-wasm.ts"
     }
   },
   "files": [
@@ -46,6 +50,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.1.1",

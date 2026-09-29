@@ -21,6 +21,11 @@ RUN corepack enable
 
 WORKDIR /workspace
 
+# Serve the SDK's wasm blobs from one shared origin-level URL (/sdk/…) so
+# browsers download them once and cache across apps, instead of re-fetching
+# ~4.6 MB per app. Consumed by @betterbase/examples-shared/vite.
+ENV SDK_WASM_SHARED_DIR=/workspace/sdk-shared SDK_WASM_PUBLIC_PATH=/sdk
+
 # SDK (TypeScript source + pre-built WASM bindings); Vite resolves the TS
 # source directly, so no SDK build step is needed.
 COPY betterbase/js/ ./betterbase/js/
@@ -63,7 +68,10 @@ RUN cd examples/ai-chat && pnpm install --frozen-lockfile && VITE_BASE_PATH=/ai-
 # ==========================================================================
 FROM caddy:2-alpine
 
-# Launchpad at the root, each app under its path.
+# Launchpad at the root, each app under its path. The shared SDK wasm blobs
+# (emitted by the app builds into sdk-shared/) sit at the origin level so
+# every app references the same immutable URLs.
+COPY --from=build /workspace/sdk-shared /srv/sdk
 COPY --from=build /workspace/examples/launchpad/dist /srv
 COPY --from=build /workspace/examples/tasks/dist /srv/tasks
 COPY --from=build /workspace/examples/notes/dist /srv/notes

@@ -16,19 +16,46 @@ vi.mock("betterbase/sync", () => ({
 
 import { adoptLocalData, retireLocalData } from "./adopt-local-data.js";
 import { accountScopeHash } from "./account-db.js";
-import type { CollectionDefHandle, Database } from "betterbase/db";
+import type {
+  AdoptRecordsResult,
+  CollectionDefHandle,
+  CollectionRead,
+  Database,
+  SchemaShape,
+} from "betterbase/db";
 
-/** Minimal Database double: records in a Map. */
+/** Minimal Database double: records in a Map. Mirrors the atomic
+ * adoptRecords path (betterbase 7b8f4ac replaced per-record bulk puts).
+ * The implementation signatures carry the SDK's real types, so contract
+ * drift fails typecheck here instead of at runtime — the exact failure
+ * mode that let the bulkPut→adoptRecords change slip through. */
 function fakeDb(records: Array<Record<string, unknown>> = []) {
   const byId = new Map(records.map((r) => [r["id"] as string, { ...r }]));
-  const db = {
-    getAll: vi.fn(async () => [...byId.values()].map((r) => ({ ...r }))),
-    bulkPut: vi.fn(async (_def: unknown, writes: Array<Record<string, unknown>>) => {
-      for (const w of writes) byId.set(w["id"] as string, { ...w });
-      return { records: writes, errors: [] };
-    }),
+  const getAll = async (
+    _def: CollectionDefHandle,
+  ): Promise<CollectionRead<SchemaShape>[]> =>
+    // Test records are deliberately partial (id/name only); the double's
+    // consumers only index arbitrary fields.
+    [...byId.values()].map((r) => ({ ...r })) as CollectionRead<SchemaShape>[];
+  const adoptRecords = async (
+    _def: CollectionDefHandle,
+    candidates: Array<Record<string, unknown>>,
+  ): Promise<AdoptRecordsResult> => {
+    for (const c of candidates) byId.set(c["id"] as string, { ...c });
+    return {
+      mergedIds: candidates.map((c) => c["id"] as string),
+      skippedTombstoned: 0,
+      skippedConflict: 0,
+      warnings: [],
+    };
   };
-  return db;
+  return {
+    getAll: vi.fn(getAll),
+    adoptRecords: vi.fn(adoptRecords),
+  } as unknown as Pick<Database, "getAll" | "adoptRecords"> & {
+    getAll: ReturnType<typeof vi.fn<typeof getAll>>;
+    adoptRecords: ReturnType<typeof vi.fn<typeof adoptRecords>>;
+  };
 }
 
 const def = { name: "lists" } as unknown as CollectionDefHandle;
@@ -53,7 +80,7 @@ describe("adoptLocalData", () => {
       collections: [def],
     });
     expect(adopted.merged).toBe(1);
-    expect(target.bulkPut).toHaveBeenCalled();
+    expect(target.adoptRecords).toHaveBeenCalled();
     expect(localStorage.getItem(await markerKey())).not.toBeNull();
   });
 
@@ -254,7 +281,7 @@ describe("adoptLocalData — records adopt as-is", () => {
       collections: [def],
     });
     expect(result.merged).toBe(2);
-    const putArg = target.bulkPut.mock.calls[0]?.[1] as Array<Record<string, unknown>>;
+    const putArg = target.adoptRecords.mock.calls[0]?.[1] as Array<Record<string, unknown>>;
     expect(putArg.map((r) => r.id)).toEqual([
       "11111111-2222-4333-8444-555555555555",
       "22222222-3333-4444-8555-666666666666",
