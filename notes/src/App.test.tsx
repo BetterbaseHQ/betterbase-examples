@@ -87,7 +87,13 @@ describe("Notes local flow", () => {
     // debounce replaces the pending timer, so without a flush-on-switch the
     // first note's captured args would be dropped (the bug this pins)
     await user.click(screen.getByRole("button", { name: "New note" }));
-    await user.type(await screen.findByLabelText("Note title", {}, { timeout: 4000 }), "2");
+    // The selection switch is async (db put, then select) and note 1's editor
+    // is still mounted until it lands — wait for the editor to show the new,
+    // empty note or the keystrokes land in the previous note's input
+    await waitFor(() => expect(screen.getByLabelText("Note title")).toHaveValue(""), {
+      timeout: 4000,
+    });
+    await user.type(screen.getByLabelText("Note title"), "2");
 
     // The first note's title must still be persisted despite the replaced timer
     await waitFor(
