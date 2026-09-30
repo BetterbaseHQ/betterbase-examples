@@ -16,37 +16,37 @@ import type { ReactNode } from "react";
 const APP_META: Record<string, { name: string; description: string; icon: ReactNode }> = {
   tasks: {
     name: "Tasks",
-    description: "Todo lists with offline-first sync",
+    description: "To-do lists you can share",
     icon: <CheckSquare size={24} />,
   },
   notes: {
     name: "Notes",
-    description: "Rich text notes with CRDT merging",
+    description: "A simple home for your notes",
     icon: <FileText size={24} />,
   },
   photos: {
     name: "Photos",
-    description: "Photo gallery with encrypted file sync",
+    description: "All your photos in one place",
     icon: <Image size={24} />,
   },
   board: {
     name: "Board",
-    description: "Collaborative kanban board",
+    description: "Plan projects on a shared board",
     icon: <Kanban size={24} />,
   },
   messenger: {
     name: "Messenger",
-    description: "Real-time encrypted messaging",
+    description: "Simple, private messaging",
     icon: <MessageCircle size={24} />,
   },
   passwords: {
     name: "Passwords",
-    description: "Encrypted password vault",
+    description: "A safe home for your passwords",
     icon: <KeyRound size={24} />,
   },
   "ai-chat": {
     name: "AI Chat",
-    description: "Chat with a local model running in the browser",
+    description: "Chat with a private AI assistant",
     icon: <Bot size={24} />,
   },
 };
