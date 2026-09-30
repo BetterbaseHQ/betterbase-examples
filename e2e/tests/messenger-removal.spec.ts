@@ -5,7 +5,6 @@ import {
   registerUser,
   uniqueCreds,
   waitForConnected,
-  accountsHost,
 } from "./fixtures";
 
 /**

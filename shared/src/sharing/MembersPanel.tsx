@@ -222,6 +222,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
               <HandleInput
                 size="xs"
                 aria-label="Invite user by handle"
+                description="Name alone infers the domain"
                 value={inviteHandle}
                 onChange={(e) => {
                   setInviteHandle(e.currentTarget.value);

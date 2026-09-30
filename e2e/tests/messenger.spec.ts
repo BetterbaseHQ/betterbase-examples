@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced, accountsHost } from "./fixtures";
+import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced } from "./fixtures";
 
 /**
  * Messenger lifecycle: Messenger requires an account before any conversation UI
