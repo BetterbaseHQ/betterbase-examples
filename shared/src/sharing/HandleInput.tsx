@@ -1,43 +1,18 @@
-import { TextInput, Text } from "@mantine/core";
+import { TextInput } from "@mantine/core";
 import type { TextInputProps } from "@mantine/core";
-import { useAuth } from "betterbase/auth/react";
+
+const DEFAULT_DESCRIPTION = "Enter a username for this server, or a full username@domain.";
 
 /**
- * Handle input for sharing UIs.
+ * Handle input for sharing UIs — one place owns the entry copy so every
+ * app explains handles the same way.
  *
- * The SDK resolves short handles by appending the current user's domain, so
- * same-server users can be entered by name alone — this input makes that
- * visible: while the typed value has no "@", a dimmed `@domain` suffix shows
- * the handle the server will actually resolve. Typing a full `user@domain`
- * (for a federated future) hides the suffix.
- *
- * The suffix owns `rightSection`, so callers can't set it. `placeholder`
- * stays caller-overridable.
- *
- * Shares the session's handle via `useAuth` — render only inside an
- * authenticated tree (all sharing UIs already are).
+ * The SDK appends the current user's domain to bare usernames, so
+ * same-server users can be entered by name alone; full handles also work
+ * (the path for eventual cross-domain sharing).
  */
-export function HandleInput(props: Omit<TextInputProps, "rightSection" | "rightSectionWidth">) {
-  const { value, ...rest } = props;
-  const { handle } = useAuth();
-
-  const domain = handle?.includes("@") ? handle.slice(handle.lastIndexOf("@") + 1) : null;
-  const showSuffix = domain !== null && !String(value ?? "").includes("@");
-
-  return (
-    <TextInput
-      placeholder="alice"
-      {...rest}
-      value={value}
-      rightSection={
-        showSuffix ? (
-          <Text size={props.size ?? "sm"} c="dimmed" pr={4}>
-            @{domain}
-          </Text>
-        ) : undefined
-      }
-    />
-  );
+export function HandleInput(props: Omit<TextInputProps, "placeholder" | "description">) {
+  return <TextInput placeholder="alice" description={DEFAULT_DESCRIPTION} {...props} />;
 }
 
 /**

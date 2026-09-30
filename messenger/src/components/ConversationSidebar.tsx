@@ -65,7 +65,6 @@ export function NewChatModal({
       <Stack gap="sm">
         <HandleInput
           label="Chat with"
-          description="Users on this server can be entered by name alone — the domain is inferred."
           value={handle}
           onChange={(e) => setHandle(e.currentTarget.value)}
           onKeyDown={(e) => {
