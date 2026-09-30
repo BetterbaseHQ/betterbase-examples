@@ -63,6 +63,14 @@ RUN cd examples/passwords && pnpm install --frozen-lockfile && VITE_BASE_PATH=/p
 COPY betterbase-examples/ai-chat/ ./examples/ai-chat/
 RUN cd examples/ai-chat && pnpm install --frozen-lockfile && VITE_BASE_PATH=/ai-chat/ pnpm build
 
+# Precompress the shared wasm blobs at zstd's maximum level: Caddy serves the
+# .zst siblings directly (file_server precompressed), so every cold download
+# ships build-time-compressed bytes — ~13% smaller than on-the-fly encoding
+# (~1.02 MB → ~0.80 MB for the db blob) with zero per-request CPU. Originals
+# stay for clients that don't accept zstd (on-the-fly gzip via `encode`).
+RUN apk add --no-cache zstd && \
+    find /workspace/sdk-shared -name '*.wasm' -exec zstd -q -19 -k {} \;
+
 # ==========================================================================
 # Serve stage — static file server with runtime config injection
 # ==========================================================================
