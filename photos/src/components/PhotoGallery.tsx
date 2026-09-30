@@ -83,7 +83,7 @@ export function PhotoGallery({
             style={{ borderBottom: "1px solid var(--mantine-color-gray-3)" }}
           >
             <Text fw={600}>{album.name}</Text>
-            {isPersonal && onShare && <ShareButton onShare={onShare} />}
+            {isPersonal && onShare && <ShareButton title="Share album" onShare={onShare} />}
             {isSharedAlbum && album._spaceId && onInvite && onRemoveMember && (
               <MembersPanel
                 spaceId={album._spaceId}
@@ -137,7 +137,7 @@ export function PhotoGallery({
           <Text size="sm" c="dimmed">
             {photos.length} {photos.length === 1 ? "photo" : "photos"}
           </Text>
-          {isPersonal && onShare && <ShareButton onShare={onShare} />}
+          {isPersonal && onShare && <ShareButton title="Share album" onShare={onShare} />}
           {isSharedAlbum && album!._spaceId && onInvite && onRemoveMember && (
             <MembersPanel
               spaceId={album!._spaceId}

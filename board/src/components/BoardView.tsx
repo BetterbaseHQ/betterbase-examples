@@ -200,7 +200,7 @@ export function BoardView({
         <Text fw={600} size="lg">
           {board.name}
         </Text>
-        {isPersonal && onShare && <ShareButton onShare={onShare} />}
+        {isPersonal && onShare && <ShareButton title="Share board" onShare={onShare} />}
         {isSharedBoard && board._spaceId && onInvite && onRemoveMember && (
           <MembersPanel
             spaceId={board._spaceId}

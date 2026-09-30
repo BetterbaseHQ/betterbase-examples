@@ -10,8 +10,6 @@ import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, wa
 
 const creds = uniqueCreds();
 
-const ownHandle = () => `${creds.username}@${accountsHost}`;
-
 test.describe.serial("messenger lifecycle", () => {
   test("conversation + message survive on reconnect", async ({ page }) => {
     await registerUser(page, creds);
@@ -23,10 +21,11 @@ test.describe.serial("messenger lifecycle", () => {
     await connectFromApp(page, creds);
     await waitForConnected(page);
 
-    // Self-conversation + message
+    // Self-conversation + message. Short handle only — the domain is
+    // inferred from the signed-in user's handle (pinned: name-only entry works).
     // The first-run CTA in the main pane (the sidebar "+" has the same name)
     await page.getByRole("main").getByRole("button", { name: "New conversation" }).click();
-    await page.getByPlaceholder("user@domain").fill(ownHandle());
+    await page.getByLabel("Chat with").fill(creds.username);
     await page.getByRole("button", { name: "Start conversation" }).click();
 
     await expect(page.getByPlaceholder("Type a message…")).toBeVisible({ timeout: 30_000 });

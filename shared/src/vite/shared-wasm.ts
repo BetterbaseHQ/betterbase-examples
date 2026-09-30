@@ -68,7 +68,9 @@ export function sdkSharedWasm(): Plugin {
               if (chunk.type !== "asset" || !isSdkWasmAsset(fileName)) continue;
               found++;
               const name = path.basename(fileName);
-              const unrewritten = new RegExp(`assets/${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+              const unrewritten = new RegExp(
+                `assets/${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+              );
               if (chunks.some((code) => unrewritten.test(code))) {
                 this.warn(
                   `sdkSharedWasm: unrewritten reference to ${fileName}; keeping the per-app asset (dedup skipped).`,

@@ -4,7 +4,6 @@ import {
   Text,
   Badge,
   ActionIcon,
-  TextInput,
   Button,
   Stack,
   UnstyledButton,
@@ -15,6 +14,7 @@ import { useMembers, usePeers, useSpaceStatus } from "betterbase/sync/react";
 import type { Member, SpaceRole } from "betterbase/sync";
 import { useAuth } from "betterbase/auth/react";
 import { truncateDid } from "./did.js";
+import { HandleInput, humanizeShareError } from "./HandleInput.js";
 
 interface MembersPanelProps {
   spaceId: string;
@@ -77,7 +77,7 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
       await onInvite(h);
       setInviteHandle("");
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Invite failed");
+      setInviteError(humanizeShareError(err));
     } finally {
       setInviting(false);
     }
@@ -219,9 +219,8 @@ export function MembersPanel({ spaceId, isAdmin, onInvite, onRemoveMember }: Mem
 
           {isAdmin && (
             <Stack gap={4} mt={4}>
-              <TextInput
+              <HandleInput
                 size="xs"
-                placeholder="user@domain"
                 aria-label="Invite user by handle"
                 value={inviteHandle}
                 onChange={(e) => {

@@ -22,8 +22,6 @@ import {
 const aliceCreds = uniqueCreds();
 const bobCreds = uniqueCreds();
 
-const bobHandle = () => `${bobCreds.username}@${accountsHost}`;
-
 test.describe("messenger two-user removal", () => {
   test.setTimeout(240_000);
 
@@ -49,7 +47,8 @@ test.describe("messenger two-user removal", () => {
     await connectFromApp(bob, bobCreds);
     await waitForConnected(bob);
     await alice.getByRole("main").getByRole("button", { name: "New conversation" }).click();
-    await alice.getByPlaceholder("user@domain").fill(bobHandle());
+    // Short handle only — the domain is inferred from alice's handle.
+    await alice.getByLabel("Chat with").fill(bobCreds.username);
     await alice.getByRole("button", { name: "Start conversation" }).click();
     await expect(alice.getByPlaceholder("Type a message…")).toBeVisible({ timeout: 30_000 });
 

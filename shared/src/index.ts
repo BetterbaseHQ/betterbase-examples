@@ -40,6 +40,7 @@ export {
   type RemovedSpaceProbe,
 } from "./sharing/RemovedSpaceNotice.js";
 export { ShareButton } from "./sharing/ShareButton.js";
+export { HandleInput, humanizeShareError } from "./sharing/HandleInput.js";
 export { PresenceAvatars } from "./sharing/PresenceAvatars.js";
 export { TypingIndicator } from "./sharing/TypingIndicator.js";
 export { peerGradient } from "./sharing/peerColor.js";

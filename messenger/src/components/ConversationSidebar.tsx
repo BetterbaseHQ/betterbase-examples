@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Stack, NavLink, TextInput, ActionIcon, Group, Text, Modal, Button } from "@mantine/core";
 import { useMembers } from "betterbase/sync/react";
 import { MessageCircle, Plus, Trash2, Pencil } from "lucide-react";
-import { ConfirmDialog } from "@betterbase/examples-shared";
+import { ConfirmDialog, HandleInput, humanizeShareError } from "@betterbase/examples-shared";
 import type { Conversation } from "@/lib/db";
 import { shortHandle } from "@/lib/handle";
 
@@ -47,7 +47,7 @@ export function NewChatModal({
       setName("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start chat");
+      setError(humanizeShareError(err));
     } finally {
       setLoading(false);
     }
@@ -63,9 +63,9 @@ export function NewChatModal({
   return (
     <Modal opened={opened} onClose={handleClose} title="New conversation" size="sm">
       <Stack gap="sm">
-        <TextInput
+        <HandleInput
           label="Chat with"
-          placeholder="user@domain"
+          description="Users on this server can be entered by name alone — the domain is inferred."
           value={handle}
           onChange={(e) => setHandle(e.currentTarget.value)}
           onKeyDown={(e) => {

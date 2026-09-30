@@ -69,7 +69,7 @@ export function TaskList({
         <Text fw={600} size="xl">
           {list.name}
         </Text>
-        {isPersonal && onShare && <ShareButton onShare={onShare} />}
+        {isPersonal && onShare && <ShareButton title="Share list" onShare={onShare} />}
         {shared && list._spaceId && onInvite && onRemoveMember && (
           <MembersPanel
             spaceId={list._spaceId}

@@ -75,7 +75,9 @@ export function NoteList({
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" lineClamp={1}>
               {notebook.name}
             </Text>
-            {!notebookIsShared && onShare && <ShareButton onShare={onShare} />}
+            {!notebookIsShared && onShare && (
+              <ShareButton title="Share notebook" onShare={onShare} />
+            )}
             {notebookIsShared && notebook._spaceId && onInvite && onRemoveMember && (
               <MembersPanel
                 spaceId={notebook._spaceId}

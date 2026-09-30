@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { Button, Modal, TextInput, Stack, Text } from "@mantine/core";
+import { Button, Modal, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { Share2 } from "lucide-react";
+import { HandleInput, humanizeShareError } from "./HandleInput.js";
 
 interface ShareButtonProps {
   onShare: (handle: string) => Promise<void>;
+  /** Modal title naming the shared thing, e.g. "Share list" / "Share album". */
+  title?: string;
 }
 
-export function ShareButton({ onShare }: ShareButtonProps) {
+export function ShareButton({ onShare, title = "Share" }: ShareButtonProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const [handle, setHandle] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +26,7 @@ export function ShareButton({ onShare }: ShareButtonProps) {
       setHandle("");
       close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Share failed");
+      setError(humanizeShareError(err));
     } finally {
       setLoading(false);
     }
@@ -41,11 +44,11 @@ export function ShareButton({ onShare }: ShareButtonProps) {
         Share
       </Button>
 
-      <Modal opened={opened} onClose={handleClose} title="Share list" size="sm">
+      <Modal opened={opened} onClose={handleClose} title={title} size="sm">
         <Stack gap="sm">
-          <TextInput
+          <HandleInput
             label="User handle"
-            placeholder="user@domain"
+            description="Users on this server can be entered by name alone — the domain is inferred."
             value={handle}
             onChange={(e) => setHandle(e.currentTarget.value)}
             onKeyDown={(e) => {

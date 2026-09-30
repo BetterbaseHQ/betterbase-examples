@@ -31,9 +31,7 @@ import type {
  * mode that let the bulkPut→adoptRecords change slip through. */
 function fakeDb(records: Array<Record<string, unknown>> = []) {
   const byId = new Map(records.map((r) => [r["id"] as string, { ...r }]));
-  const getAll = async (
-    _def: CollectionDefHandle,
-  ): Promise<CollectionRead<SchemaShape>[]> =>
+  const getAll = async (_def: CollectionDefHandle): Promise<CollectionRead<SchemaShape>[]> =>
     // Test records are deliberately partial (id/name only); the double's
     // consumers only index arbitrary fields.
     [...byId.values()].map((r) => ({ ...r })) as CollectionRead<SchemaShape>[];

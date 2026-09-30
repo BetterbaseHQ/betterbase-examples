@@ -91,7 +91,7 @@ export function EntryDetail({
           </Badge>
         </Group>
         <Group gap="xs">
-          {isPersonal && onShare && <ShareButton onShare={onShare} />}
+          {isPersonal && onShare && <ShareButton title="Share entry" onShare={onShare} />}
           {shared && entry._spaceId && onInvite && onRemoveMember && (
             <MembersPanel
               spaceId={entry._spaceId}
