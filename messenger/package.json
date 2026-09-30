@@ -1,8 +1,8 @@
 {
-  "name": "betterbase-chat",
+  "name": "betterbase-messenger",
   "private": true,
   "version": "0.0.0",
-  "description": "Betterbase example: encrypted chat",
+  "description": "Betterbase example: encrypted messenger",
   "license": "Apache-2.0",
   "author": "Betterbase <hello@betterbase.dev>",
   "type": "module",

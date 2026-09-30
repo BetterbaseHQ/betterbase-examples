@@ -49,7 +49,7 @@ const appDefs: AppDef[] = [
   { name: "notes", port: 25392, clientId: env.NOTES_CLIENT_ID },
   { name: "photos", port: 25393, clientId: env.PHOTOS_CLIENT_ID },
   { name: "board", port: 25394, clientId: env.BOARD_CLIENT_ID },
-  { name: "chat", port: 25395, clientId: env.CHAT_CLIENT_ID },
+  { name: "messenger", port: 25395, clientId: env.MESSENGER_CLIENT_ID },
   { name: "passwords", port: 25396, clientId: env.PASSWORDS_CLIENT_ID },
 ];
 
@@ -67,7 +67,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: Number.isFinite(configuredWorkers) && configuredWorkers > 0 ? configuredWorkers : 1,
   retries: 0,
-  // Sized for the worst lifecycle test (chat: registration + OAuth + E2EE
+  // Sized for the worst lifecycle test (messenger: registration + OAuth + E2EE
   // connect in one test) with headroom for a slow phase — each step's own
   // bounded waits sum, so a single stalled phase can overflow a tighter cap
   // and surface as an anonymous "timed out" with no step named

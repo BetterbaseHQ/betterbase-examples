@@ -1,6 +1,6 @@
 # Messenger — end-to-end encrypted messaging
 
-Messenger (the `chat` app) is realtime chat over Betterbase's encrypted sync:
+Messenger is realtime chat over Betterbase's encrypted sync:
 messages are written plaintext
 to the local db and only encrypted when they leave the device — the server
 never sees content. Runs on port 5385 (`pnpm dev`).
@@ -43,7 +43,7 @@ with the new epoch number; the removed member's conversation freezes live —
 history and composer replaced by a re-key notice, and messages sent after the
 rotation never decrypt on their device (the pre-removal local copy stays until
 they delete it — that's the honest local-first guarantee). Pinned end-to-end
-by `e2e/tests/chat-removal.spec.ts`, the suite's first genuine two-user spec.
+by `e2e/tests/messenger-removal.spec.ts`, the suite's first genuine two-user spec.
 
 ## Try it: two accounts
 

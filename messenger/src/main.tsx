@@ -3,7 +3,7 @@ import { AppRoot } from "@betterbase/examples-shared";
 import App from "./App.tsx";
 
 createRoot(document.getElementById("root")!).render(
-  <AppRoot appName="chat">
+  <AppRoot appName="messenger">
     <App />
   </AppRoot>,
 );

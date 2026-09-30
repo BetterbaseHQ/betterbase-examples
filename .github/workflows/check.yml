@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [shared, launchpad, tasks, notes, photos, board, passwords, chat, ai-chat]
+        app: [shared, launchpad, tasks, notes, photos, board, messenger, passwords, ai-chat]
     defaults:
       run:
         working-directory: betterbase-examples/${{ matrix.app }}

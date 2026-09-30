@@ -67,7 +67,7 @@ export interface ScopedAppTreeProps {
   getCurrentScopeDbName: () => string | null;
   /**
    * Signed-out tree (the app's local/unauthenticated UI). Omit for no
-   * signed-out UI (chat's sign-in gate). A function receives the
+   * signed-out UI (messenger's sign-in gate). A function receives the
    * anonymous FileStore.
    */
   local?: ReactNode | ((fileStore: FileStore) => ReactNode);
@@ -77,7 +77,7 @@ export interface ScopedAppTreeProps {
    * the session and the scoped FileStore.
    */
   children: (session: AuthSession, fileStore: FileStore) => ReactNode;
-  /** Collections using edit chains (chat's messages). */
+  /** Collections using edit chains (messenger's messages). */
   editChainCollections?: string[];
 }
 

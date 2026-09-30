@@ -54,8 +54,8 @@ RUN cd examples/photos && pnpm install --frozen-lockfile && VITE_BASE_PATH=/phot
 COPY betterbase-examples/board/ ./examples/board/
 RUN cd examples/board && pnpm install --frozen-lockfile && VITE_BASE_PATH=/board/ pnpm build
 
-COPY betterbase-examples/chat/ ./examples/chat/
-RUN cd examples/chat && pnpm install --frozen-lockfile && VITE_BASE_PATH=/chat/ pnpm build
+COPY betterbase-examples/messenger/ ./examples/messenger/
+RUN cd examples/messenger && pnpm install --frozen-lockfile && VITE_BASE_PATH=/messenger/ pnpm build
 
 COPY betterbase-examples/passwords/ ./examples/passwords/
 RUN cd examples/passwords && pnpm install --frozen-lockfile && VITE_BASE_PATH=/passwords/ pnpm build
@@ -85,7 +85,7 @@ COPY --from=build /workspace/examples/tasks/dist /srv/tasks
 COPY --from=build /workspace/examples/notes/dist /srv/notes
 COPY --from=build /workspace/examples/photos/dist /srv/photos
 COPY --from=build /workspace/examples/board/dist /srv/board
-COPY --from=build /workspace/examples/chat/dist /srv/chat
+COPY --from=build /workspace/examples/messenger/dist /srv/messenger
 COPY --from=build /workspace/examples/passwords/dist /srv/passwords
 COPY --from=build /workspace/examples/ai-chat/dist /srv/ai-chat
 

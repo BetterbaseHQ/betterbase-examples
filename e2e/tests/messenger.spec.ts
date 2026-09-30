@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced, accountsHost } from "./fixtures";
 
 /**
- * Messenger lifecycle: the chat app requires an account before any conversation UI
+ * Messenger lifecycle: Messenger requires an account before any conversation UI
  * renders ("Sign in to start chatting"), so unlike the other apps the
  * connect happens first. A self-conversation (own handle) is the solo case:
  * create → send → returning device downloads it.
@@ -16,8 +16,8 @@ test.describe.serial("messenger lifecycle", () => {
   test("conversation + message survive on reconnect", async ({ page }) => {
     await registerUser(page, creds);
 
-    // Anonymous state: chat gates the UI behind sign-in
-    await page.goto(appUrl("chat"));
+    // Anonymous state: messenger gates the UI behind sign-in
+    await page.goto(appUrl("messenger"));
     await expect(page.getByText("Sign in to start chatting")).toBeVisible({ timeout: 30_000 });
 
     await connectFromApp(page, creds);
@@ -45,7 +45,7 @@ test.describe.serial("messenger lifecycle", () => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
 
-    await page.goto(appUrl("chat"));
+    await page.goto(appUrl("messenger"));
     await connectFromApp(page, creds);
     await waitForConnected(page);
 

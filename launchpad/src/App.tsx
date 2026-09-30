@@ -34,7 +34,7 @@ const APP_META: Record<string, { name: string; description: string; icon: ReactN
     description: "Collaborative kanban board",
     icon: <Kanban size={24} />,
   },
-  chat: {
+  messenger: {
     name: "Messenger",
     description: "Real-time encrypted messaging",
     icon: <MessageCircle size={24} />,
@@ -57,7 +57,7 @@ const DEV_PORTS: Record<string, number> = {
   notes: 5382,
   photos: 5383,
   board: 5384,
-  chat: 5385,
+  messenger: 5385,
   "ai-chat": 5386,
   passwords: 5387,
 };

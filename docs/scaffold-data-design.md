@@ -109,7 +109,7 @@ Sample content (a sample list, a sample board + its columns) is ordinary
 records with random UUIDs, created **exactly once**, by an explicit user
 choice:
 
-- Onboarding offers "Start fresh / Sign in" (chat-style gate; lives **inside
+- Onboarding offers "Start fresh / Sign in" (messenger-style gate; lives **inside
   each app** — launchpad deep-links must hit it). Trigger is a **per-app
   localStorage first-run flag**, never an emptiness check (emptiness
   triggers would re-prompt emptied accounts and reintroduce inferred state).
@@ -206,7 +206,7 @@ Per app (this pass):
 - **board**: sample board + columns via Pattern B prompt; empty state
   otherwise.
 - **notes**: no notebook fixture; empty state or Pattern B sample prompt.
-- **chat**: unchanged (already gates on sign-in — the gate precedent within
+- **messenger**: unchanged (already gates on sign-in — the gate precedent within
   our own examples).
 - **photos / passwords**: no scaffolding; unchanged.
 

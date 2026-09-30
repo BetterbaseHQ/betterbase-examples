@@ -80,7 +80,7 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   // Selection is remembered per account so switching accounts doesn't leak
   // (or flash) another account's conversation.
-  const storageKey = handle ? `chat-selected-conv:${handle}` : null;
+  const storageKey = handle ? `messenger-selected-conv:${handle}` : null;
   const [selectedConvId, setSelectedConvId] = useState<string | null>(() =>
     storageKey ? localStorage.getItem(storageKey) : null,
   );

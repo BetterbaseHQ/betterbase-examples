@@ -13,7 +13,7 @@ Everything here works offline, syncs in real time, and encrypts data before it l
 | [notes](./notes) | Rich text editing with character-level CRDT merge | [localhost:5382](http://localhost:5382) |
 | [photos](./photos) | Encrypted photo gallery with file sync | [localhost:5383](http://localhost:5383) |
 | [board](./board) | Collaborative board with live updates | [localhost:5384](http://localhost:5384) |
-| [chat](./chat) | Messenger — encrypted messaging | [localhost:5385](http://localhost:5385) |
+| [messenger](./messenger) | Encrypted messaging | [localhost:5385](http://localhost:5385) |
 | [ai-chat](./ai-chat) | Local in-browser LLM chat with E2EE-synced history | [localhost:5386](http://localhost:5386) |
 | [passwords](./passwords) | Encrypted password vault | [localhost:5387](http://localhost:5387) |
 
@@ -27,7 +27,7 @@ Each app is this same app plus one more idea — read them in this order:
 2. [tasks](./tasks) — the simplest full app: local-first CRUD, adoption, sharing, CRDT merge. **Start here.**
 3. [notes](./notes) — rich-text editing: character-level merge of `t.text()` bodies, debounced base-anchored saves.
 4. [board](./board) — multi-record trees: parent edges, cascade deletes, children-first sharing, fractional drag ordering.
-5. [chat](./chat) — Messenger: realtime person-to-person messaging — presence, typing, signed edit chains with spoof detection.
+5. [messenger](./messenger) — realtime person-to-person messaging: presence, typing, signed edit chains with spoof detection.
 6. [photos](./photos) — blobs: FileStore upload queue, thumbnails, per-account caches, upload-aware sync status.
 7. [passwords](./passwords) — per-record sharing and secret hygiene on a flat single collection.
 8. [ai-chat](./ai-chat) — local inference: the LFM2.5 Thinking model runs entirely in the browser over WebGPU (Transformers.js + the AI SDK); chats sync end-to-end encrypted like every other app.

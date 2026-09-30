@@ -13,9 +13,9 @@ RUN cd betterbase/js && pnpm install --frozen-lockfile
 COPY betterbase-examples/shared/ ./examples/shared/
 RUN cd examples/shared && pnpm install --frozen-lockfile && pnpm build
 
-COPY betterbase-examples/chat/ ./examples/chat/
-RUN cd examples/chat && pnpm install --frozen-lockfile
+COPY betterbase-examples/messenger/ ./examples/messenger/
+RUN cd examples/messenger && pnpm install --frozen-lockfile
 
-WORKDIR /workspace/examples/chat
+WORKDIR /workspace/examples/messenger
 EXPOSE 5385
 CMD ["pnpm", "dev", "--host", "0.0.0.0"]

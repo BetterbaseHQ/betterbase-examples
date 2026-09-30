@@ -24,7 +24,7 @@ const bobCreds = uniqueCreds();
 
 const bobHandle = () => `${bobCreds.username}@${accountsHost}`;
 
-test.describe("chat two-user removal", () => {
+test.describe("messenger two-user removal", () => {
   test.setTimeout(240_000);
 
   test("removal re-keys the space and freezes the removed member's conversation", async ({
@@ -41,11 +41,11 @@ test.describe("chat two-user removal", () => {
     // Both connect first — the recipient's public key is only published
     // after their first sign-in, so inviting an account that never
     // connected fails the handle lookup.
-    await alice.goto(appUrl("chat"));
+    await alice.goto(appUrl("messenger"));
     await connectFromApp(alice, aliceCreds);
     await waitForConnected(alice);
 
-    await bob.goto(appUrl("chat"));
+    await bob.goto(appUrl("messenger"));
     await connectFromApp(bob, bobCreds);
     await waitForConnected(bob);
     await alice.getByRole("main").getByRole("button", { name: "New conversation" }).click();

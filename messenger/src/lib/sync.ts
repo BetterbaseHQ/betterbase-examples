@@ -3,7 +3,7 @@
  *
  * All conversations are shared from creation: startConversation() creates a
  * space, creates the conversation in it, and immediately invites the recipient.
- * There is no personal/local conversation path — chat requires sync.
+ * There is no personal/local conversation path — messenger requires sync.
  *
  * Local mutations auto-sync via SyncEngine's db.onChange listener — no manual
  * scheduleSync() calls needed.

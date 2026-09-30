@@ -7,11 +7,11 @@ export { conversations, messages } from "./collections.js";
 export type Conversation = CollectionRead<typeof conversations>;
 export type Message = CollectionRead<typeof messages>;
 
-export const DB_NAME = "chat";
+export const DB_NAME = "messenger";
 
 /**
  * App database — the anonymous/local namespace by default, swapped to
- * `chat_<scope-hash>` per signed-in account by `openDatabaseForScope`
+ * `messenger_<scope-hash>` per signed-in account by `openDatabaseForScope`
  * (one account's decrypted records are never visible to another account
  * or to the unauthenticated view, AUD-045). All the scope-switching
  * machinery lives in `createScopedAppDb`; this module exists because the

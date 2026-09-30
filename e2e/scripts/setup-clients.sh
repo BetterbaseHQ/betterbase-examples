@@ -48,7 +48,7 @@ APPS=(
     "notes:25392:sync"
     "photos:25393:sync files"
     "board:25394:sync"
-    "chat:25395:sync"
+    "messenger:25395:sync"
     "passwords:25396:sync"
 )
 

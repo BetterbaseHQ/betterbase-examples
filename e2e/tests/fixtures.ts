@@ -24,7 +24,7 @@ const APP_PORTS: Record<string, number> = {
   notes: 25392,
   photos: 25393,
   board: 25394,
-  chat: 25395,
+  messenger: 25395,
   passwords: 25396,
 };
 
@@ -135,7 +135,7 @@ export async function connectFromApp(page: Page, creds: UserCredentials): Promis
     if (m.type() === "error") console.log("[browser]", m.text().slice(0, 240));
   });
 
-  // Entry points differ: most apps open a "Connect Sync" modal first; chat's
+  // Entry points differ: most apps open a "Connect Sync" modal first; messenger's
   // sign-in gate starts the OAuth redirect directly (and renders two "Sign in"
   // buttons — header + centered CTA — either starts the flow). Wait for
   // whichever entry point this app renders instead of instant visibility
