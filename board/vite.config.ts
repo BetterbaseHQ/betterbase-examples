@@ -7,6 +7,9 @@ import path from "path";
 export default defineConfig({
   // Path-based hosting in the examples container (e.g. /tasks/); "/" in dev.
   base: process.env.VITE_BASE_PATH || "/",
+  // sdkSharedWasm(): no-op outside image builds (needs SDK_WASM_SHARED_DIR);
+  // the examples image dedupes the SDK wasm blobs across apps. See
+  // shared/src/vite/shared-wasm.ts.
   plugins: [wasm(), sdkSharedWasm(), react()],
   worker: {
     format: "es",

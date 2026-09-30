@@ -36,7 +36,12 @@ Each app is this same app plus one more idea — read them in this order:
 
 `Dockerfile` (repo root; build context is the parent workspace) builds every
 app for path-based hosting into a single static-serving container: the
-launchpad portal at `/` and each app at `/<app>/`. Deployment-specific
+launchpad portal at `/` and each app at `/<app>/`. Image builds also set
+`SDK_WASM_SHARED_DIR`, which activates the [`sdkSharedWasm()`](./shared/src/vite/shared-wasm.ts)
+Vite plugin: both SDK wasm blobs (~1.3 MB compressed) are served once from
+`/sdk/` under an immutable cache and shared by every app, instead of each
+app shipping its own copy. Outside image builds the plugin is inert, so a
+copied app behaves like any plain Vite app. Deployment-specific
 config (accounts domain, OAuth client IDs, enabled apps) is injected at
 container start — see [`docker/entrypoint.sh`](./docker/entrypoint.sh) and
 `shared/src/lib/runtime-config.ts`. The image is published to GHCR as
