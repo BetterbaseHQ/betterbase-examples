@@ -1,12 +1,13 @@
-# Chat — end-to-end encrypted messaging
+# Messenger — end-to-end encrypted messaging
 
-Realtime chat over Betterbase's encrypted sync: messages are written plaintext
+Messenger (the `chat` app) is realtime chat over Betterbase's encrypted sync:
+messages are written plaintext
 to the local db and only encrypted when they leave the device — the server
 never sees content. Runs on port 5385 (`pnpm dev`).
 
 ## Sign-in gated — no offline path
 
-Unlike Tasks, Chat has no local-only mode (`src/App.tsx`): every conversation
+Unlike Tasks, Messenger has no local-only mode (`src/App.tsx`): every conversation
 is shared, so unauthenticated users get a sign-in gate instead of a degraded
 offline experience.
 

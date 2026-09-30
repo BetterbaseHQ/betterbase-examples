@@ -35,7 +35,7 @@ const APP_META: Record<string, { name: string; description: string; icon: ReactN
     icon: <Kanban size={24} />,
   },
   chat: {
-    name: "Chat",
+    name: "Messenger",
     description: "Real-time encrypted messaging",
     icon: <MessageCircle size={24} />,
   },

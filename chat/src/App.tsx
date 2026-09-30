@@ -41,7 +41,7 @@ function SignInGate() {
   };
   return (
     <LessAppShell
-      appName="Chat"
+      appName="Messenger"
       appIcon={<MessageCircle size={22} color="var(--mantine-color-indigo-6)" />}
       isAuthenticated={false}
       handle={handle}
@@ -61,7 +61,7 @@ function SignInGate() {
         <EmptyState
           icon={<MessageCircle size={32} />}
           title="Sign in to start chatting"
-          description="Chat requires an account to message other users"
+          description="Messenger requires an account to message other users"
           action={<Button onClick={handleLogin}>Sign in</Button>}
         />
       </Box>
@@ -155,7 +155,7 @@ function ChatApp({ personalSpaceId }: { personalSpaceId: string | null }) {
 
   return (
     <LessAppShell
-      appName="Chat"
+      appName="Messenger"
       appIcon={<MessageCircle size={22} color="var(--mantine-color-indigo-6)" />}
       banner={banner}
       navbar={

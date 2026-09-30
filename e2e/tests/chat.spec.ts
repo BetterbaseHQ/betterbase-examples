@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { appUrl, connectFromApp, registerUser, uniqueCreds, waitForConnected, waitForSynced, accountsHost } from "./fixtures";
 
 /**
- * Chat lifecycle: chat requires an account before any conversation UI
+ * Messenger lifecycle: the chat app requires an account before any conversation UI
  * renders ("Sign in to start chatting"), so unlike the other apps the
  * connect happens first. A self-conversation (own handle) is the solo case:
  * create → send → returning device downloads it.
@@ -12,7 +12,7 @@ const creds = uniqueCreds();
 
 const ownHandle = () => `${creds.username}@${accountsHost}`;
 
-test.describe.serial("chat lifecycle", () => {
+test.describe.serial("messenger lifecycle", () => {
   test("conversation + message survive on reconnect", async ({ page }) => {
     await registerUser(page, creds);
 
