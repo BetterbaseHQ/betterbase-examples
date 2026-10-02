@@ -91,16 +91,9 @@ function AppCard({ name, description, icon, href }: AppCardProps) {
   );
 }
 
-/**
- * Enabled apps with links.
- *
- * Deployed (examples container): the entrypoint-generated config.js lists the
- * enabled apps; each is served same-origin at `/<app>/`.
- *
- * Dev: all apps on their fixed localhost ports.
- */
-/** App ids shown when no runtime config exists (unified-origin dev).
- * Kept in sync with the apps enabled in docker-compose.dev.yml. */
+/** App ids shown when no runtime config exists (unified-origin dev),
+ * served same-origin at `/<app>/`. Kept in sync with the apps enabled in
+ * docker-compose.dev.yml. Legacy dev (per-port) uses DEV_PORTS below. */
 const DEV_APPS = [
   "tasks",
   "notes",
@@ -118,7 +111,7 @@ function appCards(): AppCardProps[] {
   const ids = cfg
     ? Object.keys(cfg.apps).filter((id) => id !== "launchpad")
     : onUnifiedOrigin
-      ? DEV_APPS.filter((id) => id !== "launchpad")
+      ? [...DEV_APPS]
       : Object.keys(DEV_PORTS);
   const sources: Array<[id: string, href: string]> = ids.map((id) => [
     id,

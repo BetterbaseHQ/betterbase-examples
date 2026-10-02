@@ -35,9 +35,13 @@ export const DEFAULT_LAUNCHPAD_URL = "http://localhost:5380";
 /**
  * True when served from the Caddy dev origin (examples.betterbase.localhost),
  * where apps live path-based on one origin — same shape as the prod image.
+ * Guarded like runtimeConfig(): callable outside a browser (SSR/tests).
  */
 function onUnifiedExamplesOrigin(): boolean {
-  return window.location.hostname === "examples.betterbase.localhost";
+  return (
+    typeof window !== "undefined" &&
+    window.location.hostname === "examples.betterbase.localhost"
+  );
 }
 
 /**
