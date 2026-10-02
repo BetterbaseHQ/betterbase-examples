@@ -16,9 +16,6 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import type { UIMessage } from "ai";
-
-/** A message part, typed loosely: the chat surface only reads type/text fields. */
-type Part = { type: string; text?: string };
 import {
   Bot,
   Brain,
@@ -33,7 +30,11 @@ import {
 import { Markdown } from "@/components/Markdown";
 import type { AiChat } from "@/lib/use-ai-chat";
 import { orderPartsForDisplay } from "@/lib/message-parts";
+import { parseSummarizedResults } from "@/lib/parallel-search";
 import { WORKSPACE_HEIGHT } from "@/lib/layout";
+
+/** A message part, typed loosely: the chat surface only reads type/text fields. */
+type Part = { type: string; text?: string };
 
 /** Chat conversations read best in a centered column, not edge to edge. */
 const COLUMN_STYLE = {
@@ -422,23 +423,6 @@ function ToolResult({ result }: { result: { title?: string; url?: string; excerp
   );
 }
 
-/** Parse the tool's summarized text output back into individual results. */
-function toolResults(
-  outputText: string,
-): Array<{ title?: string; url?: string; excerpt?: string }> {
-  return outputText
-    .split("\n\n")
-    .map((block) => block.trim())
-    .filter(Boolean)
-    .map((block) => {
-      const firstLine = block.split("\n")[0] ?? "";
-      // summarizeResults emits `• title — url` then indented excerpts.
-      const m = firstLine.match(/^•\s+(.+?)(?:\s+—\s+(\S+))?$/);
-      const excerpt = block.split("\n").slice(1).join(" ").trim().slice(0, 200);
-      return m ? { title: m[1], url: m[2], excerpt } : { excerpt: firstLine };
-    });
-}
-
 /** Compact tool chip: what ran, how many results, details on demand. */
 function ToolCard({ part }: { part: Part }) {
   const tool = part as {
@@ -452,7 +436,7 @@ function ToolCard({ part }: { part: Part }) {
     tool.state === "output-error" ||
     (tool.output != null && typeof tool.output === "object" && "error" in tool.output);
   const outputText = done && tool.output && "text" in tool.output ? tool.output.text : undefined;
-  const results = outputText ? toolResults(outputText) : [];
+  const results = outputText ? parseSummarizedResults(outputText) : [];
   const [opened, { toggle }] = useDisclosure(false);
   const label = failed
     ? "Web search failed"

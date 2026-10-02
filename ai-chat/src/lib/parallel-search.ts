@@ -58,8 +58,11 @@ export interface WebSearchResult {
  * Parse the server's JSON payload (a JSON string) into a compact summary:
  * `• title — url` followed by its excerpts. Returns the raw text untouched if
  * it doesn't parse, so a format change on the server never kills the tool.
+ *
+ * Exported so the UI and the tests can pin the round-trip with
+ * {@link parseSummarizedResults} — the two halves must stay format-compatible.
  */
-function summarizeResults(raw: string): string {
+export function summarizeResults(raw: string): string {
   try {
     const parsed = JSON.parse(raw) as {
       results?: Array<{ url?: string; title?: string; excerpts?: string[] }>;
@@ -77,10 +80,52 @@ function summarizeResults(raw: string): string {
   }
 }
 
-/** Tool-error result — the AI SDK renders an `error`-shaped return as a tool error. */
+/**
+ * Tool-failure result — an app-level contract, not an SDK convention: the AI
+ * SDK treats a *thrown* error from a tool as fatal (with the default
+ * `errorMode: "none"` it ends the whole stream), so a failed search returns
+ * this shape instead and lets the multi-step loop continue. The model reads
+ * the JSON, and the UI's tool chip checks for `error` to render it red.
+ */
 export interface WebSearchError {
   error: true;
   message: string;
+}
+
+/** One search result as re-parsed by the UI from the summarized text. */
+export interface ParsedSearchResult {
+  title?: string;
+  url?: string;
+  excerpt?: string;
+}
+
+/**
+ * Reverse of {@link summarizeResults}: turn the summarized tool output back
+ * into per-result entries for the UI's tool chip. Both directions must stay
+ * in sync — the tool output format is the coupling between them, pinned by
+ * the round-trip test in parallel-search.test.ts.
+ *
+ * Anything that doesn't match (e.g. a raw, unparsed server payload) is
+ * returned as a single entry with its first line as the excerpt, so the chip
+ * never renders nothing.
+ */
+export function parseSummarizedResults(outputText: string): Array<ParsedSearchResult> {
+  return outputText
+    .split("\n\n")
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n");
+      const firstLine = lines[0] ?? "";
+      // summarizeResults emits `• title — url` then indented excerpt lines.
+      const m = firstLine.match(/^•\s+(.+?)(?:\s+—\s+(\S+))?$/);
+      const excerpt = lines
+        .slice(1)
+        .map((l) => l.trim())
+        .join(" ")
+        .slice(0, 200);
+      return m ? { title: m[1], url: m[2], excerpt } : { excerpt: firstLine };
+    });
 }
 
 /**
@@ -101,6 +146,9 @@ class ParallelMcpClient {
       "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
     };
     if (apiKey) h.Authorization = `Bearer ${apiKey}`;
+    // The Streamable-HTTP spec requires the client to echo the session id on
+    // every request after initialize; servers may reject requests without it.
+    if (this.sessionId) h["Mcp-Session-Id"] = this.sessionId;
     return h;
   }
 

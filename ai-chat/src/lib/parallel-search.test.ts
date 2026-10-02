@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { webSearchTool } from "./parallel-search";
+import { parseSummarizedResults, summarizeResults, webSearchTool } from "./parallel-search";
 
 /**
  * Failure-contract tests for the Parallel MCP client: the tool must never
@@ -90,6 +90,47 @@ describe("web_search tool failure contract", () => {
     expect(initializeCalls.length).toBe(2);
   });
 
+  it("echoes the Mcp-Session-Id header on every request after initialize", async () => {
+    // Reset the singleton client's session first (a 500 on any request drops
+    // it), so the flow below starts from a clean initialize regardless of
+    // what earlier tests left behind.
+    fetchMock.mockResolvedValue(new Response("boom", { status: 500 }));
+    await webSearchTool.execute(
+      { objective: "x", search_queries: ["q"] },
+      { abortSignal: controller(), toolCallId: "c0", messages: [], context: {} },
+    );
+
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonRpcResponse(
+          { jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18" } },
+          { headers: { "Content-Type": "application/json", "Mcp-Session-Id": "sess-9" } },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 202 }))
+      .mockResolvedValueOnce(
+        jsonRpcResponse({
+          jsonrpc: "2.0",
+          id: 2,
+          result: { content: [{ type: "text", text: '{"results":[]}' }] },
+        }),
+      );
+
+    await webSearchTool.execute(
+      { objective: "x", search_queries: ["q"] },
+      { abortSignal: controller(), toolCallId: "c1", messages: [], context: {} },
+    );
+
+    const calls = fetchMock.mock.calls
+      .slice(1)
+      .map(([, init]) => new Headers(init?.headers as HeadersInit));
+    // initialize carries no session id yet; the initialized ack and
+    // tools/call must echo the id the server issued.
+    expect(calls[0]!.get("Mcp-Session-Id")).toBeNull();
+    expect(calls[1]!.get("Mcp-Session-Id")).toBe("sess-9");
+    expect(calls[2]!.get("Mcp-Session-Id")).toBe("sess-9");
+  });
+
   it("rejects empty query lists without touching the network", async () => {
     const out = (await webSearchTool.execute(
       { objective: "x", search_queries: [] },
@@ -98,5 +139,42 @@ describe("web_search tool failure contract", () => {
 
     expect(out.error).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("summarizeResults / parseSummarizedResults round-trip", () => {
+  // The tool chip re-parses the summarized text the model gets; this pins
+  // the format contract between the two halves of that coupling.
+  const PAYLOAD = JSON.stringify({
+    search_id: "s1",
+    results: [
+      {
+        url: "https://example.com/anc",
+        title: "Best ANC",
+        excerpts: ["Bose tops the list", "Sony close behind"],
+      },
+      { url: "https://example.com/no-title", excerpts: ["A lone excerpt"] },
+    ],
+  });
+
+  it("parses back the title, url and excerpt of every result", () => {
+    const parsed = parseSummarizedResults(summarizeResults(PAYLOAD));
+    expect(parsed).toEqual([
+      {
+        title: "Best ANC",
+        url: "https://example.com/anc",
+        excerpt: "Bose tops the list Sony close behind",
+      },
+      {
+        title: "https://example.com/no-title",
+        url: "https://example.com/no-title",
+        excerpt: "A lone excerpt",
+      },
+    ]);
+  });
+
+  it("surfaces unparsed server text as a single entry instead of nothing", () => {
+    const parsed = parseSummarizedResults(summarizeResults("not json at all"));
+    expect(parsed).toEqual([{ title: undefined, url: undefined, excerpt: "not json at all" }]);
   });
 });
