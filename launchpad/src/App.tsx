@@ -51,7 +51,9 @@ const APP_META: Record<string, { name: string; description: string; icon: ReactN
   },
 };
 
-/** Dev environment: each app runs on its own port at `/`. */
+/** Legacy dev environment: each app runs on its own port at `/`. Not used
+ * on the Caddy dev origin (examples.betterbase.localhost), where apps live
+ * path-based on one origin exactly as in prod. */
 const DEV_PORTS: Record<string, number> = {
   tasks: 5381,
   notes: 5382,
@@ -97,13 +99,33 @@ function AppCard({ name, description, icon, href }: AppCardProps) {
  *
  * Dev: all apps on their fixed localhost ports.
  */
+/** App ids shown when no runtime config exists (unified-origin dev).
+ * Kept in sync with the apps enabled in docker-compose.dev.yml. */
+const DEV_APPS = [
+  "tasks",
+  "notes",
+  "photos",
+  "board",
+  "messenger",
+  "passwords",
+  "ai-chat",
+] as const;
+
 function appCards(): AppCardProps[] {
   const cfg = runtimeConfig();
-  const sources: Array<[id: string, href: string]> = cfg
-    ? Object.keys(cfg.apps)
-        .filter((id) => id !== "launchpad")
-        .map((id) => [id, new URL(`/${id}/`, window.location.origin).href])
-    : Object.entries(DEV_PORTS).map(([id, port]) => [id, `http://localhost:${port}`]);
+  const onUnifiedOrigin =
+    window.location.hostname === "examples.betterbase.localhost";
+  const ids = cfg
+    ? Object.keys(cfg.apps).filter((id) => id !== "launchpad")
+    : onUnifiedOrigin
+      ? DEV_APPS.filter((id) => id !== "launchpad")
+      : Object.keys(DEV_PORTS);
+  const sources: Array<[id: string, href: string]> = ids.map((id) => [
+    id,
+    onUnifiedOrigin || cfg
+      ? new URL(`/${id}/`, window.location.origin).href
+      : `http://localhost:${DEV_PORTS[id]}`,
+  ]);
 
   const cards: AppCardProps[] = [];
   for (const [id, href] of sources) {

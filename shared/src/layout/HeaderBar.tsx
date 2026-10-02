@@ -29,15 +29,26 @@ interface HeaderBarProps {
   };
 }
 
-/** Launchpad link target in the dev environment (each app on its own port). */
+/** Launchpad link target in the legacy dev environment (each app on its own port). */
 export const DEFAULT_LAUNCHPAD_URL = "http://localhost:5380";
 
 /**
- * Launchpad link target: the same origin's root when served from the unified
- * examples container (runtime config present), the dev origin otherwise.
+ * True when served from the Caddy dev origin (examples.betterbase.localhost),
+ * where apps live path-based on one origin — same shape as the prod image.
+ */
+function onUnifiedExamplesOrigin(): boolean {
+  return window.location.hostname === "examples.betterbase.localhost";
+}
+
+/**
+ * Launchpad link target: the same origin's root when served from the
+ * unified examples origin (runtime config present, or the Caddy dev
+ * origin), the legacy per-port dev origin otherwise.
  */
 export function resolveLaunchpadUrl(): string {
-  return runtimeConfig() ? `${window.location.origin}/` : DEFAULT_LAUNCHPAD_URL;
+  return runtimeConfig() || onUnifiedExamplesOrigin()
+    ? `${window.location.origin}/`
+    : DEFAULT_LAUNCHPAD_URL;
 }
 
 export function HeaderBar({
