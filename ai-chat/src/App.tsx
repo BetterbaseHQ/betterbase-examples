@@ -31,7 +31,7 @@ import {
   openDatabaseForScope,
   threads,
 } from "@/lib/db";
-import { useAiChat, useWrappedModel } from "@/lib/use-ai-chat";
+import { useAiChat } from "@/lib/use-ai-chat";
 
 const createFilesWorker = () =>
   new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
@@ -184,13 +184,12 @@ function AiChatWorkspace({
   onChangeModel: () => void;
 }) {
   const { isAuthenticated, handle, login, logout } = useAuth();
-  const wrappedModel = useWrappedModel(model, prefilledThink);
 
   // Null means the persistent "New chat" draft is selected — the app always
   // opens there, and nothing is created in the database until the first
   // send names the thread (see `startChat`).
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const chat = useAiChat(wrappedModel, activeThreadId);
+  const chat = useAiChat(model, activeThreadId, prefilledThink);
 
   // The db query emits after `startChat` resolves, so a just-selected id
   // is briefly absent from `chat.threads` — grace-period it until the

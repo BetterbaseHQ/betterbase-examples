@@ -43,6 +43,12 @@ const harness = vi.hoisted(() => ({
   created: [] as string[],
   reply: "Four.",
   reasoning: "2 plus 2 is 4.",
+  /** gate the fake transport stream (draft-send test) */
+  gate: null as null | Promise<void>,
+  /** make the fake transport fail with this message (error test) */
+  failWith: null as string | null,
+  /** emit a web_search tool call + result instead of plain text (tool test) */
+  tool: null as null | { objective: string; queries: string[]; summary: string },
   ready: { "1.2b": false, "2.6b": false } as Record<string, boolean>,
   selected: "1.2b",
   /** every selection the app persisted, in order */
@@ -123,21 +129,58 @@ vi.mock("@/lib/chat-service", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/chat-service")>();
   return {
     ...actual,
-    // Inference stub: streams the configured reply/reasoning in two steps.
-    streamReply: vi.fn(
-      async (
-        _model: unknown,
-        _history: unknown,
-        options: { onUpdate: (state: { reasoning: string; text: string }) => void },
-      ) => {
-        options.onUpdate({ reasoning: harness.reasoning, text: "" });
-        options.onUpdate({ reasoning: harness.reasoning, text: harness.reply });
-        return { state: { reasoning: harness.reasoning, text: harness.reply }, error: null };
-      },
-    ),
     generateThreadTitle: vi.fn(async () => "Math Question"),
   };
 });
+
+vi.mock("@/lib/local-chat-transport", () => ({
+  // Inference stub: a ChatTransport that streams the configured
+  // reasoning/reply as real UI-message chunks (start → reasoning → text →
+  // finish), optionally emitting a web_search tool call first, gated
+  // mid-stream, or failing outright.
+  createLocalChatTransport: vi.fn(() => ({
+    sendMessages: async () =>
+      new ReadableStream({
+        async start(controller) {
+          if (harness.failWith) {
+            controller.enqueue({ type: "error", errorText: harness.failWith });
+            controller.close();
+            return;
+          }
+          controller.enqueue({ type: "start" });
+          if (harness.tool) {
+            controller.enqueue({
+              type: "tool-input-available",
+              toolCallId: "call-1",
+              toolName: "web_search",
+              input: {
+                objective: harness.tool.objective,
+                search_queries: harness.tool.queries,
+              },
+            });
+          }
+          if (harness.reasoning) {
+            controller.enqueue({ type: "reasoning-start", id: "r0" });
+            controller.enqueue({ type: "reasoning-delta", id: "r0", delta: harness.reasoning });
+            controller.enqueue({ type: "reasoning-end", id: "r0" });
+          }
+          if (harness.gate) await harness.gate;
+          if (harness.tool) {
+            controller.enqueue({
+              type: "tool-output-available",
+              toolCallId: "call-1",
+              output: { text: harness.tool.summary },
+            });
+          }
+          controller.enqueue({ type: "text-start", id: "t0" });
+          controller.enqueue({ type: "text-delta", id: "t0", delta: harness.reply });
+          controller.enqueue({ type: "text-end", id: "t0" });
+          controller.enqueue({ type: "finish", finishReason: "stop" });
+          controller.close();
+        },
+      }),
+  })),
+}));
 
 /** Drives the app from the load screen to the ready workspace. */
 async function loadModelThroughUi() {
@@ -161,6 +204,9 @@ beforeEach(() => {
   harness.selectCalls = [];
   harness.created = [];
   harness.cleared = [];
+  harness.gate = null;
+  harness.failWith = null;
+  harness.tool = null;
 });
 
 afterEach(async () => {
@@ -258,18 +304,12 @@ describe("AI Chat app", () => {
   });
 
   it("shows the draft send immediately: message, stop control, provisional title", async () => {
-    // Gate the stream so the in-flight state can be observed — this pins
-    // that selecting the thread does not wait for the reply to finish.
-    const { streamReply } = await import("@/lib/chat-service");
+    // Gate the fake transport stream so the in-flight state can be
+    // observed — this pins that selecting the thread does not wait for the
+    // reply to finish.
     let releaseStream: () => void = () => undefined;
-    const streamGated = new Promise<void>((resolve) => {
+    harness.gate = new Promise<void>((resolve) => {
       releaseStream = resolve;
-    });
-    vi.mocked(streamReply).mockImplementationOnce(async (_model, _history, options) => {
-      options.onUpdate({ reasoning: "", text: "" });
-      await streamGated;
-      options.onUpdate({ reasoning: harness.reasoning, text: harness.reply });
-      return { state: { reasoning: harness.reasoning, text: harness.reply }, error: null };
     });
 
     renderWithProviders(<App />);
@@ -417,11 +457,7 @@ describe("AI Chat app", () => {
   });
 
   it("shows the real error when generation fails", async () => {
-    const { streamReply } = await import("@/lib/chat-service");
-    vi.mocked(streamReply).mockResolvedValueOnce({
-      state: { reasoning: "", text: "" },
-      error: new Error("WebGPU device lost"),
-    });
+    harness.failWith = "WebGPU device lost";
 
     renderWithProviders(<App />);
     await loadModelThroughUi();
@@ -526,6 +562,103 @@ describe("AI Chat app", () => {
       expect(within(log).getByText(/HTTPS keeps traffic private/)).toBeVisible();
       expect(within(log).getByText("Four.")).toBeVisible();
     });
+  });
+
+  it("renders the web_search tool card while it runs and its results after", async () => {
+    // Gate between the tool call and its output so the live "Searching…"
+    // state is observable, then release and pin the completed card.
+    let releaseTool: () => void = () => undefined;
+    harness.tool = {
+      objective: "Find the best noise cancelling headphones",
+      queries: ["best noise cancelling headphones"],
+      summary: "• Best ANC — https://example.com/anc",
+    };
+    harness.gate = new Promise<void>((resolve) => {
+      releaseTool = resolve;
+    });
+
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Message"), "best headphones?");
+    await user.keyboard("{Enter}");
+
+    try {
+      // While the tool runs, its card says so — this is the surface the
+      // old hand-rolled pipeline never had.
+      expect(await screen.findByText(/searching the web…/i)).toBeVisible();
+
+      releaseTool();
+      await waitFor(() => expect(screen.getByText(/searched the web/i)).toBeVisible());
+      // The summarized results render behind the card's toggle.
+      await user.click(screen.getByRole("button", { name: /searched the web/i }));
+      expect(await screen.findAllByText(/Best ANC/)).not.toHaveLength(0);
+      // And the final answer still streams after the tool.
+      await waitFor(() => {
+        expect(within(screen.getByRole("log")).getAllByText("Four.")).not.toHaveLength(0);
+      });
+
+      // The tool call is persisted on the assistant record, so the chip
+      // re-renders when the thread is reseeded (reload / navigation).
+      await waitFor(async () => {
+        const remaining = await (db as unknown as Wipeable).query(messages as never, {});
+        const assistant = remaining.records.length;
+        expect(assistant).toBeGreaterThan(0);
+      });
+      const all = (await (db as unknown as Wipeable).query(messages as never, {})).records;
+      const withTools = all.filter(
+        (r) =>
+          typeof (r as unknown as { tools?: unknown }).tools === "string" &&
+          (r as unknown as { tools: string }).tools.includes("web_search"),
+      );
+      expect(withTools).toHaveLength(1);
+    } finally {
+      releaseTool();
+    }
+  });
+
+  it("edits the last user message: rewrites it, drops the old reply, persists", async () => {
+    renderWithProviders(<App />);
+    await loadModelThroughUi();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
+    await user.type(await screen.findByLabelText("Message"), "What is 2 + 2?");
+    await user.keyboard("{Enter}");
+    await screen.findByText("Four.");
+
+    // Edit is offered on the most recent user message even with the reply
+    // after it (it used to require the user message to be the last message
+    // overall, which never holds after an exchange completes).
+    await user.click(await screen.findByRole("button", { name: "Edit message" }));
+    const field = within(screen.getByRole("log")).getByRole("textbox");
+    await user.clear(field);
+    await user.type(field, "What is 3 + 3?");
+    await user.click(screen.getByRole("button", { name: /save & regenerate/i }));
+
+    // The rewritten message is sent and re-answered.
+    await waitFor(() => {
+      const log = screen.getByRole("log");
+      expect(within(log).getByText("What is 3 + 3?")).toBeVisible();
+      expect(within(log).queryByText("What is 2 + 2?")).toBeNull();
+    });
+    await screen.findAllByText("Four.");
+
+    // The rewrite landed in the db: the thread's user message carries the
+    // new text (it used to patch the SDK message id, missing the record).
+    await openDatabaseForScope(null);
+    const current = db as unknown as {
+      query(
+        c: never,
+        o: unknown,
+      ): Promise<{
+        records: Array<{ id: string; role: string; text: string }>;
+      }>;
+    };
+    const rows = await current.query(messages as never, {});
+    const userTexts = rows.records.filter((r) => r.role === "user").map((r) => r.text);
+    expect(userTexts).toEqual(["What is 3 + 3?"]);
   });
 
   it("renames a thread from the sidebar", async () => {

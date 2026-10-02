@@ -1,0 +1,46 @@
+diff --git a/dist/index.js b/dist/index.js
+index 155aba33442b449b2acb94b8fb764592b4d7ece3..bc1842b559f39398a5e17de454102f74d98d93a6 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1222,6 +1222,7 @@ async function processToolCallStream(chunks, emitTextDelta, controller, options)
+   };
+   for await (const chunk of chunks) {
+     if (toolCallDetected) {
++      trailingText += chunk;
+       continue;
+     }
+     fenceDetector.addChunk(chunk);
+@@ -3049,7 +3050,9 @@ var TransformersJSWorkerHandler = class {
+           const { toolCalls: toolCalls2 } = parseJsonFunctionCalls(result.completeFence);
+           if (toolCalls2.length > 0) {
+             toolCallDetected = true;
+-            this.stopping_criteria.interrupt();
++            // Do NOT interrupt: LFM2.5 narrates AFTER the tool call fence.
++            // Let generation run to its natural end so the narration
++            // survives as post-fence text.
+           }
+         }
+       }
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 6d31c4d397d5169daeea71b5130d25dd59365a89..7b1c69c0cd3564f2eb73697f13a3196588f02bc1 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1194,6 +1194,7 @@ async function processToolCallStream(chunks, emitTextDelta, controller, options)
+   };
+   for await (const chunk of chunks) {
+     if (toolCallDetected) {
++      trailingText += chunk;
+       continue;
+     }
+     fenceDetector.addChunk(chunk);
+@@ -3042,7 +3043,9 @@ var TransformersJSWorkerHandler = class {
+           const { toolCalls: toolCalls2 } = parseJsonFunctionCalls(result.completeFence);
+           if (toolCalls2.length > 0) {
+             toolCallDetected = true;
+-            this.stopping_criteria.interrupt();
++            // Do NOT interrupt: LFM2.5 narrates AFTER the tool call fence.
++            // Let generation run to its natural end so the narration
++            // survives as post-fence text.
+           }
+         }
+       }
