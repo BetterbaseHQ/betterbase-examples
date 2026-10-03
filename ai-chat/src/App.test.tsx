@@ -45,6 +45,8 @@ const harness = vi.hoisted(() => ({
   reasoning: "2 plus 2 is 4.",
   /** gate the fake transport stream (draft-send test) */
   gate: null as null | Promise<void>,
+  /** last request handed to the transport stub (toggle tests) */
+  lastTransportMessages: null as null | Array<{ role: string; metadata?: unknown }>,
   /** make the fake transport fail with this message (error test) */
   failWith: null as string | null,
   /** emit a web_search tool call + result instead of plain text (tool test) */
@@ -139,8 +141,9 @@ vi.mock("@/lib/local-chat-transport", () => ({
   // finish), optionally emitting a web_search tool call first, gated
   // mid-stream, or failing outright.
   createLocalChatTransport: vi.fn(() => ({
-    sendMessages: async () =>
-      new ReadableStream({
+    sendMessages: async (request: { messages: Array<{ role: string; metadata?: unknown }> }) => {
+      harness.lastTransportMessages = request.messages;
+      return new ReadableStream({
         async start(controller) {
           if (harness.failWith) {
             controller.enqueue({ type: "error", errorText: harness.failWith });
@@ -178,7 +181,8 @@ vi.mock("@/lib/local-chat-transport", () => ({
           controller.enqueue({ type: "finish", finishReason: "stop" });
           controller.close();
         },
-      }),
+      });
+    },
   })),
 }));
 
@@ -561,6 +565,36 @@ describe("AI Chat app", () => {
       const log = screen.getByRole("log");
       expect(within(log).getByText(/HTTPS keeps traffic private/)).toBeVisible();
       expect(within(log).getByText("Four.")).toBeVisible();
+    });
+  });
+
+  it("rides the web-search toggle on the outgoing message's metadata", async () => {
+    renderWithProviders(<App />);
+    const user = await loadModelThroughUi();
+
+    await user.click(await screen.findByRole("button", { name: "Start a new chat" }));
+    await user.type(await screen.findByRole("textbox", { name: "Message" }), "hi there");
+
+    // Toggle off (default): the flag rides as false, so the transport
+    // hides the web_search tool from the model.
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(harness.lastTransportMessages?.length).toBeGreaterThan(0));
+    const off = harness.lastTransportMessages?.at(-1);
+    expect(off?.role).toBe("user");
+    expect((off?.metadata as { webSearch?: boolean } | undefined)?.webSearch).toBe(false);
+
+    await waitFor(() => expect(within(screen.getByRole("log")).getByText("Four.")).toBeVisible());
+
+    // Toggle on: the next send carries webSearch: true.
+    await user.click(screen.getByRole("button", { name: "Toggle web search" }));
+    expect(screen.getByRole("button", { name: "Toggle web search" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.type(screen.getByRole("textbox", { name: "Message" }), "again{Enter}");
+    await waitFor(() => {
+      const on = harness.lastTransportMessages?.at(-1);
+      expect((on?.metadata as { webSearch?: boolean } | undefined)?.webSearch).toBe(true);
     });
   });
 

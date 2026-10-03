@@ -136,6 +136,8 @@ describe("createLocalChatTransport", () => {
         {
           id: "m1",
           role: "user",
+          // The composer's web-search toggle rides on the user message.
+          metadata: { webSearch: true },
           parts: [{ type: "text", text: "best headphones?" }],
         } as UIMessage,
       ],
@@ -196,6 +198,50 @@ describe("createLocalChatTransport", () => {
     expect(text?.text).toBe("Four.");
   });
 
+  it("hides the web_search tool when the toggle is off (no metadata)", async () => {
+    let sawTools: unknown = "never-called";
+    const base = mockModel([
+      [streamStart, { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage }],
+    ]) as unknown as Record<string, unknown>;
+    const model = {
+      ...base,
+      doStream: async (options: { tools?: unknown }) => {
+        sawTools = options.tools;
+        return {
+          stream: new ReadableStream({
+            start(controller) {
+              controller.enqueue(streamStart);
+              controller.enqueue({ type: "text-start", id: "t0" });
+              controller.enqueue({ type: "text-delta", id: "t0", delta: "hi back" });
+              controller.enqueue({ type: "text-end", id: "t0" });
+              controller.enqueue({
+                type: "finish",
+                finishReason: { unified: "stop", raw: "stop" },
+                usage,
+              });
+              controller.close();
+            },
+          }),
+          request: { body: {} },
+        };
+      },
+    } as unknown as Parameters<typeof createLocalChatTransport>[0];
+
+    const transport = createLocalChatTransport(model);
+    const stream = await transport.sendMessages({
+      trigger: "submit-message",
+      chatId: "c1",
+      messageId: undefined,
+      messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] } as UIMessage],
+      abortSignal: undefined,
+    });
+    await finalMessage(stream); // streamText is lazy: drain to run the model
+
+    // The model cannot call a tool it cannot see: the toggle gates the set
+    // (an empty ToolSet reaches the model as undefined).
+    expect(sawTools ?? {}).toEqual({});
+  });
+
   it("surfaces a failed web_search as a tool error part instead of killing the stream", async () => {
     // No MCP mock: every fetch rejects, so the tool's execute fails and
     // returns its error result — the loop must continue to the answer.
@@ -231,7 +277,12 @@ describe("createLocalChatTransport", () => {
       chatId: "c1",
       messageId: undefined,
       messages: [
-        { id: "m1", role: "user", parts: [{ type: "text", text: "search" }] } as UIMessage,
+        {
+          id: "m1",
+          role: "user",
+          metadata: { webSearch: true },
+          parts: [{ type: "text", text: "search" }],
+        } as UIMessage,
       ],
       abortSignal: undefined,
     });

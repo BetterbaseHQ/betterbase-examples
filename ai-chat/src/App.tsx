@@ -31,7 +31,7 @@ import {
   openDatabaseForScope,
   threads,
 } from "@/lib/db";
-import { useAiChat } from "@/lib/use-ai-chat";
+import { useAiChat, type DraftSend } from "@/lib/use-ai-chat";
 
 const createFilesWorker = () =>
   new Worker(new URL("./lib/files-worker.ts", import.meta.url), {
@@ -189,7 +189,11 @@ function AiChatWorkspace({
   // opens there, and nothing is created in the database until the first
   // send names the thread (see `startChat`).
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const chat = useAiChat(model, activeThreadId, prefilledThink);
+  // Injected into useAiChat so runtime-driven sends (the assistant-ui
+  // composer) create the thread on the first send of a draft. A ref breaks
+  // the dependency cycle: startNewChat needs chat.startChat.
+  const draftSendRef = useRef<DraftSend | null>(null);
+  const chat = useAiChat(model, activeThreadId, prefilledThink, draftSendRef);
 
   // The db query emits after `startChat` resolves, so a just-selected id
   // is briefly absent from `chat.threads` — grace-period it until the
@@ -223,6 +227,7 @@ function AiChatWorkspace({
     },
     [chat],
   );
+  draftSendRef.current = startNewChat;
 
   const deleteThread = useCallback(
     async (id: string) => {
@@ -258,7 +263,7 @@ function AiChatWorkspace({
       padding={0}
     >
       {signedIn && <SyncBanner />}
-      <ChatThread chat={chat} onDraftStart={startNewChat} />
+      <ChatThread chat={chat} />
     </LessAppShell>
   );
 }

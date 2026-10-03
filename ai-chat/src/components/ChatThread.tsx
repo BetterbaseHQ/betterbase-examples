@@ -15,7 +15,12 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { AssistantRuntimeProvider, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
+import {
+  AssistantRuntimeProvider,
+  ComposerPrimitive,
+  MessagePrimitive,
+  ThreadPrimitive,
+} from "@assistant-ui/react";
 import {
   Bot,
   Brain,
@@ -65,8 +70,6 @@ const SUGGESTIONS = [
 
 interface ChatThreadProps {
   chat: AiChat;
-  /** First send from the New chat draft: creates the thread (returns its id). */
-  onDraftStart: (text: string) => Promise<string>;
 }
 
 /**
@@ -78,15 +81,15 @@ interface ChatThreadProps {
  * Mantine; the composer is custom because the draft flow must create the
  * betterbase thread before the first send reaches the chat.
  */
-export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
+export function ChatThread({ chat }: ChatThreadProps) {
   return (
     <AssistantRuntimeProvider runtime={chat.runtime}>
-      <ThreadSurface chat={chat} onDraftStart={onDraftStart} />
+      <ThreadSurface chat={chat} />
     </AssistantRuntimeProvider>
   );
 }
 
-function ThreadSurface({ chat, onDraftStart }: ChatThreadProps) {
+function ThreadSurface({ chat }: ChatThreadProps) {
   const running = chat.status === "submitted" || chat.status === "streaming";
 
   return (
@@ -102,7 +105,7 @@ function ThreadSurface({ chat, onDraftStart }: ChatThreadProps) {
           flexDirection: "column",
         }}
       >
-        {chat.messages.length === 0 && !running && <EmptyChat onSuggestion={(p) => void send(p)} />}
+        {chat.messages.length === 0 && !running && <EmptyChat />}
 
         <div style={{ ...COLUMN_STYLE, paddingTop: 16, flex: "1 0 auto" }}>
           <Stack gap={12} role="log" aria-label="Conversation">
@@ -171,21 +174,16 @@ function ThreadSurface({ chat, onDraftStart }: ChatThreadProps) {
             >
               <ChevronDown size={16} />
             </ThreadPrimitive.ScrollToBottom>
-            <Composer chat={chat} onDraftStart={onDraftStart} running={running} />
+            <Composer chat={chat} running={running} />
           </div>
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
   );
-
-  async function send(text: string) {
-    if (chat.activeThread === null) await onDraftStart(text);
-    else await chat.sendMessage(text);
-  }
 }
 
 /** ChatGPT-style landing state for a fresh thread: greeting + prompts. */
-function EmptyChat({ onSuggestion }: { onSuggestion: (prompt: string) => void }) {
+function EmptyChat() {
   return (
     <Stack
       align="center"
@@ -210,15 +208,24 @@ function EmptyChat({ onSuggestion }: { onSuggestion: (prompt: string) => void })
       </Stack>
       <Group gap="xs" justify="center" maw={560}>
         {SUGGESTIONS.map((s) => (
-          <Button
+          // Sends through the runtime — which routes into the domain flow
+          // (draft creation) exactly like the composer does.
+          <ThreadPrimitive.Suggestion
             key={s.label}
-            variant="default"
-            size="xs"
-            radius="md"
-            onClick={() => onSuggestion(s.prompt)}
+            prompt={s.prompt}
+            send
+            aria-label={s.label}
+            style={{
+              fontSize: "var(--mantine-font-size-xs)",
+              padding: "calc(0.25rem * var(--mantine-scale)) calc(0.5rem * var(--mantine-scale))",
+              borderRadius: "var(--mantine-radius-md)",
+              border: "1px solid var(--mantine-color-default-border)",
+              background: "var(--mantine-color-body)",
+              cursor: "pointer",
+            }}
           >
             {s.label}
-          </Button>
+          </ThreadPrimitive.Suggestion>
         ))}
       </Group>
     </Stack>
@@ -554,93 +561,109 @@ function ReasoningPanel({ reasoning, streaming }: { reasoning: string; streaming
   );
 }
 
-function Composer({
-  chat,
-  onDraftStart,
-  running,
-}: {
-  chat: AiChat;
-  onDraftStart: (text: string) => Promise<string>;
-  running: boolean;
-}) {
-  const [draft, setDraft] = useState("");
-
-  const submit = async () => {
-    const text = draft.trim();
-    if (text === "" || running) return;
-    setDraft("");
-    if (chat.activeThread === null) await onDraftStart(text);
-    else await chat.sendMessage(text);
-  };
-
+/**
+ * The composer, owned by assistant-ui: `ComposerPrimitive` holds the draft
+ * state and submits through the runtime (which routes into the domain flow
+ * in use-ai-chat — thread creation for drafts included). Mantine styles the
+ * chrome; the globe toggle gates the web_search tool for the next send.
+ */
+function Composer({ chat, running }: { chat: AiChat; running: boolean }) {
   return (
-    <Paper
-      radius="xl"
-      withBorder
-      style={{ position: "relative", boxShadow: "var(--mantine-shadow-xs)" }}
+    <ComposerPrimitive.Root
+      style={{
+        display: "flex",
+        alignItems: "flex-end",
+        borderRadius: "var(--mantine-radius-xl)",
+        border: "1px solid var(--mantine-color-default-border)",
+        boxShadow: "var(--mantine-shadow-xs)",
+        background: "var(--mantine-color-body)",
+      }}
     >
-      <div style={{ display: "flex", alignItems: "flex-end" }}>
-        <Textarea
-          value={draft}
-          onChange={(e) => setDraft(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void submit();
-            }
-          }}
-          minRows={1}
-          maxRows={8}
-          placeholder="Message the local model…"
-          aria-label="Message"
-          variant="unstyled"
-          style={{ flex: 1, font: "inherit", resize: "none", padding: "12px 8px 12px 16px" }}
-          autosize
-        />
-        <div style={{ padding: 6 }}>
-          {running ? (
-            <Tooltip label="Stop generating" withArrow>
-              <ActionIcon
-                radius="xl"
-                variant="light"
-                color="red"
-                aria-label="Stop generating"
-                onClick={chat.stop}
-                style={{ width: 34, height: 34 }}
+      <ComposerPrimitive.Input
+        placeholder="Ask anything privately"
+        aria-label="Message"
+        rows={1}
+        maxRows={8}
+        // No attachments UI in this composer: swallow pasted files exactly
+        // like the old plain textarea did (the runtime otherwise registers
+        // an attachment adapter and pastes would vanish on send).
+        addAttachmentOnPaste={false}
+        style={{
+          overflowY: "auto",
+          flex: 1,
+          font: "inherit",
+          resize: "none",
+          padding: "12px 8px 12px 16px",
+          border: "none",
+          outline: "none",
+          background: "transparent",
+        }}
+      />
+      <div style={{ padding: 6, display: "flex", alignItems: "center", gap: 4 }}>
+        <Tooltip
+          label={chat.webSearch ? "Web search on — the model may search the web" : "Search the web"}
+          withArrow
+        >
+          <ActionIcon
+            radius="xl"
+            variant={chat.webSearch ? "light" : "subtle"}
+            color={chat.webSearch ? "indigo" : "gray"}
+            aria-label="Toggle web search"
+            aria-pressed={chat.webSearch}
+            onClick={() => chat.setWebSearch(!chat.webSearch)}
+            style={{ width: 34, height: 34 }}
+          >
+            <Globe size={16} />
+          </ActionIcon>
+        </Tooltip>
+        {running ? (
+          <Tooltip label="Stop generating" withArrow>
+            <ActionIcon
+              radius="xl"
+              variant="light"
+              color="red"
+              aria-label="Stop generating"
+              onClick={chat.stop}
+              style={{ width: 34, height: 34 }}
+            >
+              <Square size={16} />
+            </ActionIcon>
+          </Tooltip>
+        ) : (
+          <Tooltip label="Send message" withArrow>
+            <ComposerPrimitive.Send
+              aria-label="Send message"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "var(--mantine-color-indigo-filled)",
+                color: "var(--mantine-color-white)",
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
               >
-                <Square size={16} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <Tooltip label="Send message" withArrow>
-              <ActionIcon
-                radius="xl"
-                variant="filled"
-                color="indigo"
-                aria-label="Send message"
-                style={{ width: 34, height: 34 }}
-                onClick={() => void submit()}
-                disabled={draft.trim() === ""}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M12 19V5" />
-                  <path d="m5 12 7-7 7 7" />
-                </svg>
-              </ActionIcon>
-            </Tooltip>
-          )}
-        </div>
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+            </ComposerPrimitive.Send>
+          </Tooltip>
+        )}
       </div>
-    </Paper>
+    </ComposerPrimitive.Root>
   );
 }

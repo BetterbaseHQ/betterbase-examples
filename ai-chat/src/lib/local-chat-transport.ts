@@ -91,11 +91,19 @@ export function createLocalChatTransport(model: LanguageModel): ChatTransport<UI
   return {
     sendMessages: async ({ messages, abortSignal, trigger }) => {
       console.info(`[chat] transport: ${trigger} — ${messages.length} messages`);
+      // The composer's web-search toggle rides on the outgoing user
+      // message's metadata; the model only sees the tool when it is on.
+      // (A live regenerate re-sends the original metadata; a reloaded
+      // thread has none, so regenerates there run toolless.)
+      const lastUser = [...messages].reverse().find((m) => m.role === "user");
+      const webSearch =
+        (lastUser?.metadata as { webSearch?: boolean } | undefined)?.webSearch === true;
+      const tools = webSearch ? CHAT_TOOLS : {};
       const result = streamText({
         model,
         system: CHAT_SYSTEM,
         messages: await convertToModelMessages(messages),
-        tools: CHAT_TOOLS,
+        tools,
         abortSignal,
         // Without a stop condition the run halts after the first tool
         // result — the model is never re-invoked with it, so the reply
@@ -109,7 +117,7 @@ export function createLocalChatTransport(model: LanguageModel): ChatTransport<UI
       });
       return toUIMessageStream({
         stream: result.fullStream,
-        tools: CHAT_TOOLS,
+        tools,
         // The thinking models' <think> traces stream as reasoning parts.
         sendReasoning: true,
       });

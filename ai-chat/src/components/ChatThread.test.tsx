@@ -86,6 +86,8 @@ function Harness({
     messages: chat.messages,
     status: chat.status,
     runtime,
+    webSearch: false,
+    setWebSearch: () => undefined,
     error: null,
     startChat: async () => "t1",
     sendMessage: async (text: string) => void chat.sendMessage({ text }),
@@ -95,7 +97,7 @@ function Harness({
     renameThread: async () => undefined,
     stop: chat.stop,
   };
-  return <ChatThread chat={aiChat} onDraftStart={async () => "t1"} />;
+  return <ChatThread chat={aiChat} />;
 }
 
 /** The scroll container is the overflow ancestor of the conversation log. */

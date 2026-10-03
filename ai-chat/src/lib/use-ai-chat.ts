@@ -36,6 +36,9 @@ export interface AiChat {
   startChat: (text: string) => Promise<string>;
   /** Send into the active thread (routes to the draft flow when none). */
   sendMessage: (text: string) => Promise<void>;
+  /** Whether the next send may call the web_search tool (composer toggle). */
+  webSearch: boolean;
+  setWebSearch: (enabled: boolean) => void;
   /** assistant-ui runtime over the same `useChat` state (view layer). */
   runtime: AssistantRuntime;
   /** Regenerate the trailing assistant reply (SDK replays the history). */
@@ -46,6 +49,9 @@ export interface AiChat {
   renameThread: (id: string, title: string) => Promise<void>;
   stop: () => void;
 }
+
+/** Sends the first message of a not-yet-existing thread (App creates it). */
+export type DraftSend = (text: string) => Promise<string>;
 
 const isMissingRecordError = (err: unknown) =>
   err instanceof Error && /record (deleted|not found)/i.test(err.message);
@@ -62,6 +68,12 @@ export function useAiChat(
   model: TransformersJSLanguageModel,
   activeThreadId: string | null,
   prefilledThink = false,
+  /**
+   * How the first send of a draft creates its thread. Passed as a ref so
+   * App can supply a callback that itself depends on this hook's return
+   * value (startChat + thread selection) without an ordering cycle.
+   */
+  draftSendRef?: { current: DraftSend | null },
 ): AiChat {
   const d = useDatabase();
   const threadResult = useQuery(threads, {
@@ -240,15 +252,16 @@ export function useAiChat(
       inFlightThreadRef.current = threadId;
       pendingAssistantRef.current = null;
       setError(null);
-      chat.sendMessage({ text });
+      // The web-search toggle rides on the user message's metadata: the
+      // transport reads it to decide whether the model gets the tool.
+      chat.sendMessage({ text, metadata: { webSearch: webSearchRef.current } });
     },
     [d, activeRecords, allThreads, chat],
   );
 
-  // assistant-ui view layer: the runtime observes the very same `useChat`
-  // state (no separate copy) and powers the Thread/Message primitives in
-  // ChatThread.
-  const runtime = useAISDKRuntime(chat);
+  const [webSearch, setWebSearch] = useState(false);
+  const webSearchRef = useRef(false);
+  webSearchRef.current = webSearch;
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -262,6 +275,36 @@ export function useAiChat(
     },
     [sendMessageInto],
   );
+
+  // assistant-ui view layer: the runtime observes the very same `useChat`
+  // state (no separate copy) and powers the Thread/Message/Composer
+  // primitives in ChatThread. Sends coming from the runtime are routed
+  // through the domain flow: a draft's first send creates the thread via
+  // the App-injected ref, everything else goes through sendMessage.
+  const runtimeChat = useMemo(
+    () => ({
+      ...chat,
+      sendMessage: async (message?: unknown) => {
+        const parts =
+          typeof message === "object" && message !== null
+            ? ((message as { parts?: Array<{ type: string; text?: string }> }).parts ?? [])
+            : [];
+        const text = parts
+          .filter((p) => p.type === "text")
+          .map((p) => p.text ?? "")
+          .join("")
+          .trim();
+        if (text === "") return;
+        if (activeThreadRef.current === null) {
+          await draftSendRef?.current?.(text);
+          return;
+        }
+        await sendMessage(text);
+      },
+    }),
+    [chat, sendMessage, draftSendRef],
+  );
+  const runtime = useAISDKRuntime(runtimeChat);
 
   const startChat = useCallback(
     async (text: string): Promise<string> => {
@@ -370,7 +413,9 @@ export function useAiChat(
       setError(null);
       chat.setMessages(ordered.slice(0, index).map(toUIMessage));
       console.info("[chat] edit user message, regenerate from there");
-      chat.sendMessage({ text: trimmed });
+      // The web-search toggle applies to edits too: the transport gates the
+      // tool on the outgoing user message's metadata.
+      chat.sendMessage({ text: trimmed, metadata: { webSearch: webSearchRef.current } });
     },
     [d, chat],
   );
@@ -383,6 +428,8 @@ export function useAiChat(
     status: chat.status,
     error,
     runtime,
+    webSearch,
+    setWebSearch,
     startChat,
     sendMessage,
     regenerate,
