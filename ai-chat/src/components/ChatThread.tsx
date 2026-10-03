@@ -78,28 +78,99 @@ interface ChatThreadProps {
  */
 export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [showJump, setShowJump] = useState(false);
+  // Whether the conversation is pinned to the bottom. Auto-follow (below)
+  // scrolls only while this is armed; scrolling up disarms it, returning to
+  // the bottom re-arms it. Mirrors assistant-ui's Viewport behavior.
+  const pinnedRef = useRef(true);
 
-  // Show the jump-to-latest button only when the conversation overflows
-  // and the user has scrolled away from the bottom. Streaming re-renders
-  // re-measure, so new content while pinned never summons the button.
+  // The jump button reflects distance-from-bottom on every render.
+  // The pinned *state* is only changed by actual scroll events: a render
+  // re-measure must not disarm the pin, because streaming grows the
+  // content (and thus the distance) before the ResizeObserver below
+  // re-pins — a render-time disarm would cancel auto-follow mid-stream.
   const updateJump = useCallback(() => {
     const el = viewportRef.current;
-    if (el) setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 40);
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+    setShowJump(!atBottom);
   }, []);
   useLayoutEffect(updateJump);
+
+  // A real scroll (user or programmatic) is the only pin/disarm signal —
+  // but only *upward* movement disarms. Scroll events fire frame-aligned,
+  // after the component's own re-pin and after interleaved stream commits:
+  // a stale measurement against grown content (distance > 40) would
+  // otherwise disarm the pin mid-stream. Content growth never moves
+  // scrollTop, so "didn't move up" can't be faked by growth.
+  const lastTopRef = useRef(0);
+  const onScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+    const moved = el.scrollTop - lastTopRef.current;
+    lastTopRef.current = el.scrollTop;
+    if (atBottom) pinnedRef.current = true;
+    else if (moved < -2) pinnedRef.current = false;
+    updateJump();
+  }, [updateJump]);
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
-    el.addEventListener("scroll", updateJump, { passive: true });
+    el.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", updateJump);
     return () => {
-      el.removeEventListener("scroll", updateJump);
+      el.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateJump);
     };
-  }, [updateJump]);
+  }, [onScroll, updateJump]);
 
   const running = chat.status === "submitted" || chat.status === "streaming";
+
+  // Auto-follow: keep the newest content in view while pinned. Streaming
+  // grows scrollHeight without moving scrollTop, so without this the reply
+  // runs off the bottom of the viewport. Two drivers, both needed: the
+  // messages effect re-pins synchronously as parts stream in, and a
+  // ResizeObserver catches height changes no dependency captures (late
+  // markdown layout, action rows, collapsed sections opening).
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
+  }, [chat.messages, running]);
+  useEffect(() => {
+    const scroller = viewportRef.current;
+    const content = contentRef.current;
+    if (!scroller || !content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) scroller.scrollTop = scroller.scrollHeight;
+    });
+    // The content box for stream growth; the scroller itself for viewport
+    // resizes, which change the distance-to-bottom without resizing content.
+    observer.observe(content);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
+
+  // Sending always re-pins and jumps — the outgoing message must land in
+  // view even if the user had scrolled up to quote something. Keyed on the
+  // message id, not a boolean: after a failed exchange the user message
+  // stays last, and a retry send must still jump.
+  const lastUserMessageId =
+    chat.messages.at(-1)?.role === "user" ? (chat.messages.at(-1)!.id as string) : null;
+  useLayoutEffect(() => {
+    if (lastUserMessageId === null) return;
+    pinnedRef.current = true;
+    const el = viewportRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lastUserMessageId]);
+
+  // Switching threads (or first mount) starts at the latest message.
+  useLayoutEffect(() => {
+    pinnedRef.current = true;
+    const el = viewportRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chat.activeThread?.id]);
 
   return (
     <div
@@ -122,7 +193,10 @@ export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
       >
         {chat.messages.length === 0 && !running && <EmptyChat onSuggestion={(p) => void send(p)} />}
 
-        <div style={{ ...COLUMN_STYLE, paddingTop: 16, paddingBottom: 8, flex: "0 0 auto" }}>
+        <div
+          ref={contentRef}
+          style={{ ...COLUMN_STYLE, paddingTop: 16, paddingBottom: 8, flex: "0 0 auto" }}
+        >
           <Stack gap={12} role="log" aria-label="Conversation">
             {chat.messages.map((message, index) =>
               message.role === "user" ? (
@@ -158,15 +232,30 @@ export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
             background: "var(--mantine-color-body)",
           }}
         >
+          {/* Floating above the composer, out of the scroll flow: an
+              in-flow row would grow scrollHeight on first appear and shove
+              the pinned view 40-odd pixels off the bottom. */}
           {showJump && (
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+            <div
+              style={{
+                position: "absolute",
+                bottom: "calc(100% + 8px)",
+                left: 0,
+                right: 0,
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
               <Tooltip label="Jump to latest" withArrow>
                 <ActionIcon
                   variant="default"
                   radius="xl"
                   aria-label="Scroll to bottom"
                   style={{ width: 32, height: 32 }}
-                  onClick={() => viewportRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })}
+                  // Instant, not smooth: a smooth destination clamps at
+                  // call time, so streaming growth during the animation
+                  // lands it short — and disarms follow at the same time.
+                  onClick={() => viewportRef.current?.scrollTo({ top: 1e9 })}
                 >
                   <ChevronDown size={16} />
                 </ActionIcon>
