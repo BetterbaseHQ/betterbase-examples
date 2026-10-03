@@ -626,7 +626,7 @@ function Composer({ chat, running }: { chat: AiChat; running: boolean }) {
             }}
           >
             <Globe size={14} />
-            Search
+            Web Search
           </UnstyledButton>
         </Tooltip>
         {running ? (
