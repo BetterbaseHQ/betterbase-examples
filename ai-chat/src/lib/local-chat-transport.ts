@@ -1,5 +1,7 @@
 import {
   convertToModelMessages,
+  generateText,
+  NoSuchToolError,
   stepCountIs,
   streamText,
   toUIMessageStream,
@@ -17,6 +19,63 @@ import { CHAT_SYSTEM } from "./chat-service";
  * the tool loop — execute, feed results back, re-invoke — via streamText.
  */
 export const CHAT_TOOLS: ToolSet = { web_search: webSearchTool };
+
+/**
+ * The re-ask repair strategy from the AI SDK docs: append the failed tool
+ * call and its validation error to the conversation and let the model
+ * regenerate the call. Unknown tools are never repaired (nothing to fix).
+ */
+function repairToolCallWith(
+  model: LanguageModel,
+): NonNullable<Parameters<typeof streamText>[0]["experimental_repairToolCall"]> {
+  return async ({ toolCall, tools, error, messages, instructions }) => {
+    if (NoSuchToolError.isInstance(error)) return null;
+    console.warn(`[chat] repairing malformed ${toolCall.toolName} args:`, error.message);
+    try {
+      const result = await generateText({
+        model,
+        instructions,
+        tools,
+        messages: [
+          ...messages,
+          {
+            role: "assistant" as const,
+            content: [
+              {
+                type: "tool-call" as const,
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                input: toolCall.input,
+              },
+            ],
+          },
+          {
+            role: "tool" as const,
+            content: [
+              {
+                type: "tool-result" as const,
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                output: { type: "text" as const, value: error.message },
+              },
+            ],
+          },
+        ],
+      });
+      const fixed = result.toolCalls.find((c) => c.toolName === toolCall.toolName);
+      return fixed
+        ? {
+            type: "tool-call" as const,
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            input: JSON.stringify(fixed.input),
+          }
+        : null;
+    } catch {
+      return null;
+    }
+  };
+}
 
 /**
  * The local in-browser model as an AI SDK `ChatTransport`.
@@ -42,6 +101,11 @@ export function createLocalChatTransport(model: LanguageModel): ChatTransport<UI
         // result — the model is never re-invoked with it, so the reply
         // never arrives. 5 steps bounds chained tool use.
         stopWhen: stepCountIs(5),
+        // Small local models sometimes emit malformed tool arguments. When
+        // input validation fails, re-ask the same model with the error
+        // appended (the SDK's documented re-ask strategy) instead of
+        // surfacing a failed call to the user.
+        experimental_repairToolCall: repairToolCallWith(model),
       });
       return toUIMessageStream({
         stream: result.fullStream,

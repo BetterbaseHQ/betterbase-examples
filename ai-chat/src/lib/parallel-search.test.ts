@@ -221,6 +221,29 @@ describe("web_search tool failure contract", () => {
   });
 });
 
+describe("input schema validation (jsonSchema validate)", () => {
+  it("coerces a bare-string search_queries and derives a missing objective", async () => {
+    const out = await (
+      webSearchTool.inputSchema as unknown as { validate: (v: unknown) => Promise<unknown> }
+    ).validate({ search_queries: "best headphones" });
+    expect(out).toEqual({
+      success: true,
+      value: { objective: "best headphones", search_queries: ["best headphones"] },
+    });
+  });
+
+  it("rejects unrecoverable shapes with a model-actionable error", async () => {
+    const out = (await (
+      webSearchTool.inputSchema as unknown as { validate: (v: unknown) => Promise<unknown> }
+    ).validate({ search_queries: 42 })) as {
+      success: boolean;
+      error?: Error;
+    };
+    expect(out.success).toBe(false);
+    expect(out.error?.message).toMatch(/array of strings/);
+  });
+});
+
 describe("summarizeResults / parseSummarizedResults round-trip", () => {
   // The tool chip re-parses the summarized text the model gets; this pins
   // the format contract between the two halves of that coupling.

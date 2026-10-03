@@ -251,12 +251,10 @@ const client = new ParallelMcpClient();
 /**
  * Normalize model-emitted tool arguments before they reach the server.
  *
- * The AI SDK does not validate arguments against `inputSchema` on the
- * client, and small local models occasionally emit `search_queries` as a
- * bare string or an array of non-strings — which the server's own strict
- * validation then rejects. Coerce the common cases; anything unrecoverable
- * returns an error the model can act on (the tool loop retries with better
- * arguments — a thinking model reads the message and resends).
+ * Small local models occasionally emit `search_queries` as a bare string or
+ * an array of non-strings. Coerce the common cases; anything unrecoverable
+ * returns an error the model can act on (a thinking model reads the message
+ * and resends, or the SDK's tool-repair loop re-asks).
  */
 export function normalizeSearchArgs(input: {
   objective?: unknown;
@@ -299,23 +297,41 @@ export const webSearchTool = tool<WebSearchInput, WebSearchResult | WebSearchErr
     "research, comparisons, or authoritative sources. Arguments must be JSON: " +
     '{"objective": "one focused sentence", "search_queries": ["keyword query 1", "keyword query 2"]} — ' +
     "search_queries is always an array of 2-3 plain strings, never a single string.",
-  inputSchema: jsonSchema({
-    type: "object",
-    properties: {
-      objective: {
-        type: "string",
-        description:
-          "A focused, atomic natural-language description of what the search should find. " +
-          "Include any preferred sources or freshness.",
+  inputSchema: jsonSchema<WebSearchInput>(
+    {
+      type: "object",
+      properties: {
+        objective: {
+          type: "string",
+          description:
+            "A focused, atomic natural-language description of what the search should find. " +
+            "Include any preferred sources or freshness.",
+        },
+        search_queries: {
+          type: "array",
+          items: { type: "string" },
+          description: "2-3 concise keyword queries (3-6 words each); diverse phrasings work best.",
+        },
       },
-      search_queries: {
-        type: "array",
-        items: { type: "string" },
-        description: "2-3 concise keyword queries (3-6 words each); diverse phrasings work best.",
+      required: ["objective", "search_queries"],
+    },
+    {
+      // Client-side validation: without a validator the SDK skips input
+      // checks entirely and model-emitted garbage reaches the server. Be
+      // lenient here — coerce the common small-model mistakes (bare string
+      // for the array, non-string entries) instead of failing the call.
+      // Truly unrecoverable input fails, which feeds the SDK's tool-repair
+      // loop (experimental_repairToolCall in local-chat-transport.ts).
+      validate: (value) => {
+        const normalized = normalizeSearchArgs(
+          value as { objective?: unknown; search_queries?: unknown },
+        );
+        return "error" in normalized
+          ? { success: false, error: new Error(normalized.error) }
+          : { success: true, value: normalized };
       },
     },
-    required: ["objective", "search_queries"],
-  }),
+  ),
   execute: async (rawInput, { abortSignal }) => {
     const normalized = normalizeSearchArgs(
       rawInput as { objective?: unknown; search_queries?: unknown },
