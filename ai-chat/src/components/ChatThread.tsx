@@ -604,17 +604,30 @@ function Composer({ chat, running }: { chat: AiChat; running: boolean }) {
           label={chat.webSearch ? "Web search on — the model may search the web" : "Search the web"}
           withArrow
         >
-          <ActionIcon
-            radius="xl"
-            variant={chat.webSearch ? "light" : "subtle"}
-            color={chat.webSearch ? "indigo" : "gray"}
+          <UnstyledButton
             aria-label="Toggle web search"
             aria-pressed={chat.webSearch}
             onClick={() => chat.setWebSearch(!chat.webSearch)}
-            style={{ width: 34, height: 34 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              height: 34,
+              padding: "0 12px",
+              borderRadius: 17,
+              cursor: "pointer",
+              fontSize: "var(--mantine-font-size-xs)",
+              color: chat.webSearch
+                ? "var(--mantine-color-indigo-filled)"
+                : "var(--mantine-color-dimmed)",
+              background: chat.webSearch
+                ? "color-mix(in srgb, var(--mantine-color-indigo-filled) 12%, transparent)"
+                : "transparent",
+            }}
           >
-            <Globe size={16} />
-          </ActionIcon>
+            <Globe size={14} />
+            Search
+          </UnstyledButton>
         </Tooltip>
         {running ? (
           <Tooltip label="Stop generating" withArrow>
