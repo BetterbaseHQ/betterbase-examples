@@ -140,6 +140,85 @@ describe("web_search tool failure contract", () => {
     expect(out.error).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("coerces a bare-string search_queries into an array before sending", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonRpcResponse(
+        { jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18" } },
+        { headers: { "Content-Type": "application/json", "Mcp-Session-Id": "sess-c" } },
+      ),
+    );
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 202 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonRpcResponse({
+        jsonrpc: "2.0",
+        id: 2,
+        result: { content: [{ type: "text", text: '{"results":[]}' }] },
+      }),
+    );
+
+    const out = (await webSearchTool.execute(
+      // The model emitted one string instead of an array of strings.
+      { objective: "find headphones", search_queries: "best headphones 2026" } as never,
+      { abortSignal: controller(), toolCallId: "c1", messages: [], context: {} },
+    )) as { error?: boolean };
+
+    expect(out.error).toBeUndefined();
+    const callBody = fetchMock.mock.calls
+      .map(([, init]) => String((init as RequestInit | undefined)?.body ?? ""))
+      .find((b) => b.includes("tools/call"));
+    expect(callBody).toContain('["best headphones 2026"]');
+  });
+
+  it("returns a model-actionable error for unrecoverable argument shapes", async () => {
+    const out = (await webSearchTool.execute(
+      { objective: "find headphones", search_queries: { queries: ["a"] } } as never,
+      { abortSignal: controller(), toolCallId: "c1", messages: [], context: {} },
+    )) as { error?: boolean; message?: string };
+
+    expect(out.error).toBe(true);
+    // The message must tell the model the expected JSON shape so the
+    // thinking-model retry loop can self-correct.
+    expect(out.message).toMatch(/array of strings/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces in-band server validation errors (MCP isError) as failures, not results", async () => {
+    // Drop any session the singleton client still holds, so the initialize
+    // mock below is consumed by an actual initialize.
+    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 500 }));
+    await webSearchTool.execute(
+      { objective: "reset", search_queries: ["q"] },
+      { abortSignal: controller(), toolCallId: "c0", messages: [], context: {} },
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonRpcResponse(
+        { jsonrpc: "2.0", id: 1, result: { protocolVersion: "2025-06-18" } },
+        { headers: { "Content-Type": "application/json", "Mcp-Session-Id": "sess-e" } },
+      ),
+    );
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 202 }));
+    // The server reports argument-validation failures as a normal result
+    // with isError: true (pydantic message in the text).
+    fetchMock.mockResolvedValueOnce(
+      jsonRpcResponse({
+        jsonrpc: "2.0",
+        id: 2,
+        result: {
+          isError: true,
+          content: [{ type: "text", text: "Error executing tool web_search: 1 validation error" }],
+        },
+      }),
+    );
+
+    const out = (await webSearchTool.execute(
+      { objective: "x", search_queries: ["q"] },
+      { abortSignal: controller(), toolCallId: "c1", messages: [], context: {} },
+    )) as { error?: boolean; message?: string };
+
+    expect(out.error).toBe(true);
+    expect(out.message).toMatch(/validation error/);
+  });
 });
 
 describe("summarizeResults / parseSummarizedResults round-trip", () => {

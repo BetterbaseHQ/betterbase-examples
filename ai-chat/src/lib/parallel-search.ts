@@ -218,7 +218,7 @@ class ParallelMcpClient {
         throw new Error(`Parallel web_search failed (${res.status} ${res.statusText})`);
       }
       const body = (await res.json()) as {
-        result?: { content?: Array<{ type: string; text?: string }> };
+        result?: { content?: Array<{ type: string; text?: string }>; isError?: boolean };
         error?: { message?: string };
       };
       if (body.error) {
@@ -228,6 +228,12 @@ class ParallelMcpClient {
         .filter((c) => c.type === "text" && c.text)
         .map((c) => c.text!)
         .join("\n\n");
+      // The MCP contract reports tool-level failures as a normal result with
+      // `isError: true` (e.g. the server's own argument validation) — surface
+      // those as errors instead of letting them masquerade as search results.
+      if (body.result?.isError) {
+        throw new Error(text || "Parallel web_search returned an in-band error");
+      }
       // Parse the server's JSON payload into a compact, model-friendly summary so
       // results read cleanly even when rendered to the user.
       return { text: summarizeResults(text) };
@@ -243,6 +249,44 @@ class ParallelMcpClient {
 const client = new ParallelMcpClient();
 
 /**
+ * Normalize model-emitted tool arguments before they reach the server.
+ *
+ * The AI SDK does not validate arguments against `inputSchema` on the
+ * client, and small local models occasionally emit `search_queries` as a
+ * bare string or an array of non-strings — which the server's own strict
+ * validation then rejects. Coerce the common cases; anything unrecoverable
+ * returns an error the model can act on (the tool loop retries with better
+ * arguments — a thinking model reads the message and resends).
+ */
+export function normalizeSearchArgs(input: {
+  objective?: unknown;
+  search_queries?: unknown;
+}): { objective: string; search_queries: string[] } | { error: string } {
+  const raw = input.search_queries;
+  let queries: string[];
+  if (typeof raw === "string") {
+    queries = [raw];
+  } else if (Array.isArray(raw)) {
+    queries = raw.filter((q): q is string => typeof q === "string" && q.trim() !== "");
+  } else {
+    queries = [];
+  }
+  if (queries.length === 0) {
+    return {
+      error:
+        "Invalid web_search arguments: search_queries must be a JSON array of strings, " +
+        `e.g. ["best noise cancelling headphones", "top rated headphones 2026"]. ` +
+        `You sent: ${JSON.stringify(raw)?.slice(0, 200)}`,
+    };
+  }
+  const objective =
+    typeof input.objective === "string" && input.objective.trim() !== ""
+      ? input.objective
+      : queries.join("; ");
+  return { objective, search_queries: queries };
+}
+
+/**
  * The `web_search` tool, exposed to the chat through the AI SDK tool loop.
  *
  * When a tool-capable model emits a `web_search` call, the SDK runs `execute`
@@ -252,7 +296,9 @@ const client = new ParallelMcpClient();
 export const webSearchTool = tool<WebSearchInput, WebSearchResult | WebSearchError, {}>({
   description:
     "Search the public web for current, factual information. Use for questions needing up-to-date facts, " +
-    "research, comparisons, or authoritative sources. Provide one focused objective and 2-3 keyword queries.",
+    "research, comparisons, or authoritative sources. Arguments must be JSON: " +
+    '{"objective": "one focused sentence", "search_queries": ["keyword query 1", "keyword query 2"]} — ' +
+    "search_queries is always an array of 2-3 plain strings, never a single string.",
   inputSchema: jsonSchema({
     type: "object",
     properties: {
@@ -270,11 +316,16 @@ export const webSearchTool = tool<WebSearchInput, WebSearchResult | WebSearchErr
     },
     required: ["objective", "search_queries"],
   }),
-  execute: async ({ objective, search_queries }, { abortSignal }) => {
+  execute: async (rawInput, { abortSignal }) => {
+    const normalized = normalizeSearchArgs(
+      rawInput as { objective?: unknown; search_queries?: unknown },
+    );
+    if ("error" in normalized) {
+      console.warn("[parallel-search] rejecting malformed web_search args:", normalized.error);
+      return { error: true, message: normalized.error };
+    }
+    const { objective, search_queries } = normalized;
     try {
-      if (search_queries.length === 0) {
-        return { error: true, message: "web_search requires at least one search query." };
-      }
       console.info("[parallel-search] web_search start", { objective, search_queries });
       const result = await client.webSearch(
         { objective, search_queries },
