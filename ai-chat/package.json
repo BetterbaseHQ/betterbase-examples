@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.119",
+    "@assistant-ui/ai-sdk": "^0.0.9",
+    "@assistant-ui/react": "^0.15.23",
     "@betterbase/examples-shared": "link:../shared",
     "@browser-ai/transformers-js": "^3.0.3",
     "@huggingface/transformers": "^4.3.0",

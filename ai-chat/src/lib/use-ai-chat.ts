@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import type { ChatStatus } from "ai";
+import type { AssistantRuntime } from "@assistant-ui/react";
+import { useAISDKRuntime } from "@assistant-ui/ai-sdk";
 import { deleteTree } from "betterbase/sync";
 import { useQuery, useDatabase } from "betterbase/db/react";
 import type { TransformersJSLanguageModel } from "@browser-ai/transformers-js";
@@ -34,6 +36,8 @@ export interface AiChat {
   startChat: (text: string) => Promise<string>;
   /** Send into the active thread (routes to the draft flow when none). */
   sendMessage: (text: string) => Promise<void>;
+  /** assistant-ui runtime over the same `useChat` state (view layer). */
+  runtime: AssistantRuntime;
   /** Regenerate the trailing assistant reply (SDK replays the history). */
   regenerate: () => void;
   /** Rewrite a user message and regenerate from there. */
@@ -241,6 +245,11 @@ export function useAiChat(
     [d, activeRecords, allThreads, chat],
   );
 
+  // assistant-ui view layer: the runtime observes the very same `useChat`
+  // state (no separate copy) and powers the Thread/Message primitives in
+  // ChatThread.
+  const runtime = useAISDKRuntime(chat);
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
@@ -373,6 +382,7 @@ export function useAiChat(
     messages: chat.messages,
     status: chat.status,
     error,
+    runtime,
     startChat,
     sendMessage,
     regenerate,

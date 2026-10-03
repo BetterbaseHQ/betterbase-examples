@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   ActionIcon,
   Anchor,
@@ -15,7 +15,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import type { UIMessage } from "ai";
+import { AssistantRuntimeProvider, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
 import {
   Bot,
   Brain,
@@ -27,14 +27,13 @@ import {
   RefreshCw,
   Square,
 } from "lucide-react";
+import type { UIMessage } from "ai";
 import { Markdown } from "@/components/Markdown";
-import type { AiChat } from "@/lib/use-ai-chat";
 import { orderPartsForDisplay } from "@/lib/message-parts";
+import "@/components/chat-thread.css";
+import type { AiChat } from "@/lib/use-ai-chat";
 import { parseSummarizedResults } from "@/lib/parallel-search";
 import { WORKSPACE_HEIGHT } from "@/lib/layout";
-
-/** A message part, typed loosely: the chat surface only reads type/text fields. */
-type Part = { type: string; text?: string };
 
 /** Chat conversations read best in a centered column, not edge to edge. */
 const COLUMN_STYLE = {
@@ -71,118 +70,30 @@ interface ChatThreadProps {
 }
 
 /**
- * The conversation surface, driven by the AI SDK's `useChat` state: each
- * message renders its parts — text as Markdown, the thinking trace behind a
- * "Show thinking" toggle, and tool calls as live tool cards ("Searching the
- * web…" while running, results once available). Mantine does the styling.
+ * The conversation surface. assistant-ui owns the view layer: its runtime
+ * (bridged onto the AI SDK's `useChat` in `use-ai-chat`) drives the message
+ * list through `ThreadPrimitive`, and its viewport provides the auto-scroll
+ * behavior (follow while at the bottom, jump on send/thread switch, a
+ * self-hiding jump-to-latest button). Rendering inside the primitives stays
+ * Mantine; the composer is custom because the draft flow must create the
+ * betterbase thread before the first send reaches the chat.
  */
 export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [showJump, setShowJump] = useState(false);
-  // Whether the conversation is pinned to the bottom. Auto-follow (below)
-  // scrolls only while this is armed; scrolling up disarms it, returning to
-  // the bottom re-arms it. Mirrors assistant-ui's Viewport behavior.
-  const pinnedRef = useRef(true);
+  return (
+    <AssistantRuntimeProvider runtime={chat.runtime}>
+      <ThreadSurface chat={chat} onDraftStart={onDraftStart} />
+    </AssistantRuntimeProvider>
+  );
+}
 
-  // The jump button reflects distance-from-bottom on every render.
-  // The pinned *state* is only changed by actual scroll events: a render
-  // re-measure must not disarm the pin, because streaming grows the
-  // content (and thus the distance) before the ResizeObserver below
-  // re-pins — a render-time disarm would cancel auto-follow mid-stream.
-  const updateJump = useCallback(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
-    setShowJump(!atBottom);
-  }, []);
-  useLayoutEffect(updateJump);
-
-  // A real scroll (user or programmatic) is the only pin/disarm signal —
-  // but only *upward* movement disarms. Scroll events fire frame-aligned,
-  // after the component's own re-pin and after interleaved stream commits:
-  // a stale measurement against grown content (distance > 40) would
-  // otherwise disarm the pin mid-stream. Content growth never moves
-  // scrollTop, so "didn't move up" can't be faked by growth.
-  const lastTopRef = useRef(0);
-  const onScroll = useCallback(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
-    const moved = el.scrollTop - lastTopRef.current;
-    lastTopRef.current = el.scrollTop;
-    if (atBottom) pinnedRef.current = true;
-    else if (moved < -2) pinnedRef.current = false;
-    updateJump();
-  }, [updateJump]);
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", updateJump);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updateJump);
-    };
-  }, [onScroll, updateJump]);
-
+function ThreadSurface({ chat, onDraftStart }: ChatThreadProps) {
   const running = chat.status === "submitted" || chat.status === "streaming";
 
-  // Auto-follow: keep the newest content in view while pinned. Streaming
-  // grows scrollHeight without moving scrollTop, so without this the reply
-  // runs off the bottom of the viewport. Two drivers, both needed: the
-  // messages effect re-pins synchronously as parts stream in, and a
-  // ResizeObserver catches height changes no dependency captures (late
-  // markdown layout, action rows, collapsed sections opening).
-  useLayoutEffect(() => {
-    const el = viewportRef.current;
-    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
-  }, [chat.messages, running]);
-  useEffect(() => {
-    const scroller = viewportRef.current;
-    const content = contentRef.current;
-    if (!scroller || !content || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      if (pinnedRef.current) scroller.scrollTop = scroller.scrollHeight;
-    });
-    // The content box for stream growth; the scroller itself for viewport
-    // resizes, which change the distance-to-bottom without resizing content.
-    observer.observe(content);
-    observer.observe(scroller);
-    return () => observer.disconnect();
-  }, []);
-
-  // Sending always re-pins and jumps — the outgoing message must land in
-  // view even if the user had scrolled up to quote something. Keyed on the
-  // message id, not a boolean: after a failed exchange the user message
-  // stays last, and a retry send must still jump.
-  const lastUserMessageId =
-    chat.messages.at(-1)?.role === "user" ? (chat.messages.at(-1)!.id as string) : null;
-  useLayoutEffect(() => {
-    if (lastUserMessageId === null) return;
-    pinnedRef.current = true;
-    const el = viewportRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [lastUserMessageId]);
-
-  // Switching threads (or first mount) starts at the latest message.
-  useLayoutEffect(() => {
-    pinnedRef.current = true;
-    const el = viewportRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [chat.activeThread?.id]);
-
   return (
-    <div
-      style={{
-        height: WORKSPACE_HEIGHT,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 0,
-      }}
+    <ThreadPrimitive.Root
+      style={{ height: WORKSPACE_HEIGHT, minHeight: 0, display: "flex", flexDirection: "column" }}
     >
-      <div
-        ref={viewportRef}
+      <ThreadPrimitive.Viewport
         style={{
           flex: 1,
           minHeight: 0,
@@ -193,24 +104,31 @@ export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
       >
         {chat.messages.length === 0 && !running && <EmptyChat onSuggestion={(p) => void send(p)} />}
 
-        <div
-          ref={contentRef}
-          style={{ ...COLUMN_STYLE, paddingTop: 16, paddingBottom: 8, flex: "0 0 auto" }}
-        >
+        <div style={{ ...COLUMN_STYLE, paddingTop: 16, flex: "1 0 auto" }}>
           <Stack gap={12} role="log" aria-label="Conversation">
-            {chat.messages.map((message, index) =>
-              message.role === "user" ? (
-                <UserMessage key={message.id} chat={chat} message={message} />
-              ) : (
-                <AssistantMessage
-                  key={message.id}
-                  chat={chat}
-                  message={message}
-                  isLast={index === chat.messages.length - 1}
-                  running={running}
-                />
-              ),
-            )}
+            <ThreadPrimitive.Messages>
+              {({ message }) => {
+                // Runtime message ids are opaque and its content drops
+                // step-start markers, so render from the raw UIMessage by
+                // thread position: the runtime observes the very same
+                // `useChat` list. Part ordering (narration hoisted before
+                // its tool call) then uses the same helper as persist
+                // time — one ordering rule, live and reloaded.
+                const raw = chat.messages[message.index];
+                if (!raw || raw.role !== message.role) return null;
+                return message.role === "user" ? (
+                  <UserMessage key={raw.id} chat={chat} message={raw} />
+                ) : (
+                  <AssistantMessage
+                    key={raw.id}
+                    chat={chat}
+                    message={raw}
+                    isLast={message.isLast}
+                    running={running}
+                  />
+                );
+              }}
+            </ThreadPrimitive.Messages>
             {chat.error && (
               <Text size="xs" c="red">
                 {chat.error}
@@ -220,52 +138,44 @@ export function ChatThread({ chat, onDraftStart }: ChatThreadProps) {
         </div>
 
         {/* Composer pinned to the bottom of the viewport while messages
-            scroll underneath it. */}
-        <div
+            scroll underneath it; the primitive reports its height to the
+            viewport's auto-scroll system. */}
+        <ThreadPrimitive.ViewportFooter
           style={{
             ...COLUMN_STYLE,
-            paddingBottom: 16,
-            marginTop: "auto",
             position: "sticky",
             bottom: 0,
             zIndex: 1,
             background: "var(--mantine-color-body)",
+            paddingTop: 8,
+            paddingBottom: 16,
           }}
         >
-          {/* Floating above the composer, out of the scroll flow: an
-              in-flow row would grow scrollHeight on first appear and shove
-              the pinned view 40-odd pixels off the bottom. */}
-          {showJump && (
-            <div
+          <div style={{ position: "relative" }}>
+            {/* Self-hides while at the bottom; scrolls via the runtime. */}
+            <ThreadPrimitive.ScrollToBottom
+              className="jump-to-bottom"
+              aria-label="Scroll to bottom"
               style={{
                 position: "absolute",
                 bottom: "calc(100% + 8px)",
-                left: 0,
-                right: 0,
-                display: "flex",
-                justifyContent: "center",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                border: "1px solid var(--mantine-color-default-border)",
+                background: "var(--mantine-color-body)",
+                cursor: "pointer",
               }}
             >
-              <Tooltip label="Jump to latest" withArrow>
-                <ActionIcon
-                  variant="default"
-                  radius="xl"
-                  aria-label="Scroll to bottom"
-                  style={{ width: 32, height: 32 }}
-                  // Instant, not smooth: a smooth destination clamps at
-                  // call time, so streaming growth during the animation
-                  // lands it short — and disarms follow at the same time.
-                  onClick={() => viewportRef.current?.scrollTo({ top: 1e9 })}
-                >
-                  <ChevronDown size={16} />
-                </ActionIcon>
-              </Tooltip>
-            </div>
-          )}
-          <Composer chat={chat} onDraftStart={onDraftStart} running={running} />
-        </div>
-      </div>
-    </div>
+              <ChevronDown size={16} />
+            </ThreadPrimitive.ScrollToBottom>
+            <Composer chat={chat} onDraftStart={onDraftStart} running={running} />
+          </div>
+        </ThreadPrimitive.ViewportFooter>
+      </ThreadPrimitive.Viewport>
+    </ThreadPrimitive.Root>
   );
 
   async function send(text: string) {
@@ -328,80 +238,82 @@ const ACTION_ICON_SIZE = { width: 26, height: 26 } as const;
 function UserMessage({ chat, message }: { chat: AiChat; message: UIMessage }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const text = textOf(message);
 
   return (
-    <Stack
-      gap={2}
-      align="flex-end"
-      style={{ alignSelf: "flex-end", width: "auto", maxWidth: "80%" }}
-    >
-      {editing ? (
-        <Paper px="sm" py={6} radius="lg" withBorder w="100%">
-          <Stack gap="xs">
-            <Textarea
-              value={draft}
-              onChange={(e) => setDraft(e.currentTarget.value)}
-              autosize
-              minRows={1}
-              data-autofocus
-            />
-            <Group gap="xs" justify="flex-end">
-              <Button variant="subtle" size="compact-xs" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
-              <Button
-                size="compact-xs"
-                onClick={() => {
-                  setEditing(false);
-                  void chat.editUserMessage(message.id, draft);
-                }}
-              >
-                Save & regenerate
-              </Button>
-            </Group>
-          </Stack>
-        </Paper>
-      ) : (
-        <Paper px="sm" py={6} radius="lg" style={{ background: "var(--mantine-color-blue-6)" }}>
-          <Text
-            component="div"
-            fz="sm"
-            c="white"
-            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
-          >
-            {textOf(message)}
-          </Text>
-        </Paper>
-      )}
-
-      {!editing && (
-        <Group gap={2}>
-          <CopyButton value={textOf(message)} />
-          {/* Edit the most recent user turn (even with replies after it) —
-              regenerating drops everything that followed. */}
-          {chat.messages.filter((m) => m.role === "user").at(-1) === message &&
-            chat.status === "ready" && (
-              <Tooltip label="Edit & regenerate" withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  aria-label="Edit message"
-                  style={ACTION_ICON_SIZE}
+    <MessagePrimitive.Root style={{ alignSelf: "flex-end", width: "auto", maxWidth: "80%" }}>
+      <Stack gap={2} align="flex-end">
+        {editing ? (
+          <Paper px="sm" py={6} radius="lg" withBorder w="100%">
+            <Stack gap="xs">
+              <Textarea
+                value={draft}
+                onChange={(e) => setDraft(e.currentTarget.value)}
+                autosize
+                minRows={1}
+                data-autofocus
+              />
+              <Group gap="xs" justify="flex-end">
+                <Button variant="subtle" size="compact-xs" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="compact-xs"
                   onClick={() => {
-                    setDraft(textOf(message));
-                    setEditing(true);
+                    setEditing(false);
+                    void chat.editUserMessage(message.id, draft);
                   }}
                 >
-                  <Pencil size={13} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-        </Group>
-      )}
-    </Stack>
+                  Save & regenerate
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+        ) : (
+          <Paper px="sm" py={6} radius="lg" style={{ background: "var(--mantine-color-blue-6)" }}>
+            <Text
+              component="div"
+              fz="sm"
+              c="white"
+              style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+            >
+              {text}
+            </Text>
+          </Paper>
+        )}
+
+        {!editing && (
+          <Group gap={2}>
+            <CopyButton value={text} />
+            {/* Edit the most recent user turn (even with replies after it) —
+                regenerating drops everything that followed. */}
+            {chat.messages.filter((m) => m.role === "user").at(-1)?.id === message.id &&
+              chat.status === "ready" && (
+                <Tooltip label="Edit & regenerate" withArrow>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    aria-label="Edit message"
+                    style={ACTION_ICON_SIZE}
+                    onClick={() => {
+                      setDraft(text);
+                      setEditing(true);
+                    }}
+                  >
+                    <Pencil size={13} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+          </Group>
+        )}
+      </Stack>
+    </MessagePrimitive.Root>
   );
 }
+
+/** A message part, typed loosely: the chat surface only reads type/text fields. */
+type Part = { type: string; text?: string };
 
 /**
  * Assistant replies render directly on the page (no bubble): each part
@@ -424,49 +336,51 @@ function AssistantMessage({
   // still count as content, but a bare step-start must not.
   const hasContent = parts.some((p) => p.type !== "step-start");
   return (
-    <Stack gap={4} style={{ alignSelf: "flex-start", width: "100%" }}>
-      {parts.map((part, i) => {
-        switch (part.type) {
-          case "reasoning":
-            return (
-              <ReasoningSlot
-                key={`${message.id}-reasoning-${i}`}
-                text={part.text ?? ""}
-                streaming={running && isLast && i === message.parts.length - 1}
-              />
-            );
-          case "text":
-            return <Markdown key={`${message.id}-text-${i}`} text={part.text} />;
-          default:
-            if (part.type.startsWith("tool-")) {
-              return <ToolCard key={`${message.id}-tool-${i}`} part={part} />;
-            }
-            return null;
-        }
-      })}
-      {!hasContent && running && isLast && (
-        <Text size="sm" c="dimmed">
-          Thinking…
-        </Text>
-      )}
-      {!running && isLast && (
-        <Group gap={2}>
-          <CopyButton value={textOf(message)} />
-          <Tooltip label="Regenerate" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label="Regenerate reply"
-              style={ACTION_ICON_SIZE}
-              onClick={() => chat.regenerate()}
-            >
-              <RefreshCw size={13} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      )}
-    </Stack>
+    <MessagePrimitive.Root style={{ width: "100%" }}>
+      <Stack gap={4}>
+        {parts.map((part, i) => {
+          switch (part.type) {
+            case "reasoning":
+              return (
+                <ReasoningSlot
+                  key={`${message.id}-reasoning-${i}`}
+                  text={part.text ?? ""}
+                  streaming={running && isLast && i === message.parts.length - 1}
+                />
+              );
+            case "text":
+              return <Markdown key={`${message.id}-text-${i}`} text={part.text} />;
+            default:
+              if (part.type.startsWith("tool-")) {
+                return <ToolCard key={`${message.id}-tool-${i}`} part={part} />;
+              }
+              return null;
+          }
+        })}
+        {!hasContent && running && isLast && (
+          <Text size="sm" c="dimmed">
+            Thinking…
+          </Text>
+        )}
+        {!running && isLast && (
+          <Group gap={2}>
+            <CopyButton value={textOf(message)} />
+            <Tooltip label="Regenerate" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                aria-label="Regenerate reply"
+                style={ACTION_ICON_SIZE}
+                onClick={() => chat.regenerate()}
+              >
+                <RefreshCw size={13} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        )}
+      </Stack>
+    </MessagePrimitive.Root>
   );
 }
 

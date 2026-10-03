@@ -27,6 +27,9 @@ export default defineConfig({
     },
   },
   test: {
+    // ChatThread ships a scoped css rule (jump-button hiding); load real
+    // css so visibility behavior is exercised in browser tests.
+    css: true,
     include: ["src/**/*.test.{ts,tsx}"],
     testTimeout: 15_000,
     setupFiles: ["./test/setup.ts"],

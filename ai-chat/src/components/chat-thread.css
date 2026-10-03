@@ -1,0 +1,12 @@
+/* The ScrollToBottom primitive renders a disabled button at the bottom —
+   hide it there and let it appear once the user scrolls up. Centering
+   lives here too: an inline `display` would override the disabled rule. */
+.jump-to-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jump-to-bottom:disabled {
+  display: none;
+}
