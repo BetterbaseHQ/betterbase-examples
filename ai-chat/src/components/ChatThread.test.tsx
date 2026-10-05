@@ -176,7 +176,11 @@ describe("ChatThread scrolling (assistant-ui viewport)", () => {
     // a normal { error: true, message } output, not an output-error state.
     expect(await screen.findByText("Web search failed")).toBeVisible();
     await user.click(screen.getByRole("button", { name: /web search failed/i }));
-    expect(await screen.findByText("The search backend is down.")).toBeVisible();
+    // Mantine's Collapse animates height from 0: the text is in the DOM the
+    // moment the chip opens, but stays zero-size until the transition runs.
+    await waitFor(() => expect(screen.getByText("The search backend is down.")).toBeVisible(), {
+      timeout: 4000,
+    });
     // The surrounding reply text still renders.
     expect(screen.getByText("I could not search.")).toBeVisible();
   });
